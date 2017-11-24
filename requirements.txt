@@ -1,0 +1,6 @@
+numpy
+py2neo
+python-evtx
+lxml
+changefinder
+flask
