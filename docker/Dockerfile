@@ -51,7 +51,7 @@ ENV PYTHONIOENCODING=utf-8
 WORKDIR /usr/local/src
 
 RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
-    && cd LogonTracer-Private \
+    && cd LogonTracer \
     && pip3.6 install numpy \
     && pip3.6 install -r requirements.txt \
     && unlink /var/lib/neo4j/data \
@@ -79,7 +79,7 @@ RUN echo "#!/bin/bash" > setup.sh \
     && echo "rm -f /usr/local/src/setup.sh" >> setup.sh \
     && chmod 755 setup.sh
 RUN echo "#!/bin/bash" > run.sh \
-    && echo "cd /usr/local/src/LogonTracer-Private" >> run.sh \
+    && echo "cd /usr/local/src/LogonTracer" >> run.sh \
     && echo "python3 logontracer.py -r -o 8080 -u neo4j -p password -s \${LTHOSTNAME}" >> run.sh \
     && chmod 755 run.sh
 
