@@ -37,11 +37,11 @@
 
 4. Install Python modules.  
   ```shell
-  $ pip install -r requirements.txt
+  $ pip3 install -r requirements.txt
   ```  
   or  
   ```shell
-  $ pip install numpy py2neo python-evtx lxml changefinder flask
+  $ pip3 install numpy py2neo python-evtx lxml changefinder flask
   ```  
   If statsmodels installation fails, install numpy first.  
 
