@@ -133,6 +133,15 @@ def index():
     return render_template("index.html", server_ip=NEO4J_SERVER, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
 
 
+# Web application logs
+@app.route('/log')
+def logs():
+    lf = open("static/logontracer.log", "r")
+    logdata = lf.read()
+    lf.close()
+    return logdata
+
+
 # Web application upload
 @app.route("/upload", methods=["POST"])
 def do_upload():

@@ -991,7 +991,7 @@
 
       function parseEVTX() {
         var xmlhttp2 = new XMLHttpRequest();
-        xmlhttp2.open("GET", "/static/logontracer.log");
+        xmlhttp2.open("GET", "/log");
         xmlhttp2.send();
         xmlhttp2.onreadystatechange = function() {
           if (xmlhttp2.readyState == 4) {
