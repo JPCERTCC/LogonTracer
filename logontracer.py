@@ -472,7 +472,7 @@ def main():
         sys.exit("[!] Flask must be installed for this script.")
 
     try:
-        graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD +"@localhost:" + NEO4J_PORT + "/db/data/"
+        graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD +"@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
         GRAPH = Graph(graph_http)
     except:
         sys.exit("[!] Can't connect Neo4j Database.")
