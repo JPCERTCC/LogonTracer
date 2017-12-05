@@ -9,7 +9,11 @@
   * **4776**: NTLM Authentication  
   * **4672**: Assign special privileges  
 
-  ![LogonTracer sample](images/sample.png)
+  ![LogonTracer sample](images/sample.png)  
+
+  More details are described in the following documents:   
+  https://www.jpcert.or.jp/magazine/acreport-logontracer.html (Japanese)   
+  http://blog.jpcert.or.jp/2017/11/visualise-event-logs-to-identify-compromised-accounts---logontracer-.html (English)
 
 ## Requirements
   The following tools are used
