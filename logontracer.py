@@ -67,7 +67,10 @@ EVENT_ID = [4624, 4625, 4768, 4769, 4776]
 EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
 
 # Flask instance
-app = Flask(__name__)
+if not has_flask:
+    sys.exit("[!] Flask must be installed for this script.")
+else:
+    app = Flask(__name__)
 
 parser = argparse.ArgumentParser(description="Visualizing and analyzing active directory Windows logon event logs.")
 parser.add_argument("-r", "--run", action="store_true", default=False,
@@ -467,9 +470,6 @@ def main():
 
     if not has_changefinder:
         sys.exit("[!] changefinder must be installed for this script.")
-
-    if not has_flask:
-        sys.exit("[!] Flask must be installed for this script.")
 
     try:
         graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD +"@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
