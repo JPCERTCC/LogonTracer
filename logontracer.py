@@ -58,7 +58,7 @@ NEO4J_SERVER = "localhost"
 # neo4j listen port
 NEO4J_PORT = "7474"
 # Web application port
-WEB_PORT = "8080"
+WEB_PORT = 8080
 
 # Check Event Id
 EVENT_ID = [4624, 4625, 4768, 4769, 4776]
@@ -75,7 +75,7 @@ else:
 parser = argparse.ArgumentParser(description="Visualizing and analyzing active directory Windows logon event logs.")
 parser.add_argument("-r", "--run", action="store_true", default=False,
                     help="Start web application.")
-parser.add_argument("-o", "--port", dest="port", action="store", type=str, metavar="PORT",
+parser.add_argument("-o", "--port", dest="port", action="store", type=int, metavar="PORT",
                     help="Port number to be started web application. (default: 8080).")
 parser.add_argument("-s", "--server", dest="server", action="store", type=str, metavar="SERVER",
                     help="Neo4j server. (default: localhost)")
