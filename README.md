@@ -64,7 +64,7 @@
   After importing EVTX, you need to reload the web browser.  
 ##### Use Web GUI
   Event log can be imported with upload EVTX button.  
-  ![Upload EVTX File](images/upload.gif)
+  <kbd>![Upload EVTX File](images/upload.gif)</kbd>
 ##### Use python script
   Event log can be imported by logontracer.py option **-e**.  
   ```shell
