@@ -61,9 +61,10 @@
   Access **http://[LogonTracer_Server]:8080/** via Web browser.  
 #### Import EVTX
   Import the event log using **Web GUI** or **logontracer.py**.  
+  After importing EVTX, you need to reload the web browser.  
 ##### Use Web GUI
   Event log can be imported with upload EVTX button.  
-  ![Upload EVTX File](images/upload.png)
+  ![Upload EVTX File](images/upload.gif)
 ##### Use python script
   Event log can be imported by logontracer.py option **-e**.  
   ```shell
