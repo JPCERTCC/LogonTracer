@@ -74,11 +74,12 @@ RUN touch /etc/supervisord.conf \
 
 ## Create setup file
 RUN echo "#!/bin/bash" > setup.sh \
-    && echo "sleep 30" >> setup.sh \
+    && echo "sleep 40" >> setup.sh \
     && echo "curl -H \"Content-Type: application/json\" -X POST -d '{\"password\":\"password\"}' -u neo4j:neo4j http://localhost:7474/user/neo4j/password" >> setup.sh \
     && echo "rm -f /usr/local/src/setup.sh" >> setup.sh \
     && chmod 755 setup.sh
 RUN echo "#!/bin/bash" > run.sh \
+    && echo "sleep 40" >> run.sh \
     && echo "cd /usr/local/src/LogonTracer" >> run.sh \
     && echo "python3 logontracer.py -r -o 8080 -u neo4j -p password -s \${LTHOSTNAME}" >> run.sh \
     && chmod 755 run.sh

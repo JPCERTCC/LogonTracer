@@ -270,8 +270,9 @@ def parse_evtx(evtx_file, GRAPH):
     print("[*] Parse the EVTX file %s." % evtx_file)
     with Evtx(evtx_file) as evtx:
         fh = evtx.get_file_header()
-        nx_number = fh.next_record_number()
-        print("[*] Next recode number is %i." % int(nx_number))
+        last_chunk = list(evtx.chunks())[-1]
+        last_record = last_chunk.file_first_record_number()
+        print("[*] Last recode number is %i." % int(last_record))
 
     if args.timezone:
         try:
@@ -481,7 +482,7 @@ def main():
 
     if args.run:
         try:
-            app.run(host="0.0.0.0", port=WEB_PORT)
+            app.run(threaded=True, host="0.0.0.0", port=WEB_PORT)
         except:
             sys.exit("[!] Can't runnning web application.")
 
