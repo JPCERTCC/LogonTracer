@@ -270,8 +270,8 @@ def parse_evtx(evtx_file, GRAPH):
     print("[*] Parse the EVTX file %s." % evtx_file)
     with Evtx(evtx_file) as evtx:
         fh = evtx.get_file_header()
-        last_chunk = list(evtx.chunks())[-1]
-        last_record = last_chunk.file_first_record_number()
+        last_chunk = list(evtx.chunks())[-2]
+        last_record = last_chunk.file_last_record_number()
         print("[*] Last recode number is %i." % int(last_record))
 
     if args.timezone:
