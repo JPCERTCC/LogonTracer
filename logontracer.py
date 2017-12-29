@@ -83,8 +83,8 @@ parser.add_argument("-u", "--user", dest="user", action="store", type=str, metav
                     help="Neo4j account name. (default: neo4j)")
 parser.add_argument("-p", "--password", dest="password", action="store", type=str, metavar="PASSWORD",
                     help="Neo4j password. (default: password).")
-parser.add_argument("-e", "--evtx", dest="evtx", action="store", type=str, metavar="EVTX",
-                    help="Import to the AD EVTX file.")
+parser.add_argument("-e", "--evtx", dest="evtx", nargs="*", action="store", type=str, metavar="EVTX",
+                    help="Import to the AD EVTX file. (multiple files OK)")
 parser.add_argument("-z", "--timezone", dest="timezone", action="store", type=int, metavar="UTC",
                     help="Event log time zone. (for example: +9) (default: GMT)")
 parser.add_argument("-f", "--from", dest="fromdate", action="store", type=str, metavar="DATE",
@@ -148,13 +148,17 @@ def logs():
 # Web application upload
 @app.route("/upload", methods=["POST"])
 def do_upload():
+    filelist= ""
     try:
         timezone = request.form["timezone"]
-        file = request.files["file"]
-        if file and file.filename:
-            filename = file.filename
-            file.save(filename)
-        parse_command = "nohup python3 logontracer.py --delete -z " + timezone + " -e " + filename + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " > static/logontracer.log 2>&1 &";
+        for  i in range(0, len(request.files)):
+            loadfile = "file" + str(i)
+            file = request.files[loadfile]
+            if file and file.filename:
+                filename = file.filename
+                file.save(filename)
+                filelist += filename + " "
+        parse_command = "nohup python3 logontracer.py --delete -z " + timezone + " -e " + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " > static/logontracer.log 2>&1 &";
         subprocess.call("rm -f static/logontracer.log > /dev/null", shell=True)
         subprocess.call(parse_command, shell=True)
         #parse_evtx(filename)
@@ -266,13 +270,17 @@ def get_child(node, tag, ns="{http://schemas.microsoft.com/win/2004/08/events/ev
 
 
 # Parse the EVTX file
-def parse_evtx(evtx_file, GRAPH):
-    print("[*] Parse the EVTX file %s." % evtx_file)
-    with Evtx(evtx_file) as evtx:
-        fh = evtx.get_file_header()
-        last_chunk = list(evtx.chunks())[-2]
-        last_record = last_chunk.file_last_record_number()
-        print("[*] Last recode number is %i." % int(last_record))
+def parse_evtx(evtx_list, GRAPH):
+    event_set = []
+    count_set = []
+    ipaddress_set = []
+    username_set = []
+    admins = []
+    sids = {}
+    count = 0
+    record_sum = 0
+    starttime = None
+    endtime = None
 
     if args.timezone:
         try:
@@ -298,111 +306,126 @@ def parse_evtx(evtx_file, GRAPH):
         except:
             sys.exit("[!] To date does not match format '%Y%m%d%H%M%S'.")
 
+    for evtx_file in evtx_list:
+        fb = open(evtx_file, "rb")
+        fb_data = fb.read()[0:8]
+        if fb_data != EVTX_HEADER:
+            sys.exit("[!] This file is not EVTX format {0}.".format(evtx_file))
+        fb.close()
+
+        chunk = -2
+        with Evtx(evtx_file) as evtx:
+            fh = evtx.get_file_header()
+            while True:
+                last_chunk = list(evtx.chunks())[chunk]
+                last_record = last_chunk.file_last_record_number()
+                chunk -= 1
+                if last_record > 0:
+                    record_sum = record_sum + last_record
+                    break
+
+    print("[*] Last recode number is %i." % record_sum)
+
     # Parse Event log
-    event_set = []
-    count_set = []
-    ipaddress_set = []
-    username_set = []
-    admins = []
-    sids = {}
-    count = 0
-    starttime = None
-    endtime = None
     print("[*] Start parsing the EVTX file.")
-    for node, err in xml_records(evtx_file):
-        count += 1
-        if not count % 100:
-            sys.stdout.write("\r[*] Now loading %i records." % count)
-            sys.stdout.flush()
 
-        if err is not None:
-            continue
+    for evtx_file in evtx_list:
+        print("[*] Parse the EVTX file %s." % evtx_file)
 
-        sysev = get_child(node, "System")
-        if int(get_child(sysev, "EventID").text) in EVENT_ID:
-            logtime = get_child(sysev, "TimeCreated").get("SystemTime")
-            etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
-            if args.fromdate or args.todate:
-                if args.fromdate and fdatetime > etime:
-                    continue
-                if args.todate and tdatetime < etime:
-                    endtime = datetime.datetime(*etime.timetuple()[:4])
-                    break
+        for node, err in xml_records(evtx_file):
+            count += 1
+            if not count % 100:
+                sys.stdout.write("\r[*] Now loading %i records." % count)
+                sys.stdout.flush()
 
-            if starttime is None:
-                starttime = datetime.datetime(*etime.timetuple()[:4])
-            elif starttime > etime:
-                starttime = datetime.datetime(*etime.timetuple()[:4])
+            if err is not None:
+                continue
 
-            if endtime is None:
-                endtime = datetime.datetime(*etime.timetuple()[:4])
-            elif endtime < etime:
-                endtime = datetime.datetime(*etime.timetuple()[:4])
-
-            event_data = get_child(node, "EventData")
-            logintype = "-"
-            username = "-"
-            ipaddress = "-"
-            status = "-"
-            sid = "-"
-            for data in event_data:
-                if data.get("Name") in ["IpAddress", "Workstation"] and data.text != None:
-                    ipaddress = data.text.split("@")[0]
-                    ipaddress = ipaddress.lower().replace("::ffff:", "")
-                    ipaddress = ipaddress.replace("\\", "")
-
-                if data.get("Name") in "TargetUserName" and data.text != None:
-                    username = data.text.split("@")[0]
-                    if username[-1:] not in "$":
-                        username = username.lower()
-                    else:
-                        username = "-"
-
-                if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text != None and data.text[0:2] in "S-1":
-                    sid = data.text
-
-                if data.get("Name") in "LogonType":
-                    logintype = int(data.text)
-
-                if data.get("Name") in "Status":
-                    status = data.text
-
-            if username != "-" and ipaddress != "-" and ipaddress != "::1" and ipaddress != "127.0.0.1":
-                event_set.append([int(get_child(sysev, "EventID").text), ipaddress, username, logintype, status])
-                # print("%s,%i,%s,%s,%s,%s" % (int(get_child(sysev, "EventID").text), ipaddress, username, comment, logintype))
-                count_set.append([datetime.datetime(*etime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"), int(get_child(sysev, "EventID").text), username])
-                # print("%s,%s" % (datetime.datetime(*etime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"), username))
-
-                if ipaddress not in ipaddress_set:
-                    ipaddress_set.append(ipaddress)
-
-                if username not in username_set:
-                    username_set.append(username)
-
-                if sid not in "-":
-                    sids[username] = sid
-
-        if int(get_child(sysev, "EventID").text) == 4672:
-            logtime = get_child(sysev, "TimeCreated").get("SystemTime")
-            if args.fromdate or args.todate:
+            sysev = get_child(node, "System")
+            if int(get_child(sysev, "EventID").text) in EVENT_ID:
+                logtime = get_child(sysev, "TimeCreated").get("SystemTime")
                 etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
-                if args.fromdate and fdatetime > etime:
-                    continue
-                if args.todate and tdatetime < etime:
-                    break
+                if args.fromdate or args.todate:
+                    if args.fromdate and fdatetime > etime:
+                        continue
+                    if args.todate and tdatetime < etime:
+                        endtime = datetime.datetime(*etime.timetuple()[:4])
+                        break
 
-            event_data = get_child(node, "EventData")
-            username = "-"
-            for data in event_data:
-                if data.get("Name") in "SubjectUserName" and data.text != None:
-                    username = data.text.split("@")[0]
-                    if username[-1:] not in "$":
-                        username = username.lower()
-                    else:
-                        username = "-"
+                if starttime is None:
+                    starttime = datetime.datetime(*etime.timetuple()[:4])
+                elif starttime > etime:
+                    starttime = datetime.datetime(*etime.timetuple()[:4])
 
-            if username not in admins and username != "-":
-                admins.append(username)
+                if endtime is None:
+                    endtime = datetime.datetime(*etime.timetuple()[:4])
+                elif endtime < etime:
+                    endtime = datetime.datetime(*etime.timetuple()[:4])
+
+                event_data = get_child(node, "EventData")
+                logintype = "-"
+                username = "-"
+                ipaddress = "-"
+                status = "-"
+                sid = "-"
+                for data in event_data:
+                    if data.get("Name") in ["IpAddress", "Workstation"] and data.text != None:
+                        ipaddress = data.text.split("@")[0]
+                        ipaddress = ipaddress.lower().replace("::ffff:", "")
+                        ipaddress = ipaddress.replace("\\", "")
+
+                    if data.get("Name") in "TargetUserName" and data.text != None:
+                        username = data.text.split("@")[0]
+                        if username[-1:] not in "$":
+                            username = username.lower()
+                        else:
+                            username = "-"
+
+                    if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text != None and data.text[0:2] in "S-1":
+                        sid = data.text
+
+                    if data.get("Name") in "LogonType":
+                        logintype = int(data.text)
+
+                    if data.get("Name") in "Status":
+                        status = data.text
+
+                if username != "-" and ipaddress != "-" and ipaddress != "::1" and ipaddress != "127.0.0.1":
+                    event_set.append([int(get_child(sysev, "EventID").text), ipaddress, username, logintype, status])
+                    # print("%s,%i,%s,%s,%s,%s" % (int(get_child(sysev, "EventID").text), ipaddress, username, comment, logintype))
+                    count_set.append([datetime.datetime(*etime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"), int(get_child(sysev, "EventID").text), username])
+                    # print("%s,%s" % (datetime.datetime(*etime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"), username))
+
+                    if ipaddress not in ipaddress_set:
+                        ipaddress_set.append(ipaddress)
+
+                    if username not in username_set:
+                        username_set.append(username)
+
+                    if sid not in "-":
+                        sids[username] = sid
+
+            if int(get_child(sysev, "EventID").text) == 4672:
+                logtime = get_child(sysev, "TimeCreated").get("SystemTime")
+                if args.fromdate or args.todate:
+                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+                    if args.fromdate and fdatetime > etime:
+                        continue
+                    if args.todate and tdatetime < etime:
+                        break
+
+                event_data = get_child(node, "EventData")
+                username = "-"
+                for data in event_data:
+                    if data.get("Name") in "SubjectUserName" and data.text != None:
+                        username = data.text.split("@")[0]
+                        if username[-1:] not in "$":
+                            username = username.lower()
+                        else:
+                            username = "-"
+
+                if username not in admins and username != "-":
+                    admins.append(username)
 
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
@@ -492,18 +515,10 @@ def main():
         print("[*] Delete all nodes and relationships from this Neo4j database.")
 
     if args.evtx:
-        evtx_file = args.evtx
-        try:
-            os.path.exists(evtx_file)
-        except IOError:
-            sys.exit("[!] Can't open file {0}.".format(evtx_file))
-
-        fb = open(evtx_file, "rb")
-        fb_data = fb.read()[0:8]
-        if fb_data != EVTX_HEADER:
-            sys.exit("[!] This file is not EVTX format {0}.".format(evtx_file))
-        fb.close()
-        parse_evtx(evtx_file, GRAPH)
+        for evtx_file in args.evtx:
+            if not os.path.isfile(evtx_file):
+                sys.exit("[!] Can't open file {0}.".format(evtx_file))
+        parse_evtx(args.evtx, GRAPH)
 
     print("[*] Script end. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 

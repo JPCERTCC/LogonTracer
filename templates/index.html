@@ -27,8 +27,8 @@
             <input class="form-control" type="text" value="administrator" id="query-input" size="10">
             <div id="itemForm"></div>
           </div>
-          <input type="button" value="+" onclick="ItemField.add();" />
-          <input type="button" value="-" onclick="ItemField.del();" />
+          <input type="button" class="btn btn-default" value="+" onclick="ItemField.add();" />
+          <input type="button" class="btn btn-default" value="-" onclick="ItemField.del();" />
           <div class="checkbox">
             <a>Event ID: </a>
             <label>
@@ -138,9 +138,9 @@
           </div>
           <div class="modal-body">
             <div id="zoneTime"></div>
-            <input id="lefile" type="file" style="display:none">
             <div class="input-group">
-              <input type="text" id="evtx_name" class="form-control" placeholder="select file...">
+              <input multiple id="lefile" type="file" style="display:none">
+              <input type="text" id="evtx_name" class="form-control" placeholder="select file (multi files) ...">
               <span class="input-group-btn"><button type="button" class="btn btn-info" onclick="$('input[id=lefile]').click();">Browse</button></span>
             </div>
             <div id="uploadBar"></div>
@@ -946,7 +946,10 @@
         document.getElementById("status").innerHTML = '';
 
         var formData = new FormData();
-        formData.append("file", upfile.files[0]);
+        for (var i = 0; i < upfile.files.length; i++) {
+          sendFile = "file" + i
+          formData.append(sendFile, upfile.files[i]);
+        }
         formData.append("timezone", timezone);
         var xmlhttp = new XMLHttpRequest();
         xmlhttp.upload.addEventListener("progress", progressHandler, false);
@@ -990,7 +993,14 @@
       }
 
       $('input[id=lefile]').change(function() {
-        $('#evtx_name').val($(this).val().replace("C:\\fakepath\\", ""));
+        var inFile = "";
+        var fileList = document.getElementById("lefile").files;
+        if ( 1 < fileList.length) {
+          inFile += "selected " + fileList.length + " files."
+        } else {
+          inFile += fileList[0].name
+        }
+        $('#evtx_name').val(inFile.replace("C:\\fakepath\\", ""));
       });
 
       function parseEVTX() {
