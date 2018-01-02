@@ -5,9 +5,12 @@
   <meta charset="utf-8">
   <title>LogonTracer</title>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+  <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.css" integrity="sha384-EG4MkHYaMXjB6f2q1t0Jfs+W6DpGsGZls4D6PYHr9yhXwZf27Z10ReappeV2ZXcU" crossorigin="anonymous">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.js" integrity="sha384-6pAYkjo39N26cI9QEzy7zTD9xr9XzSnaWywG02LeFyoJnBEyYvWvqomLU+uGAlaw" crossorigin="anonymous"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.1.1/cytoscape.min.js" integrity="sha256-lEMQOla3MoXVNUAEGAuu4n1XouEYLyZP3SRqe6BhpTY=" crossorigin="anonymous"></script>
+  <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-qtip/2.7.1/cytoscape-qtip.js" integrity="sha384-iEsLCgQ6cKWEBnP+3Yd8hsUSvCzDYQU/UUVvXzB10FMtPexDn68x5Sem24bboY4I" crossorigin="anonymous"></script>
   <!-- Neo4j JavaScript Driver -->
   <script src="/static/node_modules/neo4j-driver/lib/browser/neo4j-web.js"></script>
 </head>
@@ -90,6 +93,16 @@
             <input type="checkbox" name="options" id="label-type" autocomplete="off">Type</label>
           <label class="btn btn-default">
             <input type="checkbox" name="options" id="label-status" autocomplete="off">Status</label>
+        </div>
+        <hr>
+        <a>Graph mode</a><br>
+        <div class="btn-group" data-toggle="buttons">
+	        <label class="btn btn-default active">
+		        <input type="radio" id="modeGrid" name="graphmode" checked="checked">grid</label>
+	        <label class="btn btn-default">
+		        <input type="radio" id="modeCose" name="graphmode">cose</label>
+          <label class="btn btn-default">
+		        <input type="radio" id="modeCircle" name="graphmode">circle</label>
         </div>
         <hr>
         <a>Timeline</a><br>
@@ -233,29 +246,31 @@
               nname = path[idx].properties.user
               nfsize = "10"
               nshape = "ellipse"
+              nwidth = "25"
+              nheight = "25"
+              ntype = "User"
               if (path[idx].properties.rights == "system") {
-                nwidth = "22"
-                nheight = "22"
                 ncolor = "#ff0000"
                 nbcolor = "#ffc0cb"
                 nfcolor = "#ff69b4"
+                nprivilege = "SYSTEM"
               } else {
-                nwidth = "15"
-                nheight = "15"
                 ncolor = "#0000cd"
                 nbcolor = "#cee1ff"
                 nfcolor = "#6da0f2"
+                nprivilege = "Normal"
               }
             }
             if (path[idx].labels[0] == "IPAddress") {
               nname = path[idx].properties.IP
               nshape = "diamond"
-              nwidth = "15"
-              nheight = "15"
+              nwidth = "25"
+              nheight = "25"
               nfsize = "8"
               ncolor = "#2e8b57"
               nbcolor = "#98fb98"
               nfcolor = "#3cb371"
+              ntype = "Host"
             }
             graph.nodes.push({
               "data": {
@@ -270,6 +285,9 @@
                 "nfsize": nfsize,
                 "nshape": nshape,
                 "label": path[idx].labels[0],
+                "nprivilege": nprivilege,
+                "ntype": ntype,
+                "nsid": path[idx].properties.sid
               }
             });
           } else {
@@ -304,7 +322,12 @@
                 "objid": objid,
                 "elabel": ename,
                 "label": path[idx].type,
-                "distance": 5
+                "distance": 5,
+                "ntype": "edge",
+                "eid": path[idx].properties.id.low,
+                "count": path[idx].properties.count.low,
+                "logontype": path[idx].properties.logintype,
+                "status": path[idx].properties.status
               }
             });
           }
@@ -314,10 +337,24 @@
       }
 
       function drawGraph(graph, rootNode) {
+        var flagGrid = document.getElementById("modeGrid").checked;
+        var flagCose = document.getElementById("modeCose").checked;
+        var flagCircle = document.getElementById("modeCircle").checked;
+        var flagMode = "";
+
+        if (flagGrid) {
+          flagMode = "grid";
+        }
+        if (flagCose) {
+          flagMode = "cose";
+        }
+        if (flagCircle) {
+          flagMode = "circle";
+        }
+
         cy = cytoscape({
           container: document.getElementById("cy"),
           boxSelectionEnabled: false,
-          autounselectify: true,
           style: cytoscape.stylesheet()
             .selector('node').css({
               "content": "data(nlabel)",
@@ -329,7 +366,16 @@
               "border-color": "data(nfcolor)",
               "border-style": "solid",
               "border-width": 3,
+              "text-valign": "center",
+              "text-outline-width": 1,
+              "text-outline-color": "data(nbcolor)",
               "shape": "data(nshape)"
+            })
+            .selector(':selected').css({
+              "width": 25,
+              "height": 25,
+              "border-width": 4,
+              "border-color": "#404040"
             })
             .selector('edge').css({
               "content": "data(elabel)",
@@ -348,7 +394,7 @@
             }),
           elements: graph,
           layout: {
-            name: 'cose',
+            name: flagMode,
             directed: true,
             roots: rootNode,
             animate: true,
@@ -356,9 +402,73 @@
           }
         });
 
-        cy.on('click', 'node', function(event) {
-          console.log("clicked", this, event, this.id());
+          cy.nodes().forEach(function(ele) {
+          ele.qtip({
+            content: {
+              title: "<b>Node Details</b>",
+              text: qtipNode(ele)
+            },
+            style: {
+              classes: 'qtip-bootstrap'
+            },
+            position: {
+              my: 'top center',
+              at: 'bottom center',
+              target: ele
+            }
+          });
         });
+
+        cy.edges().forEach(function(ele) {
+          ele.qtip({
+            content: {
+              title: "<b>Event Details</b>",
+              text: qtipEdge(ele)
+            },
+            style: {
+              classes: 'qtip-bootstrap'
+            },
+            position: {
+              my: 'top center',
+              at: 'bottom center',
+              target: ele
+            }
+          });
+        });
+      }
+
+      function qtipNode(ndata) {
+        var qtext = 'Name: ' + ndata._private.data["nlabel"];
+        if ( ndata._private.data["ntype"] == "User" ) {
+          qtext += '<br>Privilege: ' + ndata._private.data["nprivilege"];
+          qtext += '<br>SID: ' + ndata._private.data["nsid"];
+        }
+        qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
+
+        return qtext;
+      }
+
+      function qtipEdge(ndata) {
+        var qtext = "";
+        if ( ndata._private.data["eid"] == 4624 ){
+          qtext = "<b>Successful logon</b><br>";
+        }
+        if ( ndata._private.data["eid"] == 4625 ){
+          qtext = "<b>Logon failure</b><br>";
+        }
+        if ( ndata._private.data["eid"] == 4768 ){
+          qtext = "<b>Kerberos Authentication (TGT Request)</b><br>";
+        }
+        if ( ndata._private.data["eid"] == 4769 ){
+          qtext = "<b>Kerberos Service Ticket (ST Request)</b><br>";
+        }
+        if ( ndata._private.data["eid"] == 4776 ){
+          qtext = "<b>NTLM Authentication</b><br>";
+        }
+        qtext += "Count: " + ndata._private.data["count"];
+        qtext += "<br>Logon Type: " + ndata._private.data["logontype"];
+        qtext += "<br>Status: " + ndata._private.data["status"];
+        return qtext;
       }
 
       function createAllQuery() {
@@ -1019,6 +1129,7 @@
                 document.getElementById("uploadBar").innerHTML = '<h4>Parsing  ...</h4><div class="progress"><div class="progress-bar progress-bar-striped active" role="progressbar" style="width: ' + Math.round(percent) + '%;">' + Math.round(percent) + '%</div></div>';
               } else if (nowdata.indexOf("Script end") != -1) {
                 document.getElementById("uploadBar").innerHTML = '<h4>Parsing  ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">SUCCESS</div></div>';
+                document.getElementById("status").innerHTML = '<div class="alert alert-info"><strong>Import Success</strong>: You need to reload the web page.</div>';
                 parse_status = true;
               } else if (nowdata.indexOf("[!]") != -1) {
                 document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: EVTX parse Failed!</div>';
