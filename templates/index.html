@@ -60,10 +60,10 @@
               Export <span class="caret"></span>
             </a>
             <ul class="dropdown-menu" role="menu">
-              <li role="presentation"><a href="#" download="image.csv" id="export-csv" onclick="exportCSV()">CSV</a></li>
-              <li role="presentation"><a href="#" download="image.json" id="export-json" onclick="exportJSON()">JSON</a></li>
-              <li role="presentation"><a href="#" download="image.png" id="export-png" onclick="exportPNG()">PNG</a></li>
-              <li role="presentation"><a href="#" download="image.jpeg" id="export-jpeg" onclick="exportJPEG()">JPEG</a></li>
+              <li role="presentation"><a onclick="exportCSV()">CSV</a></li>
+              <li role="presentation"><a download="image.json" id="export-json" onclick="exportJSON()">JSON</a></li>
+              <li role="presentation"><a download="image.png" id="export-png" onclick="exportPNG()">PNG</a></li>
+              <li role="presentation"><a download="image.jpeg" id="export-jpeg" onclick="exportJPEG()">JPEG</a></li>
             </ul>
           </div>
         </form>
@@ -115,8 +115,8 @@
             Download <span class="caret"></span>
           </button>
           <ul class="dropdown-menu" role="menu">
-            <li role="presentation"><a href="#" download="summary.csv" id="downloadsum-csv" onclick="downloadSummary()">Summary</a></li>
-            <li role="presentation"><a href="#" download="details.csv" id="downloaddet-csv" onclick="downloadDetail()">Details</a></li>
+            <li role="presentation"><a onclick="downloadSummary()">Summary</a></li>
+            <li role="presentation"><a onclick="downloadDetail()">Details</a></li>
           </ul>
         </div>
         <hr>
@@ -180,9 +180,6 @@
       var ipqueryStr = 'MATCH (node:IPAddress) RETURN node';
       pagerankQuery(userqueryStr, "User", rankpageUser);
       pagerankQuery(ipqueryStr, "Host", rankpageHost);
-      exportCSV();
-      downloadSummary();
-      downloadDetail();
 
       var currentNumber = 0;
       var ItemField = {
@@ -736,11 +733,11 @@
                 rowData += events[i][4] + ",";
                 rowData += events[i][5] + "\r\n";
               }
-              var csvData = "data:application/csv,";
-              csvData += encodeURIComponent(rowData);
-              var exptag = document.getElementById('export-csv');
-              exptag.href = csvData;
-
+              var downLoadLink = document.createElement("a");
+              downLoadLink.download = "image.csv";
+              downLoadLink.href = URL.createObjectURL(new Blob([rowData], {type: "application.csv"}));
+              downLoadLink.dataset.downloadurl = ["application/csv", downLoadLink.download, downLoadLink.href].join(":");
+              downLoadLink.click();
             },
             onError: function(error) {
               console.log("Error: ", error);
@@ -823,15 +820,12 @@
                 }
               }
 
-              var csvData = "data:application/csv,";
-              csvData += encodeURIComponent(rawDate + "\r\n");
-              csvData += encodeURIComponent(countData);
-              if (csvType == "summary") {
-                var exptag = document.getElementById('downloadsum-csv');
-              } else if (csvType == "detail") {
-                var exptag = document.getElementById('downloaddet-csv');
-              }
-              exptag.href = csvData;
+              rawDate += "\r\n" + countData
+              var downLoadLink = document.createElement("a");
+              downLoadLink.download = "timeline.csv";
+              downLoadLink.href = URL.createObjectURL(new Blob([rawDate], {type: "application.csv"}));
+              downLoadLink.dataset.downloadurl = ["application/csv", downLoadLink.download, downLoadLink.href].join(":");
+              downLoadLink.click();
             },
             onError: function(error) {
               console.log("Error: ", error);
