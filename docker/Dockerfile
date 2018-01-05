@@ -25,9 +25,7 @@ RUN apk add --no-cache \
     bash \
     curl \
     python \
-    py-pip \
-    nodejs \
-    nodejs-npm
+    py-pip
 
 ## python3.6 and modules install
 ENV PYTHON_VERSION=3.6.2 \
@@ -57,8 +55,6 @@ RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && unlink /var/lib/neo4j/data \
     && mkdir -p /var/lib/neo4j/data/databases \
     && tar xzf sample/graph.db.tar.gz -C /var/lib/neo4j/data/databases \
-    && cd static \
-    && npm install neo4j-driver \
     && echo "dbms.allow_format_migration=true" >> /var/lib/neo4j/conf/neo4j.conf
 
 ## Create supervisord.conf
