@@ -136,6 +136,12 @@ def index():
     return render_template("index.html", server_ip=NEO4J_SERVER, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
 
 
+# Timeline view
+@app.route('/timeline')
+def timeline():
+    return render_template("timeline.html", server_ip=NEO4J_SERVER, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
+
+
 # Web application logs
 @app.route('/log')
 def logs():

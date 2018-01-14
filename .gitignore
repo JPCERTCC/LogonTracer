@@ -1,2 +1,3 @@
-static/*
-!.gitkeep
+*.pyc
+*~
+*.bak
