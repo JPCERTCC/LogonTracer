@@ -25,7 +25,8 @@ RUN apk add --no-cache \
     bash \
     curl \
     python \
-    py-pip
+    py-pip \
+    libssl1.0
 
 ## python3.6 and modules install
 ENV PYTHON_VERSION=3.6.2 \
