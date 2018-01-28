@@ -72,6 +72,7 @@ function buildGraph(graph, path) {
       var label_count = document.getElementById("label-count").checked;
       var label_type = document.getElementById("label-type").checked;
       var label_status = document.getElementById("label-status").checked;
+      var label_authname = document.getElementById("label-authname").checked;
       var ename = path[idx].properties.id.low;
       if (label_count) {
         ename += " : " + path[idx].properties.count.low;
@@ -81,6 +82,9 @@ function buildGraph(graph, path) {
       }
       if (label_status) {
         ename += " : " + path[idx].properties.status;
+      }
+      if (label_authname) {
+        ename += " : " + path[idx].properties.authname;
       }
       for (nidx in graph.edges) {
         if (graph.edges[nidx].data.objid == objid) {
@@ -103,7 +107,8 @@ function buildGraph(graph, path) {
           "eid": path[idx].properties.id.low,
           "count": path[idx].properties.count.low,
           "logontype": path[idx].properties.logintype,
-          "status": path[idx].properties.status
+          "status": path[idx].properties.status,
+          "authname": path[idx].properties.authname
         }
       });
     }
@@ -243,6 +248,7 @@ function qtipEdge(ndata) {
   }
   qtext += "Count: " + ndata._private.data["count"];
   qtext += "<br>Logon Type: " + ndata._private.data["logontype"];
+  qtext += "<br>AuthName: " + ndata._private.data["authname"];
   qtext += "<br>Status: " + ndata._private.data["status"];
   return qtext;
 }
@@ -298,6 +304,12 @@ function create14068Query() {
 
 function createFailQuery() {
   queryStr = 'MATCH (user)-[event]-(ip) WHERE event.id = 4625 RETURN user, event, ip'
+  //console.log(queryStr);
+  executeQuery(queryStr);
+}
+
+function createNTLMQuery() {
+  queryStr = 'MATCH (user)-[event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 RETURN user, event, ip'
   //console.log(queryStr);
   executeQuery(queryStr);
 }
@@ -498,19 +510,21 @@ function exportCSV() {
         ipData = record.get("ip");
         events.push([userData.properties.user, ipData.properties.IP,
           eventData.properties.id, eventData.properties.logintype,
-          eventData.properties.status, eventData.properties.count
+          eventData.properties.status, eventData.properties.count,
+          eventData.properties.authname
         ]);
       },
       onCompleted: function() {
         session.close();
-        var rowData = "username,host,id,logontype,status,count\r\n";
+        var rowData = "username,host,id,logontype,status,count,authname\r\n";
         for (i = 0; i < events.length; i++) {
           rowData += events[i][0] + ",";
           rowData += events[i][1] + ",";
           rowData += events[i][2] + ",";
           rowData += events[i][3] + ",";
           rowData += events[i][4] + ",";
-          rowData += events[i][5] + "\r\n";
+          rowData += events[i][5] + ",";
+          rowData += events[i][6] + "\r\n";
         }
         var downLoadLink = document.createElement("a");
         downLoadLink.download = "image.csv";

@@ -77,13 +77,14 @@
       <div class="col-sm-2 col-md-2 sidebar">
         <div class="list-group">
           <button type="button" class="list-group-item" onclick="createAllQuery()">All Users</button>
-          <button type="button" class="list-group-item" onclick="createSystemQuery()">SYSTEM privileges</button>
+          <button type="button" class="list-group-item" onclick="createSystemQuery()">SYSTEM Privileges</button>
+          <button type="button" class="list-group-item" onclick="createNTLMQuery()">NTLM Remote Logon</button>
           <button type="button" class="list-group-item" onclick="createRDPQuery()">RDP Logon</button>
           <button type="button" class="list-group-item" onclick="createNetQuery()">Network Logon</button>
           <button type="button" class="list-group-item" onclick="createBatchQuery()">Batch Logon</button>
           <button type="button" class="list-group-item" onclick="createServiceQuery()">Service Logon</button>
-          <button type="button" class="list-group-item" onclick="create14068Query()">ms14-068 exploit failure</button>
-          <button type="button" class="list-group-item" onclick="createFailQuery()">Logon failure</button>
+          <button type="button" class="list-group-item" onclick="create14068Query()">MS14-068 Exploit Failure</button>
+          <button type="button" class="list-group-item" onclick="createFailQuery()">Logon Failure</button>
         </div>
         <hr>
         <a>Add event value</a><br>
@@ -94,6 +95,8 @@
             <input type="checkbox" name="options" id="label-type" autocomplete="off">Type</label>
           <label class="btn btn-default">
             <input type="checkbox" name="options" id="label-status" autocomplete="off">Status</label>
+          <label class="btn btn-default">
+            <input type="checkbox" name="options" id="label-authname" autocomplete="off">AuthName</label>
         </div>
         <hr>
         <a>Graph mode</a><br>

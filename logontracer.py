@@ -61,7 +61,7 @@ NEO4J_PORT = "7474"
 WEB_PORT = 8080
 
 # Check Event Id
-EVENT_ID = [4624, 4625, 4768, 4769, 4776]
+EVENT_ID = [4624, 4625, 4768, 4769, 4776, 4672]
 
 # EVTX Header
 EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
@@ -108,7 +108,7 @@ statement_ip = """
 statement_r = """
   MATCH (user:Username{ user:{user} })
   MATCH (ip:IPAddress{ IP:{IP} })
-  CREATE (ip)-[event:Event]->(user) set event.id={id}, event.logintype={logintype}, event.status={status}, event.count={count}
+  CREATE (ip)-[event:Event]->(user) set event.id={id}, event.logintype={logintype}, event.status={status}, event.count={count} , event.authname={authname}
 
   RETURN user, ip
   """
@@ -258,8 +258,10 @@ def pagerank(event_set_uniq):
 
 
 def to_lxml(record_xml):
-    record_xml = record_xml.encode("utf-8")
-    return etree.fromstring(record_xml)
+    rep_xml = record_xml.replace("xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"", "")
+    set_xml = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>%s" % rep_xml
+    fin_xml = set_xml.encode("utf-8")
+    return etree.fromstring(fin_xml)
 
 
 def xml_records(filename):
@@ -269,10 +271,6 @@ def xml_records(filename):
                 yield to_lxml(xml), None
             except etree.XMLSyntaxError as e:
                 yield xml, e, fh
-
-
-def get_child(node, tag, ns="{http://schemas.microsoft.com/win/2004/08/events/event}"):
-    return node.find("%s%s" % (ns, tag))
 
 
 # Parse the EVTX file
@@ -330,7 +328,7 @@ def parse_evtx(evtx_list, GRAPH):
                     record_sum = record_sum + last_record
                     break
 
-    print("[*] Last recode number is %i." % record_sum)
+    print("[*] Last record number is %i." % record_sum)
 
     # Parse Event log
     print("[*] Start parsing the EVTX file.")
@@ -340,6 +338,8 @@ def parse_evtx(evtx_list, GRAPH):
 
         for node, err in xml_records(evtx_file):
             count += 1
+            eventid = int(node.xpath("/Event/System/EventID")[0].text)
+
             if not count % 100:
                 sys.stdout.write("\r[*] Now loading %i records." % count)
                 sys.stdout.flush()
@@ -347,91 +347,86 @@ def parse_evtx(evtx_list, GRAPH):
             if err is not None:
                 continue
 
-            sysev = get_child(node, "System")
-            if int(get_child(sysev, "EventID").text) in EVENT_ID:
-                logtime = get_child(sysev, "TimeCreated").get("SystemTime")
+            if eventid in EVENT_ID:
+                logtime = node.xpath("/Event/System/TimeCreated")[0].get("SystemTime")
                 etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+                stime = datetime.datetime(*etime.timetuple()[:4])
                 if args.fromdate or args.todate:
                     if args.fromdate and fdatetime > etime:
                         continue
                     if args.todate and tdatetime < etime:
-                        endtime = datetime.datetime(*etime.timetuple()[:4])
+                        endtime = stime
                         break
 
                 if starttime is None:
-                    starttime = datetime.datetime(*etime.timetuple()[:4])
+                    starttime = stime
                 elif starttime > etime:
-                    starttime = datetime.datetime(*etime.timetuple()[:4])
+                    starttime = stime
 
                 if endtime is None:
-                    endtime = datetime.datetime(*etime.timetuple()[:4])
+                    endtime = stime
                 elif endtime < etime:
-                    endtime = datetime.datetime(*etime.timetuple()[:4])
+                    endtime = stime
 
-                event_data = get_child(node, "EventData")
+                event_data = node.xpath("/Event/EventData/Data")
                 logintype = "-"
                 username = "-"
                 ipaddress = "-"
                 status = "-"
                 sid = "-"
-                for data in event_data:
-                    if data.get("Name") in ["IpAddress", "Workstation"] and data.text != None:
-                        ipaddress = data.text.split("@")[0]
-                        ipaddress = ipaddress.lower().replace("::ffff:", "")
-                        ipaddress = ipaddress.replace("\\", "")
+                authname = "-"
 
-                    if data.get("Name") in "TargetUserName" and data.text != None:
-                        username = data.text.split("@")[0]
-                        if username[-1:] not in "$":
-                            username = username.lower()
-                        else:
-                            username = "-"
+                if eventid == 4672:
+                    for data in event_data:
+                        if data.get("Name") in "SubjectUserName" and data.text != None:
+                            username = data.text.split("@")[0]
+                            if username[-1:] not in "$":
+                                username = username.lower()
+                            else:
+                                username = "-"
 
-                    if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text != None and data.text[0:2] in "S-1":
-                        sid = data.text
+                    if username not in admins and username != "-":
+                        admins.append(username)
+                else:
+                    for data in event_data:
+                        if data.get("Name") in ["IpAddress", "Workstation"] and data.text != None:
+                            ipaddress = data.text.split("@")[0]
+                            ipaddress = ipaddress.lower().replace("::ffff:", "")
+                            ipaddress = ipaddress.replace("\\", "")
 
-                    if data.get("Name") in "LogonType":
-                        logintype = int(data.text)
+                        if data.get("Name") in "TargetUserName" and data.text != None:
+                            username = data.text.split("@")[0]
+                            if username[-1:] not in "$":
+                                username = username.lower()
+                            else:
+                                username = "-"
 
-                    if data.get("Name") in "Status":
-                        status = data.text
+                        if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text != None and data.text[0:2] in "S-1":
+                            sid = data.text
 
-                if username != "-" and ipaddress != "-" and ipaddress != "::1" and ipaddress != "127.0.0.1":
-                    event_set.append([int(get_child(sysev, "EventID").text), ipaddress, username, logintype, status])
-                    # print("%s,%i,%s,%s,%s,%s" % (int(get_child(sysev, "EventID").text), ipaddress, username, comment, logintype))
-                    count_set.append([datetime.datetime(*etime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"), int(get_child(sysev, "EventID").text), username])
-                    # print("%s,%s" % (datetime.datetime(*etime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"), username))
+                        if data.get("Name") in "LogonType":
+                            logintype = int(data.text)
 
-                    if ipaddress not in ipaddress_set:
-                        ipaddress_set.append(ipaddress)
+                        if data.get("Name") in "Status":
+                            status = data.text
 
-                    if username not in username_set:
-                        username_set.append(username)
+                        if data.get("Name") in "AuthenticationPackageName":
+                            authname = data.text
 
-                    if sid not in "-":
-                        sids[username] = sid
+                    if username != "-" and ipaddress != "-" and ipaddress != "::1" and ipaddress != "127.0.0.1":
+                        event_set.append([eventid, ipaddress, username, logintype, status, authname])
+                        # print("%s,%i,%s,%s,%s,%s" % (eventid, ipaddress, username, comment, logintype))
+                        count_set.append([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username])
+                        # print("%s,%s" % (stime.strftime("%Y-%m-%d %H:%M:%S"), username))
 
-            if int(get_child(sysev, "EventID").text) == 4672:
-                logtime = get_child(sysev, "TimeCreated").get("SystemTime")
-                if args.fromdate or args.todate:
-                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
-                    if args.fromdate and fdatetime > etime:
-                        continue
-                    if args.todate and tdatetime < etime:
-                        break
+                        if ipaddress not in ipaddress_set:
+                            ipaddress_set.append(ipaddress)
 
-                event_data = get_child(node, "EventData")
-                username = "-"
-                for data in event_data:
-                    if data.get("Name") in "SubjectUserName" and data.text != None:
-                        username = data.text.split("@")[0]
-                        if username[-1:] not in "$":
-                            username = username.lower()
-                        else:
-                            username = "-"
+                        if username not in username_set:
+                            username_set.append(username)
 
-                if username not in admins and username != "-":
-                    admins.append(username)
+                        if sid not in "-":
+                            sids[username] = sid
 
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
@@ -475,7 +470,7 @@ def parse_evtx(evtx_list, GRAPH):
 
     for events, count in event_set_uniq:
         tx.append(statement_r, {"user": events[2], "IP": events[1], "id": events[0], "logintype": events[3],
-                                               "status": events[4], "count": count})
+                                               "status": events[4], "count": count, "authname": events[5]})
 
     tx.append(statement_date, {"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
                                                  "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")})
