@@ -320,13 +320,16 @@ def parse_evtx(evtx_list, GRAPH):
         chunk = -2
         with Evtx(evtx_file) as evtx:
             fh = evtx.get_file_header()
-            while True:
-                last_chunk = list(evtx.chunks())[chunk]
-                last_record = last_chunk.file_last_record_number()
-                chunk -= 1
-                if last_record > 0:
-                    record_sum = record_sum + last_record
-                    break
+            try:
+                while True:
+                    last_chunk = list(evtx.chunks())[chunk]
+                    last_record = last_chunk.file_last_record_number()
+                    chunk -= 1
+                    if last_record > 0:
+                        record_sum = record_sum + last_record
+                        break
+            except:
+                record_sum = fh.next_record_number()
 
     print("[*] Last record number is %i." % record_sum)
 
