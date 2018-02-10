@@ -118,6 +118,19 @@ statement_date = """
   RETURN date
   """
 
+statement_domain = """
+  MERGE (domain:Domain{ domain:{domain} })
+  RETURN domain
+  """
+
+statement_dr = """
+  MATCH (domain:Domain{ domain:{domain} })
+  MATCH (user:Username{ user:{user} })
+  CREATE (user)-[group:Group]->(domain)
+
+  RETURN user, domain
+  """
+
 if args.user:
     NEO4J_USER = args.user
 
@@ -279,7 +292,9 @@ def parse_evtx(evtx_list, GRAPH):
     count_set = []
     ipaddress_set = []
     username_set = []
+    domain_set = []
     admins = []
+    domains = []
     sids = {}
     count = 0
     record_sum = 0
@@ -374,6 +389,7 @@ def parse_evtx(evtx_list, GRAPH):
                 event_data = node.xpath("/Event/EventData/Data")
                 logintype = "-"
                 username = "-"
+                domain = "-"
                 ipaddress = "-"
                 status = "-"
                 sid = "-"
@@ -404,6 +420,9 @@ def parse_evtx(evtx_list, GRAPH):
                             else:
                                 username = "-"
 
+                        if data.get("Name") in "TargetDomainName" and data.text != None:
+                            domain = data.text
+
                         if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text != None and data.text[0:2] in "S-1":
                             sid = data.text
 
@@ -421,12 +440,17 @@ def parse_evtx(evtx_list, GRAPH):
                         # print("%s,%i,%s,%s,%s,%s" % (eventid, ipaddress, username, comment, logintype))
                         count_set.append([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username])
                         # print("%s,%s" % (stime.strftime("%Y-%m-%d %H:%M:%S"), username))
+                        if domain != "-":
+                            domain_set.append([username, domain])
 
                         if ipaddress not in ipaddress_set:
                             ipaddress_set.append(ipaddress)
 
                         if username not in username_set:
                             username_set.append(username)
+
+                        if domain not in domains and domain != "-":
+                            domains.append(domain)
 
                         if sid not in "-":
                             sids[username] = sid
@@ -439,6 +463,7 @@ def parse_evtx(evtx_list, GRAPH):
     event_set_uniq = [(g[0], len(list(g[1]))) for g in itertools.groupby(event_set)]
     count_set.sort()
     count_set_uniq = [(g[0], len(list(g[1]))) for g in itertools.groupby(count_set)]
+    domain_set_uniq = list(map(list, set(map(tuple, domain_set))))
 
     # Calculate PageRank
     print("[*] Calculate PageRank.")
@@ -471,9 +496,15 @@ def parse_evtx(evtx_list, GRAPH):
                                                     "detect": ",".join(map(str, detects[i]))})
         i += 1
 
+    for domain in domains:
+        tx.append(statement_domain, {"domain": domain})
+
     for events, count in event_set_uniq:
         tx.append(statement_r, {"user": events[2], "IP": events[1], "id": events[0], "logintype": events[3],
                                                "status": events[4], "count": count, "authname": events[5]})
+
+    for username, domain in domain_set_uniq:
+        tx.append(statement_dr, {"user": username, "domain": domain})
 
     tx.append(statement_date, {"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
                                                  "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")})

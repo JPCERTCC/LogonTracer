@@ -47,6 +47,19 @@ function buildGraph(graph, path) {
         nbcolor = "#98fb98"
         nfcolor = "#3cb371"
         ntype = "Host"
+        nprivilege = "No"
+      }
+      if (path[idx].labels[0] == "Domain") {
+        nname = path[idx].properties.domain
+        nshape = "rectangle"
+        nwidth = "25"
+        nheight = "25"
+        nfsize = "10"
+        ncolor = "#8b2e86"
+        nbcolor = "#fa98ef"
+        nfcolor = "#b23aa2"
+        ntype = "Domain"
+        nprivilege = "No"
       }
       graph.nodes.push({
         "data": {
@@ -69,23 +82,6 @@ function buildGraph(graph, path) {
     } else {
       // Relationship
       var ldupflg = false;
-      var label_count = document.getElementById("label-count").checked;
-      var label_type = document.getElementById("label-type").checked;
-      var label_status = document.getElementById("label-status").checked;
-      var label_authname = document.getElementById("label-authname").checked;
-      var ename = path[idx].properties.id.low;
-      if (label_count) {
-        ename += " : " + path[idx].properties.count.low;
-      }
-      if (label_type) {
-        ename += " : " + path[idx].properties.logintype;
-      }
-      if (label_status) {
-        ename += " : " + path[idx].properties.status;
-      }
-      if (label_authname) {
-        ename += " : " + path[idx].properties.authname;
-      }
       for (nidx in graph.edges) {
         if (graph.edges[nidx].data.objid == objid) {
           ldupflg = true;
@@ -94,23 +90,54 @@ function buildGraph(graph, path) {
       if (ldupflg) {
         continue;
       }
-      graph.edges.push({
-        "data": {
-          "id": objid,
-          "source": parseInt(path[parseInt(idx) - 1].identity.low) + 100,
-          "target": parseInt(path[parseInt(idx) + 1].identity.low) + 100,
-          "objid": objid,
-          "elabel": ename,
-          "label": path[idx].type,
-          "distance": 5,
-          "ntype": "edge",
-          "eid": path[idx].properties.id.low,
-          "count": path[idx].properties.count.low,
-          "logontype": path[idx].properties.logintype,
-          "status": path[idx].properties.status,
-          "authname": path[idx].properties.authname
+      if (path[idx].type == "Event") {
+        var label_count = document.getElementById("label-count").checked;
+        var label_type = document.getElementById("label-type").checked;
+        var label_status = document.getElementById("label-status").checked;
+        var label_authname = document.getElementById("label-authname").checked;
+        var ename = path[idx].properties.id.low;
+        if (label_count) {
+          ename += " : " + path[idx].properties.count.low;
         }
-      });
+        if (label_type) {
+          ename += " : " + path[idx].properties.logintype;
+        }
+        if (label_status) {
+          ename += " : " + path[idx].properties.status;
+        }
+        if (label_authname) {
+          ename += " : " + path[idx].properties.authname;
+        }
+        graph.edges.push({
+          "data": {
+            "id": objid,
+            "source": parseInt(path[parseInt(idx) - 1].identity.low) + 100,
+            "target": parseInt(path[parseInt(idx) + 1].identity.low) + 100,
+            "objid": objid,
+            "elabel": ename,
+            "label": path[idx].type,
+            "distance": 5,
+            "ntype": "edge",
+            "eid": path[idx].properties.id.low,
+            "count": path[idx].properties.count.low,
+            "logontype": path[idx].properties.logintype,
+            "status": path[idx].properties.status,
+            "authname": path[idx].properties.authname
+          }
+        });
+      } else {
+        graph.edges.push({
+          "data": {
+            "id": objid,
+            "source": parseInt(path[parseInt(idx) - 1].identity.low) + 100,
+            "target": parseInt(path[parseInt(idx) + 1].identity.low) + 100,
+            "objid": objid,
+            "label": path[idx].type,
+            "distance": 5,
+            "ntype": "edge",
+          }
+        });
+      }
     }
   }
 
@@ -203,7 +230,7 @@ function drawGraph(graph, rootNode) {
   cy.edges().forEach(function(ele) {
     ele.qtip({
       content: {
-        title: "<b>Event Details</b>",
+        title: "<b>Details</b>",
         text: qtipEdge(ele)
       },
       style: {
@@ -224,92 +251,104 @@ function qtipNode(ndata) {
     qtext += '<br>Privilege: ' + ndata._private.data["nprivilege"];
     qtext += '<br>SID: ' + ndata._private.data["nsid"];
   }
-  qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
+  if (ndata._private.data["ntype"] != "Domain") {
+    qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
+  }
 
   return qtext;
 }
 
 function qtipEdge(ndata) {
   var qtext = "";
-  if (ndata._private.data["eid"] == 4624) {
-    qtext = "<b>Successful logon</b><br>";
+  if (ndata._private.data["label"] == "Event") {
+    if (ndata._private.data["eid"] == 4624) {
+      qtext = "<b>Successful logon</b><br>";
+    }
+    if (ndata._private.data["eid"] == 4625) {
+      qtext = "<b>Logon failure</b><br>";
+    }
+    if (ndata._private.data["eid"] == 4768) {
+      qtext = "<b>Kerberos Authentication (TGT Request)</b><br>";
+    }
+    if (ndata._private.data["eid"] == 4769) {
+      qtext = "<b>Kerberos Service Ticket (ST Request)</b><br>";
+    }
+    if (ndata._private.data["eid"] == 4776) {
+      qtext = "<b>NTLM Authentication</b><br>";
+    }
+    qtext += "Count: " + ndata._private.data["count"];
+    qtext += "<br>Logon Type: " + ndata._private.data["logontype"];
+    qtext += "<br>AuthName: " + ndata._private.data["authname"];
+    qtext += "<br>Status: " + ndata._private.data["status"];
+  } else {
+    qtext = "Domain group";
   }
-  if (ndata._private.data["eid"] == 4625) {
-    qtext = "<b>Logon failure</b><br>";
-  }
-  if (ndata._private.data["eid"] == 4768) {
-    qtext = "<b>Kerberos Authentication (TGT Request)</b><br>";
-  }
-  if (ndata._private.data["eid"] == 4769) {
-    qtext = "<b>Kerberos Service Ticket (ST Request)</b><br>";
-  }
-  if (ndata._private.data["eid"] == 4776) {
-    qtext = "<b>NTLM Authentication</b><br>";
-  }
-  qtext += "Count: " + ndata._private.data["count"];
-  qtext += "<br>Logon Type: " + ndata._private.data["logontype"];
-  qtext += "<br>AuthName: " + ndata._private.data["authname"];
-  qtext += "<br>Status: " + ndata._private.data["status"];
   return qtext;
 }
 
 function createAllQuery() {
   eidStr = getQueryID();
   eidStr = eidStr.slice(4);
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createSystemQuery() {
   eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE user.rights = "system" ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE user.rights = "system" ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createRDPQuery() {
   eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE event.logintype = 10 ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 10 ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createNetQuery() {
   eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE event.logintype = 3 ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 3 ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createBatchQuery() {
   eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE event.logintype = 4 ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 4 ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createServiceQuery() {
   eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE event.logintype = 5 ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 5 ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function create14068Query() {
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE event.status = "0xf" AND event.id = 4769 RETURN user, event, ip'
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.status = "0xf" AND event.id = 4769 RETURN user, event, ip'
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createFailQuery() {
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE event.id = 4625 RETURN user, event, ip'
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4625 RETURN user, event, ip'
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createNTLMQuery() {
-  queryStr = 'MATCH (user)-[event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 RETURN user, event, ip'
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 RETURN user, event, ip'
+  //console.log(queryStr);
+  executeQuery(queryStr);
+}
+
+function createDomainQuery() {
+  queryStr = 'MATCH (user)-[event:Group]-(ip) RETURN user, event, ip'
   //console.log(queryStr);
   executeQuery(queryStr);
 }
@@ -324,7 +363,7 @@ function createRankQuery(setStr, qType) {
 
   eidStr = getQueryID()
 
-  queryStr = 'MATCH (user)-[event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
@@ -380,7 +419,7 @@ function createQuery() {
   }
 
   eidStr = getQueryID()
-  queryStr = 'MATCH (user)-[event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
@@ -499,7 +538,7 @@ function pagerankQuery(queryStr, dataType, currentPage) {
 }
 
 function exportCSV() {
-  var queryStr = 'MATCH (user:Username)-[event]-(ip:IPAddress) RETURN user, ip, event';
+  var queryStr = 'MATCH (user:Username)-[event:Event]-(ip:IPAddress) RETURN user, ip, event';
   var events = new Array();
 
   session.run(queryStr)
