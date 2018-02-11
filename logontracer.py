@@ -85,6 +85,8 @@ parser.add_argument("-p", "--password", dest="password", action="store", type=st
                     help="Neo4j password. (default: password).")
 parser.add_argument("-e", "--evtx", dest="evtx", nargs="*", action="store", type=str, metavar="EVTX",
                     help="Import to the AD EVTX file. (multiple files OK)")
+parser.add_argument("-x", "--xml", dest="xmls", nargs="*", action="store", type=str, metavar="XML",
+                    help="Import to the XML file for event log. (multiple files OK)")
 parser.add_argument("-z", "--timezone", dest="timezone", action="store", type=int, metavar="UTC",
                     help="Event log time zone. (for example: +9) (default: GMT)")
 parser.add_argument("-f", "--from", dest="fromdate", action="store", type=str, metavar="DATE",
@@ -158,9 +160,8 @@ def timeline():
 # Web application logs
 @app.route('/log')
 def logs():
-    lf = open("static/logontracer.log", "r")
-    logdata = lf.read()
-    lf.close()
+    with open("static/logontracer.log", "r") as lf:
+        logdata = lf.read()
     return logdata
 
 
@@ -278,13 +279,25 @@ def to_lxml(record_xml):
 
 
 def xml_records(filename):
-    with Evtx(filename) as evtx:
-        for xml, record in evtx_file_xml_view(evtx.get_file_header()):
-            try:
-                yield to_lxml(xml), None
-            except etree.XMLSyntaxError as e:
-                yield xml, e, fh
+    if args.evtx:
+        with Evtx(filename) as evtx:
+            for xml, record in evtx_file_xml_view(evtx.get_file_header()):
+                try:
+                    yield to_lxml(xml), None
+                except etree.XMLSyntaxError as e:
+                    yield xml, e, fh
 
+    if args.xmls:
+        with open(filename,'r') as fx:
+            xdata = fx.read()
+            fixdata = xdata.replace("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>", "").replace("</Events>", "").replace("<Events>", "")
+            xml_list = fixdata.split("<Event xmlns=\'http://schemas.microsoft.com/win/2004/08/events/event\'>")
+            for xml in xml_list:
+                if xml.startswith("<System>"):
+                    try:
+                        yield to_lxml("<Event>" + xml), None
+                    except etree.XMLSyntaxError as e:
+                        yield xml, e, fh
 
 # Parse the EVTX file
 def parse_evtx(evtx_list, GRAPH):
@@ -326,27 +339,34 @@ def parse_evtx(evtx_list, GRAPH):
             sys.exit("[!] To date does not match format '%Y%m%d%H%M%S'.")
 
     for evtx_file in evtx_list:
-        fb = open(evtx_file, "rb")
-        fb_data = fb.read()[0:8]
-        if fb_data != EVTX_HEADER:
-            sys.exit("[!] This file is not EVTX format {0}.".format(evtx_file))
-        fb.close()
+        if args.evtx:
+            with open(evtx_file, "rb") as fb:
+                fb_data = fb.read()[0:8]
+                if fb_data != EVTX_HEADER:
+                    sys.exit("[!] This file is not EVTX format {0}.".format(evtx_file))
 
-        chunk = -2
-        with Evtx(evtx_file) as evtx:
-            fh = evtx.get_file_header()
-            try:
-                while True:
-                    last_chunk = list(evtx.chunks())[chunk]
-                    last_record = last_chunk.file_last_record_number()
-                    chunk -= 1
-                    if last_record > 0:
-                        record_sum = record_sum + last_record
-                        break
-            except:
-                record_sum = fh.next_record_number()
+            chunk = -2
+            with Evtx(evtx_file) as evtx:
+                fh = evtx.get_file_header()
+                try:
+                    while True:
+                        last_chunk = list(evtx.chunks())[chunk]
+                        last_record = last_chunk.file_last_record_number()
+                        chunk -= 1
+                        if last_record > 0:
+                            record_sum = record_sum + last_record
+                            break
+                except:
+                    record_sum = fh.next_record_number()
 
-    print("[*] Last record number is %i." % record_sum)
+        if args.xmls:
+            with open(evtx_file, "r") as fb:
+                fb_data = fb.read()
+                if "<?xml" not in fb_data[0:6]:
+                    sys.exit("[!] This file is not XML format {0}.".format(evtx_file))
+                record_sum += fb_data.count("<System>")
+
+        print("[*] Last record number is %i." % record_sum)
 
     # Parse Event log
     print("[*] Start parsing the EVTX file.")
@@ -367,7 +387,10 @@ def parse_evtx(evtx_list, GRAPH):
 
             if eventid in EVENT_ID:
                 logtime = node.xpath("/Event/System/TimeCreated")[0].get("SystemTime")
-                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+                try:
+                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+                except:
+                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
                 stime = datetime.datetime(*etime.timetuple()[:4])
                 if args.fromdate or args.todate:
                     if args.fromdate and fdatetime > etime:
@@ -554,6 +577,12 @@ def main():
             if not os.path.isfile(evtx_file):
                 sys.exit("[!] Can't open file {0}.".format(evtx_file))
         parse_evtx(args.evtx, GRAPH)
+
+    if args.xmls:
+        for xml_file in args.xmls:
+            if not os.path.isfile(xml_file):
+                sys.exit("[!] Can't open file {0}.".format(xml_file))
+        parse_evtx(args.xmls, GRAPH)
 
     print("[*] Script end. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 
