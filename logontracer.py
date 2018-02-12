@@ -171,6 +171,7 @@ def do_upload():
     filelist= ""
     try:
         timezone = request.form["timezone"]
+        logtype = request.form["logtype"]
         for  i in range(0, len(request.files)):
             loadfile = "file" + str(i)
             file = request.files[loadfile]
@@ -178,7 +179,11 @@ def do_upload():
                 filename = file.filename
                 file.save(filename)
                 filelist += filename + " "
-        parse_command = "nohup python3 logontracer.py --delete -z " + timezone + " -e " + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " > static/logontracer.log 2>&1 &";
+        if "EVTX" in logtype:
+            logoption = " -e "
+        if "XML" in logtype:
+            logoption = " -x "
+        parse_command = "nohup python3 logontracer.py --delete -z " + timezone + logoption + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " > static/logontracer.log 2>&1 &";
         subprocess.call("rm -f static/logontracer.log > /dev/null", shell=True)
         subprocess.call(parse_command, shell=True)
         #parse_evtx(filename)

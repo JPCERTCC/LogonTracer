@@ -114,7 +114,7 @@
         <button class="btn btn-default" onClick="window.open('timeline')">Create All Users</button>
         <hr>
         <a>Upload</a><br>
-        <button class="btn btn-default" data-toggle="modal" data-target="#UploadEVTX">Upload EVTX File</button>
+        <button class="btn btn-default" data-toggle="modal" data-target="#UploadEVTX">Upload Event Log</button>
       </div>
       <div class="col-sm-8 col-md-8 main">
         <div id="error"></div>
@@ -141,10 +141,16 @@
       <div class="modal-content">
         <div class="modal-header">
           <button type="button" class="close" data-dismiss="modal"><span>×</span></button>
-          <h4 class="modal-title">Upload EVTX File</h4>
+          <h4 class="modal-title">Upload Event Log File</h4>
         </div>
         <div class="modal-body">
           <div id="zoneTime"></div>
+          <div class="col-xs-2">
+            <select class="form-control" id="logType">
+              <option>EVTX</option>
+              <option>XML</option>
+            </select>
+          </div>
           <div class="input-group">
             <input multiple id="lefile" type="file" style="display:none">
             <input type="text" id="evtx_name" class="form-control" placeholder="select file (multi files) ...">
@@ -206,7 +212,7 @@
       }
     }
 
-    var downMenu = '<div class="col-xs-3"><select class="form-control" id="utcTime"><option>Time Zone</option>';
+    var downMenu = '<div class="col-xs-2"><select class="form-control" id="utcTime"><option>Time Zone</option>';
     for (i = +14; i >= -12; i--) {
       downMenu += '<option>' + i + '</option>';
     }

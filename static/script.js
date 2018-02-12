@@ -888,6 +888,7 @@ function searchError() {
 function file_upload() {
   var upfile = document.getElementById("lefile");
   var timezone = document.getElementById("utcTime").value;
+  var logtype = document.getElementById("logType").value;
   document.getElementById("uploadBar").innerHTML = '';
   document.getElementById("status").innerHTML = '';
 
@@ -897,6 +898,7 @@ function file_upload() {
     formData.append(sendFile, upfile.files[i]);
   }
   formData.append("timezone", timezone);
+  formData.append("logtype", logtype);
   var xmlhttp = new XMLHttpRequest();
   xmlhttp.upload.addEventListener("progress", progressHandler, false);
   xmlhttp.addEventListener("load", completeHandler, false);
@@ -919,7 +921,7 @@ function completeHandler(event) {
   }
   if (event.target.responseText == "SUCCESS") {
     parse_status = false
-    document.getElementById("uploadBar").innerHTML = '<h4>Upload ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">SUCCESS</div></div>';
+    document.getElementById("uploadBar").innerHTML = '<h4>Upload ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">Waiting ...</div></div>';
     var loop = function() {
       if (parse_status == false) {
         setTimeout(loop, 2000);
