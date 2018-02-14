@@ -111,7 +111,7 @@
         </div>
         <hr>
         <a>Timeline</a><br>
-        <button class="btn btn-default" onClick="window.open('timeline')">Create All Users</button>
+        <button class="btn btn-default" onClick="window.open('timeline')">Create Timeline</button>
         <hr>
         <a>Upload</a><br>
         <button class="btn btn-default" data-toggle="modal" data-target="#UploadEVTX">Upload Event Log</button>
@@ -176,8 +176,8 @@
     var rankpageUser = 0
     var rankpageHost = 0
 
-    var userqueryStr = 'MATCH (node:Username) RETURN node';
-    var ipqueryStr = 'MATCH (node:IPAddress) RETURN node';
+    var userqueryStr = 'MATCH (node:Username) RETURN node ORDER BY node.rank DESC';
+    var ipqueryStr = 'MATCH (node:IPAddress) RETURN node ORDER BY node.rank DESC';
     pagerankQuery(userqueryStr, "User", rankpageUser);
     pagerankQuery(ipqueryStr, "Host", rankpageHost);
 

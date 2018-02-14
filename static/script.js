@@ -489,6 +489,8 @@ function pagerankQuery(queryStr, dataType, currentPage) {
   var html = '<div><table class="table table-striped"><thead><tr class="col-sm-2 col-md-2">\
               <th class="col-sm-1 col-md-1">Rank</th><th class="col-sm-1 col-md-1">' + dataType +
     '</th></tr></thead><tbody class="col-sm-2 col-md-2">';
+  var startRunk = currentPage * 10;
+  queryStr = queryStr + " SKIP " + startRunk + " LIMIT " + 10;
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -502,22 +504,8 @@ function pagerankQuery(queryStr, dataType, currentPage) {
       },
       onCompleted: function() {
         session.close();
-        nodes.sort(function(a, b) {
-          var aa = a[1];
-          var bb = b[1];
-          if (aa < bb) {
-            return 1;
-          }
-          if (aa > bb) {
-            return -1;
-          }
-          return 0;
-        });
-        for (i = 10 * currentPage; i < nodes.length; i++) {
-          if (i >= 10 * currentPage + 10) {
-            break;
-          }
-          html += '<tr><td>' + (i + 1) + '</td><td><a onclick="createRankQuery(\'' + nodes[i][0] + '\', \'' + dataType + '\')">' + nodes[i][0] + '</a></td></tr>';
+        for (i = 0; i < nodes.length; i++) {
+          html += '<tr><td>' + (currentPage * 10 + i + 1) + '</td><td><a onclick="createRankQuery(\'' + nodes[i][0] + '\', \'' + dataType + '\')">' + nodes[i][0] + '</a></td></tr>';
           //console.log(nodes[i][0]);
           //console.log(hosts[i][0]);
         }

@@ -59,7 +59,7 @@
     //Neo4j access settings
     var driver = neo.driver("bolt://{{ server_ip }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
     var session = driver.session();
-    createAlltimeline();
+    //createAlltimeline();
 
     var currentNumber = 0;
     var ItemField = {
