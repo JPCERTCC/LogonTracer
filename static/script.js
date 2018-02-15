@@ -251,9 +251,7 @@ function qtipNode(ndata) {
     qtext += '<br>Privilege: ' + ndata._private.data["nprivilege"];
     qtext += '<br>SID: ' + ndata._private.data["nsid"];
   }
-  if (ndata._private.data["ntype"] != "Domain") {
-    qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
-  }
+  qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
 
   return qtext;
 }
@@ -330,25 +328,25 @@ function createServiceQuery() {
 }
 
 function create14068Query() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.status = "0xf" AND event.id = 4769 RETURN user, event, ip'
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.status = "0xf" AND event.id = 4769 RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createFailQuery() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4625 RETURN user, event, ip'
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4625 RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createNTLMQuery() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 RETURN user, event, ip'
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
 
 function createDomainQuery() {
-  queryStr = 'MATCH (user)-[event:Group]-(ip) RETURN user, event, ip'
+  queryStr = 'MATCH (user)-[event:Group]-(ip) RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
@@ -361,9 +359,12 @@ function createRankQuery(setStr, qType) {
     whereStr = 'ip.IP = "' + setStr + '" ';
   }
 
-  eidStr = getQueryID()
-
-  queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
+  if (qType != "Domain") {
+    eidStr = getQueryID();
+    queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
+  } else {
+    queryStr = 'MATCH (user)-[event:Group]-(ip) WHERE user.domain = "' + setStr + '" RETURN user, event, ip'
+  }
   //console.log(queryStr);
   executeQuery(queryStr);
 }
