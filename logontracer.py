@@ -296,7 +296,10 @@ def xml_records(filename):
         with open(filename,'r') as fx:
             xdata = fx.read()
             fixdata = xdata.replace("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>", "").replace("</Events>", "").replace("<Events>", "")
+            # fixdata = xdata.replace("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>", "")
+            del xdata
             xml_list = fixdata.split("<Event xmlns=\'http://schemas.microsoft.com/win/2004/08/events/event\'>")
+            del fixdata
             for xml in xml_list:
                 if xml.startswith("<System>"):
                     try:
@@ -362,7 +365,7 @@ def parse_evtx(evtx_list, GRAPH):
                             record_sum = record_sum + last_record
                             break
                 except:
-                    record_sum = fh.next_record_number()
+                    record_sum =  record_sum + fh.next_record_number()
 
         if args.xmls:
             with open(evtx_file, "r") as fb:
@@ -370,8 +373,9 @@ def parse_evtx(evtx_list, GRAPH):
                 if "<?xml" not in fb_data[0:6]:
                     sys.exit("[!] This file is not XML format {0}.".format(evtx_file))
                 record_sum += fb_data.count("<System>")
+                del fb_data
 
-        print("[*] Last record number is %i." % record_sum)
+    print("[*] Last record number is %i." % record_sum)
 
     # Parse Event log
     print("[*] Start parsing the EVTX file.")
@@ -380,15 +384,14 @@ def parse_evtx(evtx_list, GRAPH):
         print("[*] Parse the EVTX file %s." % evtx_file)
 
         for node, err in xml_records(evtx_file):
+            if err is not None:
+                continue
             count += 1
             eventid = int(node.xpath("/Event/System/EventID")[0].text)
 
             if not count % 100:
                 sys.stdout.write("\r[*] Now loading %i records." % count)
                 sys.stdout.flush()
-
-            if err is not None:
-                continue
 
             if eventid in EVENT_ID:
                 logtime = node.xpath("/Event/System/TimeCreated")[0].get("SystemTime")
