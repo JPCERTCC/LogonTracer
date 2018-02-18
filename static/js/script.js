@@ -160,6 +160,9 @@ function drawGraph(graph, rootNode) {
     flagMode = "circle";
   }
 
+  var loading = document.getElementById('loading');
+  loading.classList.remove('loaded');
+
   cy = cytoscape({
     container: document.getElementById("cy"),
     boxSelectionEnabled: false,
@@ -208,6 +211,10 @@ function drawGraph(graph, rootNode) {
       animate: true,
       padding: 10
     }
+  });
+
+  cy.on("layoutstop", function() {
+    loading.classList.add("loaded");
   });
 
   cy.nodes().forEach(function(ele) {
@@ -425,7 +432,7 @@ function createQuery() {
   executeQuery(queryStr);
 }
 
-function executeQuery(queryStr) {
+function sendQuery(queryStr) {
   var graph = {
     "nodes": [],
     "edges": []
@@ -435,7 +442,7 @@ function executeQuery(queryStr) {
     .subscribe({
       onNext: function(record) {
         //console.log(record.get('user'), record.get('event'), record.get('ip'));
-        graph = buildGraph(graph, [record.get("user"), record.get("event"), record.get("ip")])
+        graph = buildGraph(graph, [record.get("user"), record.get("event"), record.get("ip")]);
       },
       onCompleted: function() {
         session.close();
@@ -445,6 +452,32 @@ function executeQuery(queryStr) {
           //console.log(graph);
           rootNode = graph.nodes[0].id;
           drawGraph(graph, rootNode);
+        }
+      },
+      onError: function(error) {
+        console.log("Error: ", error);
+      }
+    });
+}
+
+function executeQuery(queryStr) {
+  var countStr = queryStr.replace("user, event, ip" , "COUNT(event)");
+  document.getElementById("continueButton").innerHTML = '<button type="button" class="btn btn-default" onclick="sendQuery(\'' + queryStr + '\')" data-dismiss="modal">Yes</button>\
+                                                         <button type="button" class="btn btn-primary" data-dismiss="modal">No</button>';
+  session.run(countStr)
+    .subscribe({
+      onNext: function(record) {
+        recordCount = record._fields[0].low;
+      },
+      onCompleted: function() {
+        session.close();
+        if (recordCount > 3000) {
+          $('#warningMessage').modal({
+            show: true,
+            backdrop: 'static'
+          });
+        } else {
+          sendQuery(queryStr);
         }
       },
       onError: function(error) {

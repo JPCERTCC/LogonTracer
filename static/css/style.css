@@ -1,0 +1,14 @@
+#loading {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 100%;
+  text-align: center;
+  margin-top: -0.5em;
+  font-size: 4em;
+  color: #000;
+}
+
+#loading.loaded {
+  display: none;
+}
