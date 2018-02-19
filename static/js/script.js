@@ -160,9 +160,6 @@ function drawGraph(graph, rootNode) {
     flagMode = "circle";
   }
 
-  var loading = document.getElementById('loading');
-  loading.classList.remove('loaded');
-
   cy = cytoscape({
     container: document.getElementById("cy"),
     boxSelectionEnabled: false,
@@ -438,6 +435,9 @@ function sendQuery(queryStr) {
     "edges": []
   };
 
+  var loading = document.getElementById('loading');
+  loading.classList.remove('loaded');
+
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -448,6 +448,7 @@ function sendQuery(queryStr) {
         session.close();
         if (graph.nodes.length == 0) {
           searchError();
+          loading.classList.add("loaded");
         } else {
           //console.log(graph);
           rootNode = graph.nodes[0].id;
@@ -462,8 +463,7 @@ function sendQuery(queryStr) {
 
 function executeQuery(queryStr) {
   var countStr = queryStr.replace("user, event, ip" , "COUNT(event)");
-  document.getElementById("continueButton").innerHTML = '<button type="button" class="btn btn-default" onclick="sendQuery(\'' + queryStr + '\')" data-dismiss="modal">Yes</button>\
-                                                         <button type="button" class="btn btn-primary" data-dismiss="modal">No</button>';
+
   session.run(countStr)
     .subscribe({
       onNext: function(record) {
@@ -472,9 +472,10 @@ function executeQuery(queryStr) {
       onCompleted: function() {
         session.close();
         if (recordCount > 3000) {
+          setqueryStr = queryStr;
           $('#warningMessage').modal({
             show: true,
-            backdrop: 'static'
+            backdrop: 'false'
           });
         } else {
           sendQuery(queryStr);
@@ -484,6 +485,11 @@ function executeQuery(queryStr) {
         console.log("Error: ", error);
       }
     });
+}
+
+var setqueryStr = "";
+function contQuery() {
+  sendQuery(setqueryStr);
 }
 
 function pruserBack() {
