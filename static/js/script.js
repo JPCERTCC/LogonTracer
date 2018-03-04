@@ -76,7 +76,8 @@ function buildGraph(graph, path) {
           "label": path[idx].labels[0],
           "nprivilege": nprivilege,
           "ntype": ntype,
-          "nsid": path[idx].properties.sid
+          "nsid": path[idx].properties.sid,
+          "nhostname": path[idx].properties.hostname
         }
       });
     } else {
@@ -95,9 +96,9 @@ function buildGraph(graph, path) {
         var label_type = document.getElementById("label-type").checked;
         var label_status = document.getElementById("label-status").checked;
         var label_authname = document.getElementById("label-authname").checked;
-        var ename = path[idx].properties.id.low;
+        var ename = path[idx].properties.id;
         if (label_count) {
-          ename += " : " + path[idx].properties.count.low;
+          ename += " : " + path[idx].properties.count;
         }
         if (label_type) {
           ename += " : " + path[idx].properties.logintype;
@@ -118,8 +119,8 @@ function buildGraph(graph, path) {
             "label": path[idx].type,
             "distance": 5,
             "ntype": "edge",
-            "eid": path[idx].properties.id.low,
-            "count": path[idx].properties.count.low,
+            "eid": path[idx].properties.id,
+            "count": path[idx].properties.count,
             "logontype": path[idx].properties.logintype,
             "status": path[idx].properties.status,
             "authname": path[idx].properties.authname
@@ -254,6 +255,8 @@ function qtipNode(ndata) {
   if (ndata._private.data["ntype"] == "User") {
     qtext += '<br>Privilege: ' + ndata._private.data["nprivilege"];
     qtext += '<br>SID: ' + ndata._private.data["nsid"];
+  } else if (ndata._private.data["ntype"] == "Host") {
+    qtext += '<br>Hostname: ' + ndata._private.data["nhostname"];
   }
   qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
 
@@ -408,8 +411,10 @@ function createQuery() {
 
   if (selectVal == "Username") {
     whereStr = 'user.user =~ "' + setStr + '" ';
-  } else {
+  } else if (selectVal == "IPAddress") {
     whereStr = 'ip.IP =~ "' + setStr + '" ';
+  } else {
+    whereStr = 'ip.hostname =~ "' + setStr + '" ';
   }
 
   for (i = 1; i <= currentNumber; i++) {
@@ -417,8 +422,10 @@ function createQuery() {
       ruleStr = document.getElementById("InputRule" + i).value;
       if (document.getElementById("InputSelect" + i).value == "Username") {
         whereStr += ruleStr + ' user.user =~ "' + document.getElementById("query-input" + i).value + '" ';
-      } else {
+      } else if (document.getElementById("InputSelect" + i).value == "IPAddress") {
         whereStr += ruleStr + ' ip.IP =~ "' + document.getElementById("query-input" + i).value + '" ';
+      } else {
+        whereStr += ruleStr + ' ip.hostname =~ "' + document.getElementById("query-input" + i).value + '" ';
       }
     }
   }

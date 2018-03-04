@@ -49,6 +49,12 @@ try:
 except ImportError:
     has_flask = False
 
+try:
+    import pandas as pd
+    has_pandas = True
+except ImportError:
+    has_pandas = False
+
 # neo4j password
 NEO4J_PASSWORD = "password"
 # neo4j user name
@@ -103,7 +109,7 @@ statement_user = """
   """
 
 statement_ip = """
-  MERGE (ip:IPAddress{ IP:{IP} }) set ip.rank={rank}
+  MERGE (ip:IPAddress{ IP:{IP} }) set ip.rank={rank}, ip.hostname={hostname}
   RETURN ip
   """
 
@@ -197,20 +203,20 @@ def adetection(counts, users,  ranks, starttime, tohours):
     count_array = np.zeros((5, len(users), tohours + 1))
     count_all_array = []
     result_array = []
-    for event, count in counts:
-        column = int((datetime.datetime.strptime(event[0], "%Y-%m-%d  %H:%M:%S") - starttime).total_seconds() / 3600)
-        row = users.index(event[2])
+    for _, event in counts.iterrows():
+        column = int((datetime.datetime.strptime(event["dates"], "%Y-%m-%d  %H:%M:%S") - starttime).total_seconds() / 3600)
+        row = users.index(event["username"])
         #count_array[row, column, 0] = count_array[row, column, 0] + count
-        if event[1] == 4624:
-            count_array[0, row, column] = count
-        elif event[1] == 4625:
-            count_array[1, row, column] = count
-        elif event[1] == 4768:
-            count_array[2, row, column] = count
-        elif event[1] == 4769:
-            count_array[3, row, column] = count
-        elif event[1] == 4776:
-            count_array[4, row, column] = count
+        if event["eventid"] == 4624:
+            count_array[0, row, column] = event["count"]
+        elif event["eventid"] == 4625:
+            count_array[1, row, column] = event["count"]
+        elif event["eventid"] == 4768:
+            count_array[2, row, column] = event["count"]
+        elif event["eventid"] == 4769:
+            count_array[3, row, column] = event["count"]
+        elif event["eventid"] == 4776:
+            count_array[4, row, column] = event["count"]
 
     #count_average = count_array.mean(axis=0)
     count_sum = np.sum(count_array, axis=0)
@@ -240,20 +246,20 @@ def adetection(counts, users,  ranks, starttime, tohours):
 
 
 # Calculate PageRank
-def pagerank(event_set_uniq):
+def pagerank(event_set):
     graph = {}
     nodes = []
-    for events, count in event_set_uniq:
-        nodes.append(events[1])
-        nodes.append(events[2])
+    for _, events in event_set.iterrows():
+        nodes.append(events["ipaddress"])
+        nodes.append(events["username"])
 
     for node in list(set(nodes)):
         links = []
-        for events, count in event_set_uniq:
-            if node in events[1]:
-                links.append(events[2])
-            if node in events[2]:
-                links.append(events[1])
+        for _, events in event_set.iterrows():
+            if node in events["ipaddress"]:
+                links.append(events["username"])
+            if node in events["username"]:
+                links.append(events["ipaddress"])
         graph[node] = links
 
     d = 0.8
@@ -309,14 +315,14 @@ def xml_records(filename):
 
 # Parse the EVTX file
 def parse_evtx(evtx_list, GRAPH):
-    event_set = []
-    count_set = []
-    ipaddress_set = []
+    event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname"])
+    count_set = pd.DataFrame(index=[], columns=["dates", "eventid", "username"])
     username_set = []
     domain_set = []
     admins = []
     domains = []
     sids = {}
+    hosts = {}
     count = 0
     record_sum = 0
     starttime = None
@@ -422,6 +428,7 @@ def parse_evtx(evtx_list, GRAPH):
                 username = "-"
                 domain = "-"
                 ipaddress = "-"
+                hostname = "-"
                 status = "-"
                 sid = "-"
                 authname = "-"
@@ -443,6 +450,11 @@ def parse_evtx(evtx_list, GRAPH):
                             ipaddress = data.text.split("@")[0]
                             ipaddress = ipaddress.lower().replace("::ffff:", "")
                             ipaddress = ipaddress.replace("\\", "")
+
+                        if data.get("Name") == "WorkstationName" and data.text != None:
+                            hostname = data.text.split("@")[0]
+                            hostname = hostname.lower().replace("::ffff:", "")
+                            hostname = hostname.replace("\\", "")
 
                         if data.get("Name") in "TargetUserName" and data.text != None:
                             username = data.text.split("@")[0]
@@ -467,15 +479,14 @@ def parse_evtx(evtx_list, GRAPH):
                             authname = data.text
 
                     if username != "-" and ipaddress != "-" and ipaddress != "::1" and ipaddress != "127.0.0.1":
-                        event_set.append([eventid, ipaddress, username, logintype, status, authname])
+                        event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname], index=event_set.columns)
+                        event_set = event_set.append(event_series, ignore_index = True)
                         # print("%s,%i,%s,%s,%s,%s" % (eventid, ipaddress, username, comment, logintype))
-                        count_set.append([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username])
+                        count_series = pd.Series([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username], index=count_set.columns)
+                        count_set = count_set.append(count_series, ignore_index = True)
                         # print("%s,%s" % (stime.strftime("%Y-%m-%d %H:%M:%S"), username))
                         if domain != "-":
                             domain_set.append([username, domain])
-
-                        if ipaddress not in ipaddress_set:
-                            ipaddress_set.append(ipaddress)
 
                         if username not in username_set:
                             username_set.append(username)
@@ -486,29 +497,38 @@ def parse_evtx(evtx_list, GRAPH):
                         if sid not in "-":
                             sids[username] = sid
 
+                        if hostname not in "-":
+                            hosts[hostname] = ipaddress
+
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
     print("\n[*] Load finished.")
     print("[*] Total Event log is %i." % count)
-    event_set.sort()
-    event_set_uniq = [(g[0], len(list(g[1]))) for g in itertools.groupby(event_set)]
-    count_set.sort()
-    count_set_uniq = [(g[0], len(list(g[1]))) for g in itertools.groupby(count_set)]
+    event_set = event_set.replace(hosts)
+    event_set["count"] = event_set.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname"])["eventid"].transform("count")
+    event_set = event_set.drop_duplicates()
+    count_set["count"] = count_set.groupby(["dates", "eventid", "username"])["dates"].transform("count")
+    count_set = count_set.drop_duplicates()
     domain_set_uniq = list(map(list, set(map(tuple, domain_set))))
 
     # Calculate PageRank
     print("[*] Calculate PageRank.")
-    ranks = pagerank(event_set_uniq)
+    ranks = pagerank(event_set)
 
     # Calculate ChangeFinder
     print("[*] Calculate ChangeFinder.")
-    timelines, detects = adetection(count_set_uniq, username_set, ranks, starttime, tohours)
+    timelines, detects = adetection(count_set, username_set, ranks, starttime, tohours)
 
     # Create node
     print("[*] Creating a graph data.")
     tx = GRAPH.begin()
-    for ipaddress in ipaddress_set:
-        tx.append(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress]})
+    hosts_inv = {v:k for k, v in hosts.items()}
+    for ipaddress in event_set["ipaddress"].drop_duplicates():
+        if ipaddress in hosts_inv:
+            hostname = hosts_inv[ipaddress]
+        else:
+            hostname = ipaddress
+        tx.append(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname})
 
     i = 0
     for username in username_set:
@@ -530,9 +550,9 @@ def parse_evtx(evtx_list, GRAPH):
     for domain in domains:
         tx.append(statement_domain, {"domain": domain})
 
-    for events, count in event_set_uniq:
-        tx.append(statement_r, {"user": events[2], "IP": events[1], "id": events[0], "logintype": events[3],
-                                               "status": events[4], "count": count, "authname": events[5]})
+    for _, events in event_set.iterrows():
+        tx.append(statement_r, {"user": events["username"], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
+                                               "status": events["status"], "count": events["count"], "authname": events["authname"]})
 
     for username, domain in domain_set_uniq:
         tx.append(statement_dr, {"user": username, "domain": domain})
@@ -560,6 +580,9 @@ def main():
 
     if not has_changefinder:
         sys.exit("[!] changefinder must be installed for this script.")
+
+    if not has_pandas:
+        sys.exit("[!] pandas must be installed for this script.")
 
     try:
         graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD +"@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
