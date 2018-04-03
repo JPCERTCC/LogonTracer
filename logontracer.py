@@ -139,6 +139,11 @@ statement_dr = """
   RETURN user, domain
   """
 
+statement_del = """
+  MERGE (date:Deletetime{ date:{deletetime} }) set date.user={user}, date.domain={domain}
+  RETURN date
+  """
+
 if args.user:
     NEO4J_USER = args.user
 
@@ -321,6 +326,7 @@ def parse_evtx(evtx_list, GRAPH):
     domain_set = []
     admins = []
     domains = []
+    deletelog = []
     sids = {}
     hosts = {}
     count = 0
@@ -500,6 +506,32 @@ def parse_evtx(evtx_list, GRAPH):
                         if hostname not in "-":
                             hosts[hostname] = ipaddress
 
+            if eventid == 1102:
+                logtime = node.xpath("/Event/System/TimeCreated")[0].get("SystemTime")
+                try:
+                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+                except:
+                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
+                deletelog.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
+
+                namespace = "http://manifests.microsoft.com/win/2004/08/windows/eventlog"
+                user_data = node.xpath("/Event/UserData/ns:LogFileCleared/ns:SubjectUserName", namespaces={"ns": namespace})
+                domain_data = node.xpath("/Event/UserData/ns:LogFileCleared/ns:SubjectDomainName", namespaces={"ns": namespace})
+
+                if user_data[0].text != None:
+                    username = user_data[0].text.split("@")[0]
+                    if username[-1:] not in "$":
+                        deletelog.append(username.lower())
+                    else:
+                        deletelog.append("-")
+                else:
+                    deletelog.append("-")
+
+                if domain_data[0].text != None:
+                    deletelog.append(domain_data[0].text)
+                else:
+                    deletelog.append("-")
+
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
     print("\n[*] Load finished.")
@@ -559,6 +591,9 @@ def parse_evtx(evtx_list, GRAPH):
 
     tx.append(statement_date, {"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
                                                  "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")})
+
+    if len(deletelog):
+        tx.append(statement_del, {"deletetime": deletelog[0], "user": deletelog[1], "domain": deletelog[2]})
 
     tx.process()
     tx.commit()

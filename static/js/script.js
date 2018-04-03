@@ -910,6 +910,36 @@ function clickTimeline(setStr) {
   createTimeline(queryStr, "search");
 }
 
+
+function logdeleteCheck() {
+  var queryStr = "MATCH (date:Deletetime) RETURN date";
+  var ddata = "";
+
+  session.run(queryStr)
+    .subscribe({
+      onNext: function(record) {
+        ddata = record.get("date");
+      },
+      onCompleted: function() {
+        session.close();
+        if (ddata.length != 0) {
+          delDate = ddata.properties.date;
+          delDomain = ddata.properties.domain;
+          delUser = ddata.properties.user;
+
+          var elemMsg = document.getElementById("error");
+          elemMsg.innerHTML =
+            '<div class="alert alert-danger alert-dismissible" id="alertfadeout" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="close">\
+            <span aria-hidden="true">×</span></button><strong>IMPORTANT</strong>: Delete Event Log has detected! If you have not deleted the event log, the attacker may have deleted it.\
+            <br>DATE: ' + delDate + '  DOMAIN: ' + delDomain + '  USERNAME: ' + delUser + '</div>';
+        }
+      },
+      onError: function(error) {
+        console.log("Error: ", error);
+      }
+    });
+}
+
 function searchError() {
   var elemMsg = document.getElementById("error");
   elemMsg.innerHTML =

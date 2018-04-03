@@ -203,6 +203,7 @@
     var ipqueryStr = 'MATCH (node:IPAddress) RETURN node ORDER BY node.rank DESC';
     pagerankQuery(userqueryStr, "User", rankpageUser);
     pagerankQuery(ipqueryStr, "Host", rankpageHost);
+    logdeleteCheck();
 
     var loading = document.getElementById('loading');
     loading.classList.add('loaded');
