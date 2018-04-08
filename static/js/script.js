@@ -36,6 +36,10 @@ function buildGraph(graph, path) {
           nfcolor = "#6da0f2"
           nprivilege = "Normal"
         }
+        if (path[idx].properties.status != "-") {
+          ncolor = "#404040"
+          nshape = "octagon"
+        }
       }
       if (path[idx].labels[0] == "IPAddress") {
         nname = path[idx].properties.IP
@@ -77,6 +81,7 @@ function buildGraph(graph, path) {
           "nprivilege": nprivilege,
           "ntype": ntype,
           "nsid": path[idx].properties.sid,
+          "nstatus": path[idx].properties.status,
           "nhostname": path[idx].properties.hostname
         }
       });
@@ -255,6 +260,7 @@ function qtipNode(ndata) {
   if (ndata._private.data["ntype"] == "User") {
     qtext += '<br>Privilege: ' + ndata._private.data["nprivilege"];
     qtext += '<br>SID: ' + ndata._private.data["nsid"];
+    qtext += '<br>Status: ' + ndata._private.data["nstatus"];
   } else if (ndata._private.data["ntype"] == "Host") {
     qtext += '<br>Hostname: ' + ndata._private.data["nhostname"];
   }
@@ -348,6 +354,12 @@ function createFailQuery() {
 
 function createNTLMQuery() {
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 RETURN user, event, ip';
+  //console.log(queryStr);
+  executeQuery(queryStr);
+}
+
+function adddelUsersQuery() {
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE NOT (user.status = "-") RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }

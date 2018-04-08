@@ -67,7 +67,7 @@ NEO4J_PORT = "7474"
 WEB_PORT = 8080
 
 # Check Event Id
-EVENT_ID = [4624, 4625, 4768, 4769, 4776, 4672]
+EVENT_ID = [4624, 4625, 4768, 4769, 4776, 4672, 4720, 7726]
 
 # EVTX Header
 EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
@@ -104,7 +104,7 @@ parser.add_argument("--delete", action="store_true", default=False,
 args = parser.parse_args()
 
 statement_user = """
-  MERGE (user:Username{ user:{user} }) set user.rights={rights}, user.sid={sid}, user.rank={rank}, user.counts={counts}, user.counts4624={counts4624}, user.counts4625={counts4625}, user.counts4768={counts4768}, user.counts4769={counts4769}, user.counts4776={counts4776}, user.detect={detect}
+  MERGE (user:Username{ user:{user} }) set user.rights={rights}, user.sid={sid}, user.rank={rank}, user.status={status}, user.counts={counts}, user.counts4624={counts4624}, user.counts4625={counts4625}, user.counts4768={counts4768}, user.counts4769={counts4769}, user.counts4776={counts4776}, user.detect={detect}
   RETURN user
   """
 
@@ -327,6 +327,8 @@ def parse_evtx(evtx_list, GRAPH):
     admins = []
     domains = []
     deletelog = []
+    addusers = {}
+    delusers = {}
     sids = {}
     hosts = {}
     count = 0
@@ -447,9 +449,20 @@ def parse_evtx(evtx_list, GRAPH):
                                 username = username.lower()
                             else:
                                 username = "-"
-
                     if username not in admins and username != "-":
                         admins.append(username)
+                elif eventid in [4720, 4726]:
+                    for data in event_data:
+                        if data.get("Name") in "TargetUserName" and data.text != None:
+                            username = data.text.split("@")[0]
+                            if username[-1:] not in "$":
+                                username = username.lower()
+                            else:
+                                username = "-"
+                    if eventid == 4720:
+                        addusers[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        delusers[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
                 else:
                     for data in event_data:
                         if data.get("Name") in ["IpAddress", "Workstation"] and data.text != None:
@@ -572,7 +585,14 @@ def parse_evtx(evtx_list, GRAPH):
             rights = "system"
         else:
             rights = "user"
-        tx.append(statement_user, {"user": username, "rank": ranks[username],"rights": rights,"sid": sid,
+        ustatus = ""
+        if username in addusers:
+            ustatus += "Created(" + addusers[username] + ")"
+        if username in delusers:
+            ustatus += "Deleted(" + addusers[username] + ")"
+        if not ustatus:
+            ustatus = "-"
+        tx.append(statement_user, {"user": username, "rank": ranks[username],"rights": rights,"sid": sid,"status": ustatus,
                                                     "counts": ",".join(map(str, timelines[i*6])), "counts4624": ",".join(map(str, timelines[i*6+1])),
                                                     "counts4625": ",".join(map(str, timelines[i*6+2])), "counts4768": ",".join(map(str, timelines[i*6+3])),
                                                     "counts4769": ",".join(map(str, timelines[i*6+4])), "counts4776": ",".join(map(str, timelines[i*6+5])),
