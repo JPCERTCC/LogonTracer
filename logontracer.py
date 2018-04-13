@@ -630,7 +630,7 @@ def main():
     if not has_lxml:
         sys.exit("[!] lxml must be installed for this script.")
 
-    if not has_lxml:
+    if not has_numpy:
         sys.exit("[!] numpy must be installed for this script.")
 
     if not has_changefinder:
