@@ -301,7 +301,7 @@ def xml_records(filename):
                 try:
                     yield to_lxml(xml), None
                 except etree.XMLSyntaxError as e:
-                    yield xml, e, fh
+                    yield xml, e
 
     if args.xmls:
         with open(filename,'r') as fx:
@@ -316,7 +316,7 @@ def xml_records(filename):
                     try:
                         yield to_lxml("<Event>" + xml), None
                     except etree.XMLSyntaxError as e:
-                        yield xml, e, fh
+                        yield xml, e
 
 # Parse the EVTX file
 def parse_evtx(evtx_list, GRAPH):
