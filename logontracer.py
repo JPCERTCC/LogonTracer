@@ -447,7 +447,7 @@ def parse_evtx(evtx_list, GRAPH):
                         if data.get("Name") in "SubjectUserName" and data.text != None:
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
-                                username = username.lower()
+                                username = username.lower() + "@"
                             else:
                                 username = "-"
                     if username not in admins and username != "-":
@@ -457,7 +457,7 @@ def parse_evtx(evtx_list, GRAPH):
                         if data.get("Name") in "TargetUserName" and data.text != None:
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
-                                username = username.lower()
+                                username = username.lower() + "@"
                             else:
                                 username = "-"
                     if eventid == 4720:
@@ -493,7 +493,7 @@ def parse_evtx(evtx_list, GRAPH):
                         if data.get("Name") in "TargetUserName" and data.text != None:
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
-                                username = username.lower()
+                                username = username.lower() + "@"
                             else:
                                 username = "-"
 
@@ -609,7 +609,7 @@ def parse_evtx(evtx_list, GRAPH):
             ustatus += changegroups[sid]
         if not ustatus:
             ustatus = "-"
-        tx.append(statement_user, {"user": username, "rank": ranks[username],"rights": rights,"sid": sid,"status": ustatus,
+        tx.append(statement_user, {"user": username[:-1], "rank": ranks[username],"rights": rights,"sid": sid,"status": ustatus,
                                                     "counts": ",".join(map(str, timelines[i*6])), "counts4624": ",".join(map(str, timelines[i*6+1])),
                                                     "counts4625": ",".join(map(str, timelines[i*6+2])), "counts4768": ",".join(map(str, timelines[i*6+3])),
                                                     "counts4769": ",".join(map(str, timelines[i*6+4])), "counts4776": ",".join(map(str, timelines[i*6+5])),
@@ -620,11 +620,11 @@ def parse_evtx(evtx_list, GRAPH):
         tx.append(statement_domain, {"domain": domain})
 
     for _, events in event_set.iterrows():
-        tx.append(statement_r, {"user": events["username"], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
+        tx.append(statement_r, {"user": events["username"][:-1], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
                                                "status": events["status"], "count": events["count"], "authname": events["authname"]})
 
     for username, domain in domain_set_uniq:
-        tx.append(statement_dr, {"user": username, "domain": domain})
+        tx.append(statement_dr, {"user": username[:-1], "domain": domain})
 
     tx.append(statement_date, {"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
                                                  "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")})
