@@ -584,6 +584,39 @@ function pagerankQuery(queryStr, dataType, currentPage) {
     });
 }
 
+function policychangeCheck() {
+  var queryStr = "MATCH (date:Changetime) RETURN date";
+  var html = '<hr><div><table class="table table-striped"><thead><tr class="col-sm-2 col-md-2">\
+              <th class="col-sm-1 col-md-1">Date</th><th class="col-sm-1 col-md-1">Policy_Change_Category\
+              </th></tr></thead><tbody class="col-sm-2 col-md-2">';
+  var nodes = new Array();
+
+  session.run(queryStr)
+    .subscribe({
+      onNext: function(record) {
+        nodeData = record.get("date");
+        nodes.push([nodeData.properties.date, nodeData.properties.content]);
+      },
+      onCompleted: function() {
+        session.close();
+        if (nodes.length != 0) {
+          for (i = 0; i < nodes.length; i++) {
+            html += '<tr><td>' + nodes[i][0] + '</td><td>' + nodes[i][1] + '</a></td></tr>';
+            //console.log(nodes[i][0]);
+            //console.log(hosts[i][0]);
+          }
+          html += '</tbody></table></div>';
+
+          var polList = document.getElementById("policyList");
+          polList.innerHTML = html;
+        }
+      },
+      onError: function(error) {
+        console.log("Error: ", error);
+      }
+    });
+}
+
 function exportCSV() {
   var queryStr = 'MATCH (user:Username)-[event:Event]-(ip:IPAddress) RETURN user, ip, event';
   var events = new Array();

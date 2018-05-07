@@ -139,6 +139,7 @@
           <li><a onclick="prhostBack()">Back</a></li>
           <li><a onclick="prhostNext()">Next</a></li>
         </ul>
+        <div class="container" id="policyList"></div>
       </div>
     </div>
   </div>
@@ -205,6 +206,7 @@
     pagerankQuery(userqueryStr, "User", rankpageUser);
     pagerankQuery(ipqueryStr, "Host", rankpageHost);
     logdeleteCheck();
+    policychangeCheck();
 
     var loading = document.getElementById('loading');
     loading.classList.add('loaded');
