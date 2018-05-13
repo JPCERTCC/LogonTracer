@@ -90,6 +90,7 @@
           <button type="button" class="list-group-item" onclick="createFailQuery()">Logon Failure</button>
           <button type="button" class="list-group-item" onclick="adddelUsersQuery()">Add/Delete Users</button>
           <button type="button" class="list-group-item" onclick="createDomainQuery()">Domain Check</button>
+          <button type="button" class="list-group-item" onclick="policyQuery()">Audit Policy Change</button>
         </div>
         <hr>
         <a>Add event value</a><br>
@@ -139,7 +140,6 @@
           <li><a onclick="prhostBack()">Back</a></li>
           <li><a onclick="prhostNext()">Next</a></li>
         </ul>
-        <div class="container" id="policyList"></div>
       </div>
     </div>
   </div>
@@ -206,7 +206,6 @@
     pagerankQuery(userqueryStr, "User", rankpageUser);
     pagerankQuery(ipqueryStr, "Host", rankpageHost);
     logdeleteCheck();
-    policychangeCheck();
 
     var loading = document.getElementById('loading');
     loading.classList.add('loaded');

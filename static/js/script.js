@@ -18,6 +18,9 @@ function buildGraph(graph, path) {
         continue;
       }
 
+      nprivilege = "";
+      nsub = "";
+      ncategory = "";
       if (path[idx].labels[0] == "Username") {
         nname = path[idx].properties.user
         nfsize = "10"
@@ -51,7 +54,6 @@ function buildGraph(graph, path) {
         nbcolor = "#98fb98"
         nfcolor = "#3cb371"
         ntype = "Host"
-        nprivilege = "No"
       }
       if (path[idx].labels[0] == "Domain") {
         nname = path[idx].properties.domain
@@ -63,7 +65,20 @@ function buildGraph(graph, path) {
         nbcolor = "#fa98ef"
         nfcolor = "#b23aa2"
         ntype = "Domain"
-        nprivilege = "No"
+      }
+      if (path[idx].labels[0] == "ID") {
+        nname = path[idx].properties.changetime
+        nuser = path[idx].properties.user
+        nsub = path[idx].properties.sub
+        ncategory = path[idx].properties.category
+        nshape = "hexagon"
+        nwidth = "25"
+        nheight = "25"
+        nfsize = "10"
+        ncolor = "#8b6f2e"
+        nbcolor = "#f9d897"
+        nfcolor = "#b28539"
+        ntype = "Policy"
       }
       graph.nodes.push({
         "data": {
@@ -82,7 +97,9 @@ function buildGraph(graph, path) {
           "ntype": ntype,
           "nsid": path[idx].properties.sid,
           "nstatus": path[idx].properties.status,
-          "nhostname": path[idx].properties.hostname
+          "nhostname": path[idx].properties.hostname,
+          "nsub": nsub,
+          "ncategory": ncategory
         }
       });
     } else {
@@ -263,8 +280,16 @@ function qtipNode(ndata) {
     qtext += '<br>Status: ' + ndata._private.data["nstatus"];
   } else if (ndata._private.data["ntype"] == "Host") {
     qtext += '<br>Hostname: ' + ndata._private.data["nhostname"];
+  } else if (ndata._private.data["ntype"] == "Policy") {
+    qtext = "";
+    qtext += 'Date: ' + ndata._private.data["nlabel"];
+    qtext += '<br>Category: ' + ndata._private.data["ncategory"];
+    qtext += '<br>Subcategory: ' + ndata._private.data["nsub"];
   }
-  qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
+
+  if (ndata._private.data["ntype"] != "Policy") {
+    qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
+  }
 
   return qtext;
 }
@@ -291,8 +316,10 @@ function qtipEdge(ndata) {
     qtext += "<br>Logon Type: " + ndata._private.data["logontype"];
     qtext += "<br>AuthName: " + ndata._private.data["authname"];
     qtext += "<br>Status: " + ndata._private.data["status"];
-  } else {
+  } else if (ndata._private.data["label"] == "Group") {
     qtext = "Domain group";
+  } else {
+    qtext = "Audit policy change";
   }
   return qtext;
 }
@@ -366,6 +393,12 @@ function adddelUsersQuery() {
 
 function createDomainQuery() {
   queryStr = 'MATCH (user)-[event:Group]-(ip) RETURN user, event, ip';
+  //console.log(queryStr);
+  executeQuery(queryStr);
+}
+
+function policyQuery() {
+  queryStr = 'MATCH (user)-[event:Policy]-(ip) RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr);
 }
@@ -577,39 +610,6 @@ function pagerankQuery(queryStr, dataType, currentPage) {
           var rankElem = document.getElementById("rankHost");
         }
         rankElem.innerHTML = html;
-      },
-      onError: function(error) {
-        console.log("Error: ", error);
-      }
-    });
-}
-
-function policychangeCheck() {
-  var queryStr = "MATCH (date:Changetime) RETURN date";
-  var html = '<hr><div><table class="table table-striped"><thead><tr class="col-sm-2 col-md-2">\
-              <th class="col-sm-1 col-md-1">Date</th><th class="col-sm-1 col-md-1">Policy_Change_Category\
-              </th></tr></thead><tbody class="col-sm-2 col-md-2">';
-  var nodes = new Array();
-
-  session.run(queryStr)
-    .subscribe({
-      onNext: function(record) {
-        nodeData = record.get("date");
-        nodes.push([nodeData.properties.date, nodeData.properties.content]);
-      },
-      onCompleted: function() {
-        session.close();
-        if (nodes.length != 0) {
-          for (i = 0; i < nodes.length; i++) {
-            html += '<tr><td>' + nodes[i][0] + '</td><td>' + nodes[i][1] + '</a></td></tr>';
-            //console.log(nodes[i][0]);
-            //console.log(hosts[i][0]);
-          }
-          html += '</tbody></table></div>';
-
-          var polList = document.getElementById("policyList");
-          polList.innerHTML = html;
-        }
       },
       onError: function(error) {
         console.log("Error: ", error);
