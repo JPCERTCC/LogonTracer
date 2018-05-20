@@ -12,3 +12,9 @@
 #loading.loaded {
   display: none;
 }
+
+table.floatThead-table {
+  border-top: none;
+  border-bottom: none;
+  background-color: #efefef;
+}

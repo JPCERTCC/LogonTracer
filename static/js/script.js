@@ -719,15 +719,15 @@ function downloadCSV(csvType) {
             countData += users[i][0];
             for (j = 2; j <= 6; j++) {
               if (j == 2) {
-                countData += ",4624,"
+                countData += ",4624,";
               } else if (j == 3) {
-                countData += ",4625,"
+                countData += ",4625,";
               } else if (j == 4) {
-                countData += ",4768,"
+                countData += ",4768,";
               } else if (j == 5) {
-                countData += ",4769,"
+                countData += ",4769,";
               } else if (j == 6) {
-                countData += ",4776,"
+                countData += ",4776,";
               }
               countData += users[i][j] + "\r\n";
             }
@@ -750,11 +750,11 @@ function downloadCSV(csvType) {
 }
 
 function downloadSummary() {
-  downloadCSV("summary")
+  downloadCSV("summary");
 }
 
 function downloadDetail() {
-  downloadCSV("detail")
+  downloadCSV("detail");
 }
 
 function createTimeline(queryStr, tableType) {
@@ -770,8 +770,14 @@ function createTimeline(queryStr, tableType) {
   if (tableType == "search") {
     var span = 'rowspan = "4" colspan="2"';
   }
-  var html = '<div class="table-responsive"><table class="table table-bordered table-condensed table-striped" style="background-color:#EEE;"><thead><tr>\
+  var html = '<div class="table-responsive"><table class="table table-bordered table-condensed table-striped table-wrapper" style="background-color:#EEE;"><thead><tr>\
                     <th ' + span + '>Username</th>';
+
+  for (i = 0; i < chartArray.length; i ++) {
+    if (chartArray[i]) {
+      chartArray[i].destroy();
+    }
+  }
 
   session.run(queryStr)
     .subscribe({
@@ -913,11 +919,174 @@ function createTimeline(queryStr, tableType) {
 
         var timelineElem = document.getElementById("cy");
         timelineElem.innerHTML = html;
+
+        $(function(){
+          $(".table.table-wrapper").floatThead({
+            responsiveContainer: function($table){
+              return $table.closest(".table-responsive");
+            }
+          });
+        });
       },
       onError: function(error) {
         console.log("Error: ", error);
       }
     });
+}
+
+var chartArray = new Array();
+function createTimelineGraph(queryStr) {
+  var users = new Array();
+  var dates = new Array();
+  var starttime = "";
+  var endtime = "";
+
+  session.run(queryStr)
+    .subscribe({
+      onNext: function(record) {
+        dateData = record.get("date");
+        nodeData = record.get("user");
+        users.push([nodeData.properties.user, nodeData.properties.counts4624, nodeData.properties.counts4625, nodeData.properties.counts4768,
+                    nodeData.properties.counts4769, nodeData.properties.counts4776]);
+        starttime = dateData.properties.start;
+        endtime = dateData.properties.end;
+      },
+      onCompleted: function() {
+        session.close();
+        var canvasArray = addCanvas(users);
+        var startDate = new Date(starttime);
+        var rangeHours = Math.floor((Date.parse(endtime) - Date.parse(starttime)) / (1000 * 60 * 60)) + 1;
+        for (i = 1; i <= rangeHours; i++) {
+          startDate.setHours(startDate.getHours() + 1);
+          dates.push(formatDate(startDate))
+        }
+
+        for (i = 0; i < users.length; i++) {
+          var ctx = canvasArray[i].getContext("2d");
+          chartArray[i] = new Chart(ctx, {
+            type: "line",
+            data: {
+              labels: dates,
+              datasets: [
+              {
+                label: "4624",
+                borderColor: "rgb(141, 147, 200)",
+                backgroundColor: "rgb(141, 147, 200)",
+                pointHoverBorderColor: "rgb(255, 0, 0)",
+                lineTension: 0,
+                fill: false,
+                data: users[i][1].split(","),
+                pointRadius: 5,
+                pointHoverRadius: 10,
+              },
+              {
+                label: "4625",
+                borderColor: "rgb(89, 195, 225)",
+                backgroundColor: "rgb(89, 195, 225)",
+                pointHoverBorderColor: "rgb(255, 0, 0)",
+                lineTension: 0,
+                fill: false,
+                data: users[i][2].split(","),
+                pointRadius: 5,
+                pointHoverRadius: 10,
+              },
+              {
+                label: "4768",
+                borderColor: "rgb(30, 44, 92)",
+                backgroundColor: "rgb(30, 44, 92)",
+                pointHoverBorderColor: "rgb(255, 0, 0)",
+                lineTension: 0,
+                fill: false,
+                data: users[i][3].split(","),
+                pointRadius: 5,
+                pointHoverRadius: 10,
+              },
+              {
+                label: "4769",
+                borderColor: "rgb(1, 96, 140)",
+                backgroundColor: "rgb(1, 96, 140)",
+                pointHoverBorderColor: "rgb(255, 0, 0)",
+                lineTension: 0,
+                fill: false,
+                data: users[i][4].split(","),
+                pointRadius: 5,
+                pointHoverRadius: 10,
+              },
+              {
+                label: "4776",
+                borderColor: "rgb(0, 158, 150)",
+                backgroundColor: "rgb(0, 158, 150)",
+                pointHoverBorderColor: "rgb(255, 0, 0)",
+                lineTension: 0,
+                fill: false,
+                data: users[i][5].split(","),
+                pointRadius: 5,
+                pointHoverRadius: 10,
+              },
+              ]
+            },
+            options: {
+              responsive: true,
+              legend: {
+      					position: "bottom",
+                fontSize: 15,
+      				},
+      				scales: {
+      					xAxes: [{
+      						display: true,
+      						scaleLabel: {
+      							display: true,
+                    fontSize: 15,
+      							labelString: "Date"
+      						}
+      					}],
+      					yAxes: [{
+      						display: true,
+      						scaleLabel: {
+      							display: true,
+                    fontSize: 15,
+      							labelString: "Count"
+      						}
+      					}]
+      				},
+              title: {
+                  display: true,
+                  fontSize: 18,
+                  text: users[i][0]
+              },
+              elements: {
+  						  point: {
+  							  pointStyle: "crossRot"
+  					  	}
+  					  }
+            }
+          });
+        }
+
+        var timelineElem = document.getElementById("cy");
+        timelineElem.innerHTML = "";
+      },
+      onError: function(error) {
+        console.log("Error: ", error);
+      }
+    });
+}
+
+function addCanvas(users){
+    var canvasArray = new Array();
+    var obj = document.getElementById("addcanvas");
+    obj.textContent = null;
+
+    for (i = 1; i <= users.length; i++) {
+      var canvas = document.createElement("canvas");
+      canvas.id = "canvas" + i;
+      canvas.style = "height:400px;";
+      canvasArray.push(canvas);
+
+      obj.appendChild(canvas);
+    }
+
+    return canvasArray;
 }
 
 function createAlltimeline() {
@@ -945,14 +1114,24 @@ function searchTimeline() {
     }
   }
   var queryStr = 'MATCH (date:Date) MATCH (user:Username) WHERE (' + whereStr + ') RETURN date, user';
-  createTimeline(queryStr, "search");
+  var gtype = document.getElementById("timelineTypes").checked;
+  if (gtype) {
+    createTimeline(queryStr, "search");
+  } else {
+    createTimelineGraph(queryStr);
+  }
 }
 
 function clickTimeline(setStr) {
   whereStr = 'user.user =~ "' + setStr + '" ';
 
   var queryStr = 'MATCH (date:Date) MATCH (user:Username) WHERE (' + whereStr + ') RETURN date, user';
-  createTimeline(queryStr, "search");
+  var gtype = document.getElementById("timelineTypes").checked;
+  if (gtype) {
+    createTimeline(queryStr, "search");
+  } else {
+    createTimelineGraph(queryStr);
+  }
 }
 
 
@@ -1079,3 +1258,13 @@ function parseEVTX() {
     }
   }
 }
+
+var formatDate = function (date) {
+  format = "YYYY-MM-DD hh:00:00";
+  format = format.replace(/YYYY/g, date.getFullYear());
+  format = format.replace(/MM/g, ('0' + (date.getMonth() + 1)).slice(-2));
+  format = format.replace(/DD/g, ('0' + date.getDate()).slice(-2));
+  format = format.replace(/hh/g, ('0' + date.getHours()).slice(-2));
+
+  return format;
+};

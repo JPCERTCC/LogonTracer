@@ -5,11 +5,13 @@
   <meta charset="utf-8">
   <title>LogonTracer</title>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-  <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.css" integrity="sha384-EG4MkHYaMXjB6f2q1t0Jfs+W6DpGsGZls4D6PYHr9yhXwZf27Z10ReappeV2ZXcU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://gitcdn.github.io/bootstrap-toggle/2.2.2/css/bootstrap-toggle.min.css" integrity="sha384-yBEPaZw444dClEfen526Q6x4nwuzGO6PreKpbRVSLFCci3oYGE5DnD1pNsubCxYW" crossorigin="anonymous">
+  <link rel="stylesheet" href="static/css/style.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.js" integrity="sha384-6pAYkjo39N26cI9QEzy7zTD9xr9XzSnaWywG02LeFyoJnBEyYvWvqomLU+uGAlaw" crossorigin="anonymous"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
-  <!-- Neo4j JavaScript Driver -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js" integrity="sha384-0saKbDOWtYAw5aP4czPUm6ByY5JojfQ9Co6wDgkuM7Zn+anp+4Rj92oGK8cbV91S" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/floatthead/2.1.2/jquery.floatThead.min.js" integrity="sha384-ASdxdxzGplF9B/P3mStsNmNS1x+OFhChbFeLziK29WOvaWkGDMspp2xw5+Vha6Ck" crossorigin="anonymous"></script>
+  <script src="https://gitcdn.github.io/bootstrap-toggle/2.2.2/js/bootstrap-toggle.min.js" integrity="sha384-cd07Jx5KAMCf7qM+DveFKIzHXeCSYUrai+VWCPIXbYL7JraHMFL/IXaCKbLtsxyB" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>  <!-- Neo4j JavaScript Driver -->
   <script src="https://cdn.rawgit.com/neo4j/neo4j-javascript-driver/1.4.1/lib/browser/neo4j-web.min.js" integrity="sha384-xu5q3iV0ueZtK1T6RpPoUqv4VlVuEJpax+yyNmlN6CuOtT+SeUe1dqlI7MHpIN0p" crossorigin="anonymous"></script>
   <script src="static/js/script.js"></script>
 </head>
@@ -30,6 +32,7 @@
           </div>
           <input type="button" class="btn btn-default" value="+" onclick="ItemField.add();" />
           <input type="button" class="btn btn-default" value="-" onclick="ItemField.del();" />
+          <input checked data-toggle="toggle" data-on="Table" data-off="Graph" data-onstyle="primary" data-offstyle="info" type="checkbox"  id="timelineTypes">
           <button type="button" class="btn btn-default" onclick="searchTimeline()">search</button>
           <button type="button" class="btn btn-default" onclick="createAlltimeline()">all</button>
           <div class="btn-group">
@@ -50,7 +53,8 @@
     <div class="row">
       <div class="col-sm-12 col-md-12 main">
         <div id="error"></div>
-        <div id="cy" style="height:900px;"></div>
+        <div id="cy"></div>
+        <div id="addcanvas"></div>
       </div>
     </div>
   </div>
