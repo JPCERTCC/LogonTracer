@@ -947,7 +947,7 @@ function createTimelineGraph(queryStr) {
         dateData = record.get("date");
         nodeData = record.get("user");
         users.push([nodeData.properties.user, nodeData.properties.counts4624, nodeData.properties.counts4625, nodeData.properties.counts4768,
-                    nodeData.properties.counts4769, nodeData.properties.counts4776]);
+                    nodeData.properties.counts4769, nodeData.properties.counts4776, nodeData.properties.detect]);
         starttime = dateData.properties.start;
         endtime = dateData.properties.end;
       },
@@ -1023,6 +1023,18 @@ function createTimelineGraph(queryStr) {
                 pointRadius: 5,
                 pointHoverRadius: 10,
               },
+              {
+                label: "Anomaly Score",
+                borderColor: "rgb(230, 0, 57)",
+                backgroundColor: "rgb(230, 0, 57)",
+                pointHoverBorderColor: "rgb(255, 0, 0)",
+                lineTension: 0,
+                fill: false,
+                data: users[i][6].split(","),
+                pointRadius: 5,
+                pointHoverRadius: 10,
+                yAxisID: "y-right",
+              },
               ]
             },
             options: {
@@ -1047,6 +1059,19 @@ function createTimelineGraph(queryStr) {
                     fontSize: 15,
       							labelString: "Count"
       						}
+      					},
+                {
+      						display: true,
+                  id: "y-right",
+                  position: "right",
+      						scaleLabel: {
+      							display: true,
+                    fontSize: 15,
+      							labelString: "Score"
+      						},
+                  ticks: {
+                    max: 20
+                  }
       					}]
       				},
               title: {
