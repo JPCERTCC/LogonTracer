@@ -1203,23 +1203,28 @@ function file_upload() {
   var upfile = document.getElementById("lefile");
   var timezone = document.getElementById("utcTime").value;
   var logtype = document.getElementById("logType").value;
-  document.getElementById("uploadBar").innerHTML = '';
-  document.getElementById("status").innerHTML = '';
 
-  var formData = new FormData();
-  for (var i = 0; i < upfile.files.length; i++) {
-    sendFile = "file" + i
-    formData.append(sendFile, upfile.files[i]);
+  if (timezone == "Time Zone") {
+    document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Please set the time zone of the event logs.</div>';
+  } else {
+    document.getElementById("uploadBar").innerHTML = '';
+    document.getElementById("status").innerHTML = '';
+
+    var formData = new FormData();
+    for (var i = 0; i < upfile.files.length; i++) {
+      sendFile = "file" + i
+      formData.append(sendFile, upfile.files[i]);
+    }
+    formData.append("timezone", timezone);
+    formData.append("logtype", logtype);
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.upload.addEventListener("progress", progressHandler, false);
+    xmlhttp.addEventListener("load", completeHandler, false);
+    xmlhttp.addEventListener("error", errorHandler, false);
+    xmlhttp.addEventListener("abort", abortHandler, false);
+    xmlhttp.open("POST", "upload", true);
+    xmlhttp.send(formData);
   }
-  formData.append("timezone", timezone);
-  formData.append("logtype", logtype);
-  var xmlhttp = new XMLHttpRequest();
-  xmlhttp.upload.addEventListener("progress", progressHandler, false);
-  xmlhttp.addEventListener("load", completeHandler, false);
-  xmlhttp.addEventListener("error", errorHandler, false);
-  xmlhttp.addEventListener("abort", abortHandler, false);
-  xmlhttp.open("POST", "upload", true);
-  xmlhttp.send(formData);
 }
 
 function progressHandler(event) {
