@@ -1,4 +1,5 @@
 # LogonTracer
+  [![Arsenal](https://rawgit.com/toolswatch/badges/master/arsenal/usa/2018.svg)](https://www.toolswatch.org/2018/05/black-hat-arsenal-usa-2018-the-w0w-lineup/)  
   Investigate malicious logon by visualizing and analyzing Windows active directory event logs.  
 
   ![LogonTracer sample](images/sample.png)  
