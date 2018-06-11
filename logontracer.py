@@ -399,7 +399,7 @@ def xml_records(filename):
                         yield xml, e
 
 # Parse the EVTX file
-def parse_evtx(evtx_list, GRAPH):
+def parse_evtx(evtx_list):
     event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname"])
     count_set = pd.DataFrame(index=[], columns=["dates", "eventid", "username"])
     username_set = []
@@ -675,6 +675,13 @@ def parse_evtx(evtx_list, GRAPH):
 
     # Create node
     print("[*] Creating a graph data.")
+
+    try:
+        graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD +"@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
+        GRAPH = Graph(graph_http)
+    except:
+        sys.exit("[!] Can't connect Neo4j Database.")
+
     tx = GRAPH.begin()
     hosts_inv = {v:k for k, v in hosts.items()}
     for ipaddress in event_set["ipaddress"].drop_duplicates():
@@ -789,13 +796,13 @@ def main():
         for evtx_file in args.evtx:
             if not os.path.isfile(evtx_file):
                 sys.exit("[!] Can't open file {0}.".format(evtx_file))
-        parse_evtx(args.evtx, GRAPH)
+        parse_evtx(args.evtx)
 
     if args.xmls:
         for xml_file in args.xmls:
             if not os.path.isfile(xml_file):
                 sys.exit("[!] Can't open file {0}.".format(xml_file))
-        parse_evtx(args.xmls, GRAPH)
+        parse_evtx(args.xmls)
 
     print("[*] Script end. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 
