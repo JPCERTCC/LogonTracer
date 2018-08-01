@@ -498,7 +498,7 @@ def xml_records(filename):
             fixdata = xdata.replace("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>", "").replace("</Events>", "").replace("<Events>", "")
             # fixdata = xdata.replace("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>", "")
             del xdata
-            xml_list = fixdata.split("<Event xmlns=\'http://schemas.microsoft.com/win/2004/08/events/event\'>")
+            xml_list = fixdata.split("<Event xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\">")
             del fixdata
             for xml in xml_list:
                 if xml.startswith("<System>"):
