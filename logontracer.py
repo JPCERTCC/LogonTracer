@@ -251,7 +251,8 @@ def timeline():
 # Web application logs
 @app.route('/log')
 def logs():
-    with open("static/logontracer.log", "r") as lf:
+    fpath = os.path.dirname(os.path.abspath(__file__))
+    with open(fpath + "/static/logontracer.log", "r") as lf:
         logdata = lf.read()
     return logdata
 
@@ -260,6 +261,7 @@ def logs():
 @app.route("/upload", methods=["POST"])
 def do_upload():
     filelist= ""
+    fpath = os.path.dirname(os.path.abspath(__file__))
     try:
         timezone = request.form["timezone"]
         logtype = request.form["logtype"]
@@ -274,7 +276,7 @@ def do_upload():
             logoption = " -e "
         if "XML" in logtype:
             logoption = " -x "
-        parse_command = "nohup python3 logontracer.py --delete -z " + timezone + logoption + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " > static/logontracer.log 2>&1 &";
+        parse_command = "nohup python3 " + fpath + "/logontracer.py --delete -z " + timezone + logoption + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " >  " + fpath + "/static/logontracer.log 2>&1 &";
         subprocess.call("rm -f static/logontracer.log > /dev/null", shell=True)
         subprocess.call(parse_command, shell=True)
         #parse_evtx(filename)
