@@ -19,7 +19,7 @@
   * [イベントログを可視化して不正使用されたアカウントを調査](https://www.jpcert.or.jp/magazine/acreport-logontracer.html) (Japanese)
 
 ## Additional Analysis
-  LogonTracer uses [PageRank](https://en.wikipedia.org/wiki/PageRank) and [ChangeFinder](https://pdfs.semanticscholar.org/c5bc/7ca31914d3cdfe1b2932cbc779875e645bbb.pdf) to detect malicious hosts and accounts from event log.  
+  LogonTracer uses [PageRank](https://en.wikipedia.org/wiki/PageRank), [Hidden Markov model](https://en.wikipedia.org/wiki/Hidden_Markov_model) and [ChangeFinder](https://pdfs.semanticscholar.org/c5bc/7ca31914d3cdfe1b2932cbc779875e645bbb.pdf) to detect malicious hosts and accounts from event log.  
   ![PageRank List](images/rank.png)  
   With LogonTracer, it is also possible to display event logs in a chronological order.  
   ![Timeline](images/timeline.png)  

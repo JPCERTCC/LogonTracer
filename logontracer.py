@@ -55,6 +55,18 @@ try:
 except ImportError:
     has_pandas = False
 
+try:
+    from hmmlearn import hmm
+    has_hmmlearn = True
+except ImportError:
+    has_hmmlearn = False
+
+try:
+    from sklearn.externals import joblib
+    has_sklearn = True
+except ImportError:
+    has_sklearn = False
+
 # neo4j password
 NEO4J_PASSWORD = "password"
 # neo4j user name
@@ -71,6 +83,9 @@ EVENT_ID = [4624, 4625, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 47
 
 # EVTX Header
 EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
+
+# LogonTracer folder path
+FPATH = os.path.dirname(os.path.abspath(__file__))
 
 # CategoryId
 CATEGORY_IDs = {
@@ -148,6 +163,8 @@ else:
 parser = argparse.ArgumentParser(description="Visualizing and analyzing active directory Windows logon event logs.")
 parser.add_argument("-r", "--run", action="store_true", default=False,
                     help="Start web application.")
+parser.add_argument("-l", "--learn", action="store_true", default=False,
+                    help="Machine learning event logs using Hidden Markov Model.")
 parser.add_argument("-o", "--port", dest="port", action="store", type=int, metavar="PORT",
                     help="Port number to be started web application. (default: 8080).")
 parser.add_argument("-s", "--server", dest="server", action="store", type=str, metavar="SERVER",
@@ -251,8 +268,7 @@ def timeline():
 # Web application logs
 @app.route('/log')
 def logs():
-    fpath = os.path.dirname(os.path.abspath(__file__))
-    with open(fpath + "/static/logontracer.log", "r") as lf:
+    with open(FPATH + "/static/logontracer.log", "r") as lf:
         logdata = lf.read()
     return logdata
 
@@ -261,7 +277,6 @@ def logs():
 @app.route("/upload", methods=["POST"])
 def do_upload():
     filelist= ""
-    fpath = os.path.dirname(os.path.abspath(__file__))
     try:
         timezone = request.form["timezone"]
         logtype = request.form["logtype"]
@@ -276,8 +291,8 @@ def do_upload():
             logoption = " -e "
         if "XML" in logtype:
             logoption = " -x "
-        parse_command = "nohup python3 " + fpath + "/logontracer.py --delete -z " + timezone + logoption + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " >  " + fpath + "/static/logontracer.log 2>&1 &";
-        subprocess.call("rm -f static/logontracer.log > /dev/null", shell=True)
+        parse_command = "nohup python3 " + FPATH + "/logontracer.py --delete -z " + timezone + logoption + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " >  " + FPATH + "/static/logontracer.log 2>&1 &";
+        subprocess.call("rm -f " + FPATH + "/static/logontracer.log > /dev/null", shell=True)
         subprocess.call(parse_command, shell=True)
         #parse_evtx(filename)
         return "SUCCESS"
@@ -286,10 +301,11 @@ def do_upload():
 
 
 # Calculate ChangeFinder
-def adetection(counts, users,  ranks, starttime, tohours):
+def adetection(counts, users, starttime, tohours):
     count_array = np.zeros((5, len(users), tohours + 1))
     count_all_array = []
     result_array = []
+    cfdetect = {}
     for _, event in counts.iterrows():
         column = int((datetime.datetime.strptime(event["dates"], "%Y-%m-%d  %H:%M:%S") - starttime).total_seconds() / 3600)
         row = users.index(event["username"])
@@ -312,14 +328,15 @@ def adetection(counts, users,  ranks, starttime, tohours):
     for udata in count_sum:
         cf = changefinder.ChangeFinder(r=0.04, order=1, smooth=5)
         ret = []
-        u = ranks[users[num]]
         for i in count_average:
-            cf.update(i * u)
+            cf.update(i)
 
         for i in udata:
-            score = cf.update(i * u)
+            score = cf.update(i)
             ret.append(round(score, 2))
         result_array.append(ret)
+
+        cfdetect[users[num]] = max(ret)
 
         count_all_array.append(udata.tolist())
         for var in range(0, 5):
@@ -329,11 +346,11 @@ def adetection(counts, users,  ranks, starttime, tohours):
             count_all_array.append(con)
         num += 1
 
-    return count_all_array, result_array
+    return count_all_array, result_array, cfdetect
 
 
 # Calculate PageRank
-def pagerank(event_set):
+def pagerank(event_set, admins, hmm, cf, ntml):
     graph = {}
     nodes = []
     for _, events in event_set.iterrows():
@@ -349,24 +366,114 @@ def pagerank(event_set):
                 links.append(events["ipaddress"])
         graph[node] = links
 
-    d = 0.8
-    numloops = 10
+    # d = 0.85
+    numloops = 30
     ranks = {}
+    d = {}
     npages = len(graph)
+
+    # Calc damping factor and initial value
     for page in graph:
+        if page in admins:
+            df = 0.6
+        elif "@" in page[-1]:
+            df = 0.85
+        else:
+            df = 0.8
+        if page in hmm:
+            df -= 0.2
+        if page in ntml:
+            df -= 0.1
+        if page in cf:
+            df -= cf[page] / 200
+
+        d[page] = df
         ranks[page] = 1.0 / npages
 
     for i in range(0, numloops):
         newranks = {}
         for page in graph:
-            newrank = (1 - d) / npages
+            newrank = (1 - d[page]) / npages
             for node in graph:
                 if page in graph[node]:
-                    newrank = newrank + d * ranks[node]/len(graph[node])
+                    newrank = newrank + d[node] * ranks[node]/len(graph[node])
             newranks[page] = newrank
         ranks = newranks
 
     return ranks
+
+
+# Calculate Hidden Markov Model
+def decodehmm(frame, hosts, users, stime):
+    detect_hmm = []
+    model = joblib.load(FPATH + "/model/hmm.pkl")
+    while(1):
+        date = stime.strftime("%Y-%m-%d")
+        for user in users:
+            for host in hosts:
+                udata = np.array([])
+                for _, data in frame[(frame["date"].str.contains(date)) & (frame["user"] == user) & (frame["host"] == host)].iterrows():
+                    id = data["id"]
+                    if id == 4776:
+                        udata = np.append(udata, [0], axis=0)
+                    elif id == 4768:
+                        udata = np.append(udata, [1], axis=0)
+                    elif id == 4769:
+                        udata = np.append(udata, [2], axis=0)
+                    elif id == 4624:
+                        udata = np.append(udata, [3], axis=0)
+                    elif id == 4625:
+                        udata = np.append(udata, [4], axis=0)
+                if udata.shape[0] > 2:
+                    data_decode = model.predict(np.array([udata], dtype="int").T)
+                    unique_data = np.unique(data_decode)
+                    if unique_data.shape[0] == 2:
+                        if user not in detect_hmm:
+                            detect_hmm.append(user)
+
+        stime += datetime.timedelta(days=1)
+        if frame.loc[(frame["date"].str.contains(date))].empty:
+            break
+
+    return detect_hmm
+
+
+# Learning Hidden Markov Model
+def learnhmm(frame, hosts, users, stime):
+    lengths = []
+    data_array = np.array([])
+    # start_probability = np.array([0.52, 0.37, 0.11])
+    emission_probability = np.array([[0.09,   0.05,   0.35,   0.51],
+                                     [0.0003, 0.0004, 0.0003, 0.999],
+                                     [0.0003, 0.0004, 0.0003, 0.999]])
+    while(1):
+        date = stime.strftime("%Y-%m-%d")
+        for user in users:
+            for host in hosts:
+                udata = np.array([])
+                for _, data in frame[(frame["date"].str.contains(date)) & (frame["user"] == user) & (frame["host"] == host)].iterrows():
+                    id = data["id"]
+                    udata = np.append(udata, id)
+                # udata = udata[(udata*np.sign(abs(np.diff(np.concatenate(([0], udata)))))).nonzero()]
+                if udata.shape[0] > 2:
+                    data_array = np.append(data_array, udata)
+                    lengths.append(udata.shape[0])
+
+        stime += datetime.timedelta(days=1)
+        if frame.loc[(frame["date"].str.contains(date))].empty:
+            break
+
+    data_array[data_array == 4776] = 0
+    data_array[data_array == 4768] = 1
+    data_array[data_array == 4769] = 2
+    data_array[data_array == 4624] = 3
+    data_array[data_array == 4625] = 4
+    #model = hmm.GaussianHMM(n_components=3, covariance_type="full", n_iter=10000)
+    model = hmm.MultinomialHMM(n_components=3, n_iter=10000)
+    #model.startprob_ = start_probability
+    model.emissionprob_ = emission_probability
+    model.fit(np.array([data_array], dtype="int").T, lengths)
+    joblib.dump(model, FPATH + "/model/hmm.pkl")
 
 
 def to_lxml(record_xml):
@@ -404,10 +511,12 @@ def xml_records(filename):
 def parse_evtx(evtx_list):
     event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname"])
     count_set = pd.DataFrame(index=[], columns=["dates", "eventid", "username"])
+    ml_frame = pd.DataFrame(index=[], columns=["date","user","host","id"])
     username_set = []
     domain_set = []
     admins = []
     domains = []
+    ntmlauth = []
     deletelog = []
     policylist = []
     addusers = {}
@@ -615,6 +724,9 @@ def parse_evtx(evtx_list):
                         count_series = pd.Series([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username], index=count_set.columns)
                         count_set = count_set.append(count_series, ignore_index = True)
                         # print("%s,%s" % (stime.strftime("%Y-%m-%d %H:%M:%S"), username))
+                        ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, ipaddress, eventid],  index=ml_frame.columns)
+                        ml_frame = ml_frame.append(ml_series, ignore_index=True)
+
                         if domain != "-":
                             domain_set.append([username, domain])
 
@@ -629,6 +741,9 @@ def parse_evtx(evtx_list):
 
                         if hostname not in "-":
                             hosts[hostname] = ipaddress
+
+                        if authname in "NTML" and authname not in ntmlauth:
+                            ntmlauth.append(username)
 
             if eventid == 1102:
                 logtime = node.xpath("/Event/System/TimeCreated")[0].get("SystemTime")
@@ -667,13 +782,24 @@ def parse_evtx(evtx_list):
     count_set = count_set.drop_duplicates()
     domain_set_uniq = list(map(list, set(map(tuple, domain_set))))
 
-    # Calculate PageRank
-    print("[*] Calculate PageRank.")
-    ranks = pagerank(event_set)
+    # Learning event logs using Hidden Markov Model
+    ml_frame = ml_frame.replace(hosts)
+    ml_frame = ml_frame.sort_values(by="date")
+    if args.learn:
+        print("[*] Learning event logs using Hidden Markov Model.")
+        learnhmm(ml_frame, event_set["ipaddress"].drop_duplicates(), username_set, datetime.datetime(*starttime.timetuple()[:3]))
 
     # Calculate ChangeFinder
     print("[*] Calculate ChangeFinder.")
-    timelines, detects = adetection(count_set, username_set, ranks, starttime, tohours)
+    timelines, detects, detect_cf = adetection(count_set, username_set, starttime, tohours)
+
+    # Calculate Hidden Markov Model
+    print("[*] Calculate Hidden Markov Model.")
+    detect_hmm = decodehmm(ml_frame, event_set["ipaddress"].drop_duplicates(), username_set, datetime.datetime(*starttime.timetuple()[:3]))
+
+    # Calculate PageRank
+    print("[*] Calculate PageRank.")
+    ranks = pagerank(event_set, admins, detect_hmm, detect_cf, ntmlauth)
 
     # Create node
     print("[*] Creating a graph data.")
@@ -774,6 +900,12 @@ def main():
 
     if not has_pandas:
         sys.exit("[!] pandas must be installed for this script.")
+
+    if not has_hmmlearn:
+        sys.exit("[!] hmmlearn must be installed for this script.")
+
+    if not has_sklearn:
+        sys.exit("[!] scikit-learn must be installed for this script.")
 
     try:
         graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD +"@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"

@@ -4,3 +4,5 @@ python-evtx
 lxml
 changefinder
 flask
+hmmlearn
+scikit-learn
