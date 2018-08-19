@@ -718,15 +718,19 @@ def parse_evtx(evtx_list):
                         if data.get("Name") in "AuthenticationPackageName":
                             authname = data.text
 
-                    if username != "-" and ipaddress != "-" and ipaddress != "::1" and ipaddress != "127.0.0.1":
-                        event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname], index=event_set.columns)
+                    if username != "-" and ipaddress != "::1" and ipaddress != "127.0.0.1" and (ipaddress != "-" or hostname != "-"):
+                        if ipaddress != "-":
+                            event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname], index=event_set.columns)
+                            ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, ipaddress, eventid],  index=ml_frame.columns)
+                        else:
+                            event_series = pd.Series([eventid, hostname, username, logintype, status, authname], index=event_set.columns)
+                            ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, hostname, eventid],  index=ml_frame.columns)
                         event_set = event_set.append(event_series, ignore_index = True)
+                        ml_frame = ml_frame.append(ml_series, ignore_index=True)
                         # print("%s,%i,%s,%s,%s,%s" % (eventid, ipaddress, username, comment, logintype))
                         count_series = pd.Series([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username], index=count_set.columns)
                         count_set = count_set.append(count_series, ignore_index = True)
                         # print("%s,%s" % (stime.strftime("%Y-%m-%d %H:%M:%S"), username))
-                        ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, ipaddress, eventid],  index=ml_frame.columns)
-                        ml_frame = ml_frame.append(ml_series, ignore_index=True)
 
                         if domain != "-":
                             domain_set.append([username, domain])
@@ -737,10 +741,10 @@ def parse_evtx(evtx_list):
                         if domain not in domains and domain != "-":
                             domains.append(domain)
 
-                        if sid not in "-":
+                        if sid != "-":
                             sids[username] = sid
 
-                        if hostname not in "-":
+                        if hostname != "-" and ipaddress != "-" :
                             hosts[hostname] = ipaddress
 
                         if authname in "NTML" and authname not in ntmlauth:
