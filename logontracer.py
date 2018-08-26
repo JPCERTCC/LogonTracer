@@ -401,7 +401,13 @@ def pagerank(event_set, admins, hmm, cf, ntml):
             newranks[page] = newrank
         ranks = newranks
 
-    return ranks
+    nranks = {}
+    max_v = max(ranks.values())
+    min_v = min(ranks.values())
+    for key, value in ranks.items():
+        nranks[key] = (value - min_v) / (max_v - min_v)
+
+    return nranks
 
 
 # Calculate Hidden Markov Model

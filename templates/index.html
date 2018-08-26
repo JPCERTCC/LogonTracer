@@ -6,10 +6,12 @@
   <title>LogonTracer</title>
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
   <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.css" integrity="sha384-EG4MkHYaMXjB6f2q1t0Jfs+W6DpGsGZls4D6PYHr9yhXwZf27Z10ReappeV2ZXcU" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://gitcdn.github.io/bootstrap-toggle/2.2.2/css/bootstrap-toggle.min.css" integrity="sha384-yBEPaZw444dClEfen526Q6x4nwuzGO6PreKpbRVSLFCci3oYGE5DnD1pNsubCxYW" crossorigin="anonymous">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" integrity="sha384-CmLV3WR+cw/TcN50vJSYAs2EAzhDD77tQvGcmoZ1KEzxtpl2K5xkrpFz9N2H9ClN" crossorigin="anonymous">
   <link rel="stylesheet" href="static/css/style.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.js" integrity="sha384-6pAYkjo39N26cI9QEzy7zTD9xr9XzSnaWywG02LeFyoJnBEyYvWvqomLU+uGAlaw" crossorigin="anonymous"></script>
+  <script src="https://gitcdn.github.io/bootstrap-toggle/2.2.2/js/bootstrap-toggle.min.js" integrity="sha384-cd07Jx5KAMCf7qM+DveFKIzHXeCSYUrai+VWCPIXbYL7JraHMFL/IXaCKbLtsxyB" crossorigin="anonymous"></script>
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/cytoscape/3.1.1/cytoscape.min.js" integrity="sha256-lEMQOla3MoXVNUAEGAuu4n1XouEYLyZP3SRqe6BhpTY=" crossorigin="anonymous"></script>
   <script src="https://cdn.rawgit.com/cytoscape/cytoscape.js-qtip/2.7.1/cytoscape-qtip.js" integrity="sha384-iEsLCgQ6cKWEBnP+3Yd8hsUSvCzDYQU/UUVvXzB10FMtPexDn68x5Sem24bboY4I" crossorigin="anonymous"></script>
@@ -115,6 +117,9 @@
 		        <input type="radio" id="modeCircle" name="graphmode">circle</label>
         </div>
         <hr>
+        <a>Rank visualize mode</a><br>
+        <input type="checkbox" data-toggle="toggle" data-on="Enabled" data-height="35" data-off="Disabled" id="rankMode">
+        <hr>
         <a>Timeline</a><br>
         <button class="btn btn-default" onClick="window.open('timeline')">Create Timeline</button>
         <hr>
@@ -123,7 +128,7 @@
       </div>
       <div class="col-sm-8 col-md-8 main">
         <div id="error"></div>
-        <div id="cy" style="height:900px;"></div>
+        <div id="cy" style="height:1000px;"></div>
         <div id="loading">
           <span class="fa fa-refresh fa-spin"></span>
         </div>

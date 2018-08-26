@@ -21,12 +21,18 @@ function buildGraph(graph, path) {
       nprivilege = "";
       nsub = "";
       ncategory = "";
+      var rmode = document.getElementById("rankMode").checked;
+      if (rmode) {
+        nwidth = path[idx].properties.rank * 80 + 20
+        nheight = path[idx].properties.rank * 80 + 20
+      } else {
+        nwidth = "25"
+        nheight = "25"
+      }
       if (path[idx].labels[0] == "Username") {
         nname = path[idx].properties.user
         nfsize = "10"
         nshape = "ellipse"
-        nwidth = "25"
-        nheight = "25"
         ntype = "User"
         if (path[idx].properties.rights == "system") {
           ncolor = "#ff0000"
@@ -203,8 +209,6 @@ function drawGraph(graph, rootNode) {
         "shape": "data(nshape)"
       })
       .selector(':selected').css({
-        "width": 25,
-        "height": 25,
         "border-width": 4,
         "border-color": "#404040"
       })
