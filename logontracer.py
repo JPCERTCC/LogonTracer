@@ -782,11 +782,16 @@ def parse_evtx(evtx_list):
                 else:
                     deletelog.append("-")
 
-    tohours = int((endtime - starttime).total_seconds() / 3600)
-
     print("\n[*] Load finished.")
     print("[*] Total Event log is %i." % count)
-    event_set = event_set.replace(hosts)
+
+    if not username_set:
+        sys.exit("[!] This event log did not include logs to be visualized. Please check the details of the event log.")
+
+    tohours = int((endtime - starttime).total_seconds() / 3600)
+
+    if hosts:
+        event_set = event_set.replace(hosts)
     event_set["count"] = event_set.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname"])["eventid"].transform("count")
     event_set = event_set.drop_duplicates()
     count_set["count"] = count_set.groupby(["dates", "eventid", "username"])["dates"].transform("count")
@@ -794,7 +799,8 @@ def parse_evtx(evtx_list):
     domain_set_uniq = list(map(list, set(map(tuple, domain_set))))
 
     # Learning event logs using Hidden Markov Model
-    ml_frame = ml_frame.replace(hosts)
+    if hosts:
+        ml_frame = ml_frame.replace(hosts)
     ml_frame = ml_frame.sort_values(by="date")
     if args.learn:
         print("[*] Learning event logs using Hidden Markov Model.")
