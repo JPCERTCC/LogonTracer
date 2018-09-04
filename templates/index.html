@@ -39,28 +39,29 @@
           <input type="button" class="btn btn-default" value="+" onclick="ItemField.add();" />
           <input type="button" class="btn btn-default" value="-" onclick="ItemField.del();" />
           <div class="checkbox">
-            <a>Event ID: </a>
-            <label>
+            <a data-toggle="tooltip" data-placement="bottom" data-original-title="Select Event ID to visualize.">Event ID: </a>
+            <label data-toggle="tooltip" data-placement="bottom" data-original-title="Successful logon">
               <input type="checkbox" id="id4624" checked="checked"> 4624
             </label>
-            <label>
+            <label data-toggle="tooltip" data-placement="bottom" data-original-title="Logon failure">
               <input type="checkbox" id="id4625" checked="checked"> 4625
             </label>
-            <label>
+            <label data-toggle="tooltip" data-placement="bottom" data-original-title="Kerberos Authentication (TGT Request)">
               <input type="checkbox" id="id4768" checked="checked"> 4768
             </label>
-            <label>
+            <label data-toggle="tooltip" data-placement="bottom" data-original-title="Kerberos Service Ticket (ST Request)">
               <input type="checkbox" id="id4769" checked="checked"> 4769
             </label>
-            <label>
+            <label data-toggle="tooltip" data-placement="bottom" data-original-title="NTLM Authentication">
               <input type="checkbox" id="id4776" checked="checked"> 4776
             </label>
           </div>
-          <a>Count: </a>
+          <a data-toggle="tooltip" data-placement="bottom" data-original-title="Set the lower limit of Event ID to visualize."> Count: </a>
           <div class="form-group">
             <input class="form-control" type="text" value=0 id="count-input" size="1">
           </div>
-          <button type="button" class="btn btn-default" onclick="createQuery()">search</button>
+          <button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="bottom" data-original-title="Username/IPAddress/Hostname search" onclick="createQuery()">search</button>
+          <button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="bottom" data-original-title="Search for how exploit the administrator account from the account. (only one Username)" onclick="searchPath()">search path</button>
           <div class="btn-group">
             <a href="#" class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">
               Export <span class="caret"></span>
@@ -81,21 +82,21 @@
     <div class="row">
       <div class="col-sm-2 col-md-2 sidebar">
         <div class="list-group">
-          <button type="button" class="list-group-item" onclick="createAllQuery()">All Users</button>
-          <button type="button" class="list-group-item" onclick="createSystemQuery()">SYSTEM Privileges</button>
-          <button type="button" class="list-group-item" onclick="createNTLMQuery()">NTLM Remote Logon</button>
-          <button type="button" class="list-group-item" onclick="createRDPQuery()">RDP Logon</button>
-          <button type="button" class="list-group-item" onclick="createNetQuery()">Network Logon</button>
-          <button type="button" class="list-group-item" onclick="createBatchQuery()">Batch Logon</button>
-          <button type="button" class="list-group-item" onclick="createServiceQuery()">Service Logon</button>
-          <button type="button" class="list-group-item" onclick="create14068Query()">MS14-068 Exploit Failure</button>
-          <button type="button" class="list-group-item" onclick="createFailQuery()">Logon Failure</button>
-          <button type="button" class="list-group-item" onclick="adddelUsersQuery()">Add/Delete Users</button>
-          <button type="button" class="list-group-item" onclick="createDomainQuery()">Domain Check</button>
-          <button type="button" class="list-group-item" onclick="policyQuery()">Audit Policy Change</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing all users and hosts." onclick="createAllQuery()">All Users</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing users with system privileges." onclick="createSystemQuery()">SYSTEM Privileges</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing remote logon users and hosts using NTLM authentication. If not using NTLM authentication, it may be pass-the-hash." onclick="createNTLMQuery()">NTLM Remote Logon</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing RDP logon users and hosts (Logon type: 10)." onclick="createRDPQuery()">RDP Logon</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing logon users and hosts from remote network (Logon type: 3)." onclick="createNetQuery()">Network Logon</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing batch server logon (Logon type: 4)." onclick="createBatchQuery()">Batch Logon</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing Services Control Manager logon (Logon type: 5)." onclick="createServiceQuery()">Service Logon</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing the error log that the ms14-068 exploit failed." onclick="create14068Query()">MS14-068 Exploit Failure</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing failed logon." onclick="createFailQuery()">Logon Failure</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing deleted or added users." onclick="adddelUsersQuery()">Add/Delete Users</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing all domain names. If an attacker is intrude into a network, there may be a malicious domain name." onclick="createDomainQuery()">Domain Check</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing changed audit policy." onclick="policyQuery()">Audit Policy Change</button>
         </div>
         <hr>
-        <a>Add event value</a><br>
+        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Add value to edges of visualization graph.">Add event value</a><br>
         <div class="btn-group" data-toggle="buttons">
           <label class="btn btn-default">
             <input type="checkbox" name="options" id="label-count" autocomplete="off">Count</label>
@@ -107,7 +108,7 @@
             <input type="checkbox" name="options" id="label-authname" autocomplete="off">AuthName</label>
         </div>
         <hr>
-        <a>Graph mode</a><br>
+        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Select visualization graph mode.">Graph mode</a><br>
         <div class="btn-group" data-toggle="buttons">
           <label class="btn btn-default active">
 		        <input type="radio" id="modeGrid" name="graphmode" checked="checked">grid</label>
@@ -117,13 +118,13 @@
 		        <input type="radio" id="modeCircle" name="graphmode">circle</label>
         </div>
         <hr>
-        <a>Rank visualize mode</a><br>
+        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Enable visualization of malicious account ranking.">Rank visualize mode</a><br>
         <input type="checkbox" data-toggle="toggle" data-on="Enabled" data-height="35" data-off="Disabled" id="rankMode">
         <hr>
-        <a>Timeline</a><br>
+        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Displays hourly event log counts in time series.">Timeline</a><br>
         <button class="btn btn-default" onClick="window.open('timeline')">Create Timeline</button>
         <hr>
-        <a>Upload</a><br>
+        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Import event logs in EVTX or XML format.">Upload</a><br>
         <button class="btn btn-default" data-toggle="modal" data-target="#UploadEVTX">Upload Event Log</button>
       </div>
       <div class="col-sm-8 col-md-8 main">
@@ -263,6 +264,10 @@
       }
       $('#evtx_name').val(inFile.replace("C:\\fakepath\\", ""));
     });
+
+    $(function () {
+      $('[data-toggle="tooltip"]').tooltip();
+    })
   </script>
 </body>
 

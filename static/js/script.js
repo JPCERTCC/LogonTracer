@@ -485,6 +485,20 @@ function createQuery() {
   executeQuery(queryStr);
 }
 
+function searchPath() {
+  var setStr = document.getElementById("query-input").value;
+
+  queryStr = 'MATCH (from:Username) WHERE from.user = "' + setStr + '" \
+              MATCH (to:Username) WHERE to.rights = "system" \
+              MATCH (user:Username) WHERE user IN shortestPath((from)-[:Event*]-(to)) \
+              MATCH (ip:IPAddress) WHERE ip IN shortestPath((from)-[:Event*]-(to)) \
+              MATCH (user)-[event]-(ip)\
+              RETURN user, ip, event'
+
+  //console.log(queryStr);
+  executeQuery(queryStr);
+}
+
 function sendQuery(queryStr) {
   var graph = {
     "nodes": [],
@@ -512,6 +526,7 @@ function sendQuery(queryStr) {
         }
       },
       onError: function(error) {
+        searchError();
         console.log("Error: ", error);
       }
     });
@@ -538,6 +553,7 @@ function executeQuery(queryStr) {
         }
       },
       onError: function(error) {
+        searchError();
         console.log("Error: ", error);
       }
     });
@@ -933,6 +949,7 @@ function createTimeline(queryStr, tableType) {
         });
       },
       onError: function(error) {
+        searchError();
         console.log("Error: ", error);
       }
     });
@@ -1096,6 +1113,7 @@ function createTimelineGraph(queryStr) {
         timelineElem.innerHTML = "";
       },
       onError: function(error) {
+        searchError();
         console.log("Error: ", error);
       }
     });
