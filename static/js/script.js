@@ -237,7 +237,6 @@ function drawGraph(graph, rootNode) {
     elements: graph,
     layout: {
       name: flagMode,
-      directed: true,
       roots: rootNode,
       animate: true,
       padding: 10
@@ -528,7 +527,15 @@ function sendQuery(queryStr, root) {
           loading.classList.add("loaded");
         } else {
           //console.log(graph);
-          rootNode = graph.nodes[0].id;
+          if (root == "noRoot") {
+            rootNode = graph.nodes[0].data.id;
+          } else {
+            for (var i = 0; i < graph.nodes.length; i++) {
+              if (graph.nodes[i].data.nlabel == root) {
+                rootNode = graph.nodes[i].data.id;
+              }
+            }
+          }
           drawGraph(graph, rootNode);
         }
       },
