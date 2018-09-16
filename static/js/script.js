@@ -173,6 +173,7 @@ function drawGraph(graph, rootNode) {
   var flagGrid = document.getElementById("modeGrid").checked;
   var flagCose = document.getElementById("modeCose").checked;
   var flagCircle = document.getElementById("modeCircle").checked;
+  var flagTree = document.getElementById("modeTree").checked;
   var flagMode = "";
 
   if (flagGrid) {
@@ -184,6 +185,10 @@ function drawGraph(graph, rootNode) {
   if (flagCircle) {
     flagMode = "circle";
   }
+  if (flagTree) {
+    flagMode = "breadthfirst";
+  }
+
 
   cy = cytoscape({
     container: document.getElementById("cy"),
