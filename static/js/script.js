@@ -122,7 +122,6 @@ function buildGraph(graph, path) {
       if (path[idx].type == "Event") {
         var label_count = document.getElementById("label-count").checked;
         var label_type = document.getElementById("label-type").checked;
-        var label_status = document.getElementById("label-status").checked;
         var label_authname = document.getElementById("label-authname").checked;
         var ename = path[idx].properties.id;
         if (label_count) {
@@ -130,9 +129,6 @@ function buildGraph(graph, path) {
         }
         if (label_type) {
           ename += " : " + path[idx].properties.logintype;
-        }
-        if (label_status) {
-          ename += " : " + path[idx].properties.status;
         }
         if (label_authname) {
           ename += " : " + path[idx].properties.authname;
