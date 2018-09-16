@@ -1,4 +1,4 @@
-function buildGraph(graph, path) {
+function buildGraph(graph, path, root) {
   for (idx in path) {
     if (Object.keys(path[idx]).length == 3) {
       objid = parseInt(path[idx].identity.low) + 100;
@@ -49,6 +49,9 @@ function buildGraph(graph, path) {
           ncolor = "#404040"
           nshape = "octagon"
         }
+        if (root == path[idx].properties.user) {
+          nfcolor = "#404040"
+        }
       }
       if (path[idx].labels[0] == "IPAddress") {
         nname = path[idx].properties.IP
@@ -60,6 +63,9 @@ function buildGraph(graph, path) {
         nbcolor = "#98fb98"
         nfcolor = "#3cb371"
         ntype = "Host"
+        if (root == path[idx].properties.IP) {
+          nfcolor = "#404040"
+        }
       }
       if (path[idx].labels[0] == "Domain") {
         nname = path[idx].properties.domain
@@ -334,78 +340,78 @@ function createAllQuery() {
   eidStr = eidStr.slice(4);
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createSystemQuery() {
   eidStr = getQueryID();
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE user.rights = "system" ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createRDPQuery() {
   eidStr = getQueryID();
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 10 ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createNetQuery() {
   eidStr = getQueryID();
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 3 ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createBatchQuery() {
   eidStr = getQueryID();
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 4 ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createServiceQuery() {
   eidStr = getQueryID();
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 5 ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function create14068Query() {
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.status = "0xf" AND event.id = 4769 RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createFailQuery() {
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4625 RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createNTLMQuery() {
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function adddelUsersQuery() {
   queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE NOT (user.status = "-") RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createDomainQuery() {
   queryStr = 'MATCH (user)-[event:Group]-(ip) RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function policyQuery() {
   queryStr = 'MATCH (user)-[event:Policy]-(ip) RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, "noRoot");
 }
 
 function createRankQuery(setStr, qType) {
@@ -423,7 +429,7 @@ function createRankQuery(setStr, qType) {
     queryStr = 'MATCH (user)-[event:Group]-(ip) WHERE user.domain = "' + setStr + '" RETURN user, event, ip'
   }
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, setStr);
 }
 
 function getQueryID() {
@@ -483,7 +489,7 @@ function createQuery() {
   eidStr = getQueryID()
   queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, setStr);
 }
 
 function searchPath() {
@@ -497,10 +503,10 @@ function searchPath() {
               RETURN user, ip, event'
 
   //console.log(queryStr);
-  executeQuery(queryStr);
+  executeQuery(queryStr, setStr);
 }
 
-function sendQuery(queryStr) {
+function sendQuery(queryStr, root) {
   var graph = {
     "nodes": [],
     "edges": []
@@ -513,7 +519,7 @@ function sendQuery(queryStr) {
     .subscribe({
       onNext: function(record) {
         //console.log(record.get('user'), record.get('event'), record.get('ip'));
-        graph = buildGraph(graph, [record.get("user"), record.get("event"), record.get("ip")]);
+        graph = buildGraph(graph, [record.get("user"), record.get("event"), record.get("ip")], root);
       },
       onCompleted: function() {
         session.close();
@@ -533,7 +539,7 @@ function sendQuery(queryStr) {
     });
 }
 
-function executeQuery(queryStr) {
+function executeQuery(queryStr, root) {
   var countStr = queryStr.replace("user, event, ip" , "COUNT(event)");
 
   session.run(countStr)
@@ -550,7 +556,7 @@ function executeQuery(queryStr) {
             backdrop: 'false'
           });
         } else {
-          sendQuery(queryStr);
+          sendQuery(queryStr, root);
         }
       },
       onError: function(error) {
@@ -562,7 +568,7 @@ function executeQuery(queryStr) {
 
 var setqueryStr = "";
 function contQuery() {
-  sendQuery(setqueryStr);
+  sendQuery(setqueryStr, "noRoot");
 }
 
 function pruserBack() {
