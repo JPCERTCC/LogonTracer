@@ -396,7 +396,13 @@ function createNTLMQuery() {
 }
 
 function adddelUsersQuery() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE NOT (user.status = "-") RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE (user.status =~ "Created.*") OR (user.status =~ ".*Deleted.*") OR (user.status =~ ".*RemoveGroup.*") OR (user.status =~ ".*AddGroup.*") RETURN user, event, ip';
+  //console.log(queryStr);
+  executeQuery(queryStr, "noRoot");
+}
+
+function dcsyncQuery() {
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE (user.status =~ ".*DCSync.*") RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
