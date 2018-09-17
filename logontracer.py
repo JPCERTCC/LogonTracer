@@ -850,9 +850,9 @@ def parse_evtx(evtx_list):
         if username in addusers:
             ustatus += "Created(" + addusers[username] + ") "
         if username in delusers:
-            ustatus += "Deleted(" + addusers[username] + ") "
         if sid in changegroups:
             ustatus += changegroups[sid]
+            ustatus += "Deleted(" + delusers[username] + ") "
         if not ustatus:
             ustatus = "-"
         tx.append(statement_user, {"user": username[:-1], "rank": ranks[username],"rights": rights,"sid": sid,"status": ustatus,
