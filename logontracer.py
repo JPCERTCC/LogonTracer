@@ -528,7 +528,8 @@ def parse_evtx(evtx_list):
     policylist = []
     addusers = {}
     delusers = {}
-    changegroups = {}
+    addgroups = {}
+    removegroups = {}
     sids = {}
     hosts = {}
     count = 0
@@ -682,14 +683,14 @@ def parse_evtx(evtx_list):
                             groupname = data.text
                         elif data.get("Name") in "MemberSid" and data.text not in "-" and data.text != None:
                             usid = data.text
-                    changegroups[usid] = "AddGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ")"
+                    addgroups[usid] = "AddGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
                 elif eventid in [4729, 4733, 4757]:
                     for data in event_data:
                         if data.get("Name") in "TargetUserName" and data.text != None:
                             groupname = data.text
                         elif data.get("Name") in "MemberSid" and data.text not in "-" and data.text != None:
                             usid = data.text
-                    changegroups[usid] = "RemoveGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ")"
+                    removegroups[usid] = "RemoveGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
                 else:
                     for data in event_data:
                         if data.get("Name") in ["IpAddress", "Workstation"] and data.text != None:
@@ -850,9 +851,11 @@ def parse_evtx(evtx_list):
         if username in addusers:
             ustatus += "Created(" + addusers[username] + ") "
         if username in delusers:
-        if sid in changegroups:
-            ustatus += changegroups[sid]
             ustatus += "Deleted(" + delusers[username] + ") "
+        if sid in addgroups:
+            ustatus += addgroups[sid]
+        if sid in removegroups:
+            ustatus += removegroups[sid]
         if not ustatus:
             ustatus = "-"
         tx.append(statement_user, {"user": username[:-1], "rank": ranks[username],"rights": rights,"sid": sid,"status": ustatus,
