@@ -378,7 +378,7 @@ function createServiceQuery() {
 }
 
 function create14068Query() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.status = "0xf" AND event.id = 4769 RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.status =~ ".*0F" AND event.id = 4769 RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
