@@ -80,7 +80,7 @@ NEO4J_PORT = "7474"
 WEB_PORT = 8080
 
 # Check Event Id
-EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719]
+EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719, 5137, 5141]
 
 # EVTX Header
 EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
@@ -534,6 +534,8 @@ def parse_evtx(evtx_list):
     hosts = {}
     dcsync_count = {}
     dcsync = {}
+    dcshadow_check = []
+    dcshadow = {}
     count = 0
     record_sum = 0
     starttime = None
@@ -705,6 +707,18 @@ def parse_evtx(evtx_list):
                         if dcsync_count[username] == 3:
                             dcsync[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
                             dcsync_count[username] = 0
+                elif eventid in [5137, 5141]:
+                    for data in event_data:
+                        if data.get("Name") in "SubjectUserName" and data.text != None:
+                            username = data.text.split("@")[0]
+                            if username[-1:] not in "$":
+                                username = username.lower() + "@"
+                            else:
+                                username = "-"
+                        if etime.strftime("%Y-%m-%d %H:%M:%S") in dcshadow_check:
+                            dcshadow[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
+                        else:
+                            dcshadow_check.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
                 else:
                     for data in event_data:
                         if data.get("Name") in ["IpAddress", "Workstation"] and data.text != None:
@@ -872,6 +886,8 @@ def parse_evtx(evtx_list):
             ustatus += removegroups[sid]
         if username in dcsync:
             ustatus += "DCSync(" + dcsync[username] + ") "
+        if username in dcshadow:
+            ustatus += "DCShadow(" + dcshadow[username] + ") "
         if not ustatus:
             ustatus = "-"
         tx.append(statement_user, {"user": username[:-1], "rank": ranks[username],"rights": rights,"sid": sid,"status": ustatus,

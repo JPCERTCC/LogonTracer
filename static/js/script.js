@@ -401,8 +401,8 @@ function adddelUsersQuery() {
   executeQuery(queryStr, "noRoot");
 }
 
-function dcsyncQuery() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE (user.status =~ ".*DCSync.*") RETURN user, event, ip';
+function dcsQuery() {
+  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE (user.status =~ ".*DCSync.*") OR (user.status =~ ".*DCShadow.*") RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
