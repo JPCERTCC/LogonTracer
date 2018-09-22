@@ -1,11 +1,9 @@
-# LogonTracer
-  [![Arsenal](https://rawgit.com/toolswatch/badges/master/arsenal/usa/2018.svg)](https://www.toolswatch.org/2018/05/black-hat-arsenal-usa-2018-the-w0w-lineup/)  
-  Investigate malicious logon by visualizing and analyzing Windows active directory event logs.  
+  <div align="center"><img src="images/logo_top.svg" width="500"></div>  
 
-  ![LogonTracer sample](images/sample.png)  
+  [![Arsenal](https://rawgit.com/toolswatch/badges/master/arsenal/usa/2018.svg)](https://www.toolswatch.org/2018/05/black-hat-arsenal-usa-2018-the-w0w-lineup/)   
 
 ## Concept
-  LogonTracer associates a host name (or an IP address) and account name found in logon-related events and displays it as a graph. This way, it is possible to see in which account login attempt occurs and which host is used.  
+  **LogonTracer** is a tool to investigate malicious logon by visualizing and analyzing Windows Active Directory event logs. This tool associates a host name (or an IP address) and account name found in logon-related events and displays it as a graph. This way, it is possible to see in which account login attempt occurs and which host is used.  
   This tool can visualize the following event id related to Windows logon based on [this research](https://www.first.org/resources/papers/conf2016/FIRST-2016-105.pdf).  
   * **4624**: Successful logon  
   * **4625**: Logon failure  
@@ -16,7 +14,9 @@
 
   More details are described in the following documents:     
   * [Visualise Event Logs to Identify Compromised Accounts - LogonTracer -](http://blog.jpcert.or.jp/2017/11/visualise-event-logs-to-identify-compromised-accounts---logontracer-.html)  
-  * [イベントログを可視化して不正使用されたアカウントを調査](https://www.jpcert.or.jp/magazine/acreport-logontracer.html) (Japanese)
+  * [イベントログを可視化して不正使用されたアカウントを調査](https://www.jpcert.or.jp/magazine/acreport-logontracer.html) (Japanese)  
+
+  ![LogonTracer sample](images/sample.png)  
 
 ## Additional Analysis
   LogonTracer uses [PageRank](https://en.wikipedia.org/wiki/PageRank), [Hidden Markov model](https://en.wikipedia.org/wiki/Hidden_Markov_model) and [ChangeFinder](https://pdfs.semanticscholar.org/c5bc/7ca31914d3cdfe1b2932cbc779875e645bbb.pdf) to detect malicious hosts and accounts from event log.  
