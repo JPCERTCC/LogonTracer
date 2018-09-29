@@ -411,28 +411,29 @@ def pagerank(event_set, admins, hmm, cf, ntml):
 
 
 # Calculate Hidden Markov Model
-def decodehmm(frame, hosts, users, stime):
+def decodehmm(frame, users, stime):
     detect_hmm = []
     model = joblib.load(FPATH + "/model/hmm.pkl")
     while(1):
         date = stime.strftime("%Y-%m-%d")
         for user in users:
+            hosts = np.unique(frame[(frame["user"] == user)].host.values)
             for host in hosts:
-                udata = np.array([])
+                udata = []
                 for _, data in frame[(frame["date"].str.contains(date)) & (frame["user"] == user) & (frame["host"] == host)].iterrows():
                     id = data["id"]
                     if id == 4776:
-                        udata = np.append(udata, [0], axis=0)
+                        udata.append(0)
                     elif id == 4768:
-                        udata = np.append(udata, [1], axis=0)
+                        udata.append(1)
                     elif id == 4769:
-                        udata = np.append(udata, [2], axis=0)
+                        udata.append(2)
                     elif id == 4624:
-                        udata = np.append(udata, [3], axis=0)
+                        udata.append(3)
                     elif id == 4625:
-                        udata = np.append(udata, [4], axis=0)
-                if udata.shape[0] > 2:
-                    data_decode = model.predict(np.array([udata], dtype="int").T)
+                        udata.append(4)
+                if len(udata) > 2:
+                    data_decode = model.predict(np.array([np.array(udata)], dtype="int").T)
                     unique_data = np.unique(data_decode)
                     if unique_data.shape[0] == 2:
                         if user not in detect_hmm:
@@ -446,7 +447,7 @@ def decodehmm(frame, hosts, users, stime):
 
 
 # Learning Hidden Markov Model
-def learnhmm(frame, hosts, users, stime):
+def learnhmm(frame, users, stime):
     lengths = []
     data_array = np.array([])
     # start_probability = np.array([0.52, 0.37, 0.11])
@@ -456,6 +457,7 @@ def learnhmm(frame, hosts, users, stime):
     while(1):
         date = stime.strftime("%Y-%m-%d")
         for user in users:
+            hosts = np.unique(frame[(frame["user"] == user)].host.values)
             for host in hosts:
                 udata = np.array([])
                 for _, data in frame[(frame["date"].str.contains(date)) & (frame["user"] == user) & (frame["host"] == host)].iterrows():
@@ -833,7 +835,7 @@ def parse_evtx(evtx_list):
     ml_frame = ml_frame.sort_values(by="date")
     if args.learn:
         print("[*] Learning event logs using Hidden Markov Model.")
-        learnhmm(ml_frame, event_set["ipaddress"].drop_duplicates(), username_set, datetime.datetime(*starttime.timetuple()[:3]))
+        learnhmm(ml_frame, username_set, datetime.datetime(*starttime.timetuple()[:3]))
 
     # Calculate ChangeFinder
     print("[*] Calculate ChangeFinder.")
@@ -841,7 +843,7 @@ def parse_evtx(evtx_list):
 
     # Calculate Hidden Markov Model
     print("[*] Calculate Hidden Markov Model.")
-    detect_hmm = decodehmm(ml_frame, event_set["ipaddress"].drop_duplicates(), username_set, datetime.datetime(*starttime.timetuple()[:3]))
+    detect_hmm = decodehmm(ml_frame, username_set, datetime.datetime(*starttime.timetuple()[:3]))
 
     # Calculate PageRank
     print("[*] Calculate PageRank.")
