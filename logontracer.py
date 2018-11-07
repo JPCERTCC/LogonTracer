@@ -84,7 +84,7 @@ EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 47
 # EVTX Header
 EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
 
-# String Chack list
+# String Check list
 UCHECK = r"[%*+=\[\]\\/|;:\"<>?,&]"
 HCHECK = r"[*\\/|:\"<>?&]"
 
