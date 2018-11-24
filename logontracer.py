@@ -88,6 +88,12 @@ EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
 UCHECK = r"[%*+=\[\]\\/|;:\"<>?,&]"
 HCHECK = r"[*\\/|:\"<>?&]"
 
+# IPv4 regex
+IPv4_PATTERN = re.compile(r"\A\d+\.\d+\.\d+\.\d+\Z", re.DOTALL)
+
+# IPv6 regex
+IPv6_PATTERN = re.compile(r"\A(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){0,5})?|([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){0,4})?|:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){0,3})?|:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){0,2})?|:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3}))?)?|:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::([0-9a-f]|[1-9a-f][0-9a-f]{1,3})?|(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){3}))))))\Z", re.DOTALL)
+
 # LogonTracer folder path
 FPATH = os.path.dirname(os.path.abspath(__file__))
 
@@ -746,12 +752,12 @@ def parse_evtx(evtx_list):
                             dcshadow_check.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
                 else:
                     for data in event_data:
-                        if data.get("Name") in ["IpAddress", "Workstation"] and data.text is not None and (not re.search(HCHECK, data.text) or re.search(r"\A\d+\.\d+\.\d+\.\d+\Z", data.text)):
+                        if data.get("Name") in ["IpAddress", "Workstation"] and data.text is not None and (not re.search(HCHECK, data.text) or re.search(IPv4_PATTERN, data.text) or re.search(r"\A::ffff:\d+\.\d+\.\d+\.\d+\Z", data.text) or re.search(IPv6_PATTERN, data.text)):
                             ipaddress = data.text.split("@")[0]
                             ipaddress = ipaddress.lower().replace("::ffff:", "")
                             ipaddress = ipaddress.replace("\\", "")
 
-                        if data.get("Name") == "WorkstationName" and data.text is not None and (not re.search(HCHECK, data.text) or re.search(r"\A\d+\.\d+\.\d+\.\d+\Z", data.text)):
+                        if data.get("Name") == "WorkstationName" and data.text is not None and (not re.search(HCHECK, data.text) or re.search(IPv4_PATTERN, data.text) or re.search(r"\A::ffff:\d+\.\d+\.\d+\.\d+\Z", data.text) or re.search(IPv6_PATTERN, data.text)):
                             hostname = data.text.split("@")[0]
                             hostname = hostname.lower().replace("::ffff:", "")
                             hostname = hostname.replace("\\", "")
