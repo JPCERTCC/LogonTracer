@@ -31,6 +31,11 @@
 ## Documentation
   If you want to know more details, please check [the LogonTracer wiki](https://github.com/JPCERTCC/LogonTracer/wiki).
 
+## Demonstration
+  Following [YouTube's video](https://www.youtube.com/watch?v=aX-vTd7-moY) shows how to use LogonTracer.
+
+  [![LogonTracer_Demonstration](https://img.youtube.com/vi/aX-vTd7-moY/0.jpg)](https://www.youtube.com/watch?v=aX-vTd7-moY)
+
 ## Architecture
   LogonTracer is written in Python and uses Neo4j for database. The following tools are used.  
 
