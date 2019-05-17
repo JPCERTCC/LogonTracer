@@ -1,11 +1,11 @@
 function buildGraph(graph, path, root) {
+  var objidList = []
   for (idx in path) {
     if (Object.keys(path[idx]).length == 3) {
       objid = parseInt(path[idx].identity.low) + 100;
     } else {
       objid = parseInt(path[idx].identity.low) + 1000;
     }
-
     // Node
     if (Object.keys(path[idx]).length == 3) {
       var ndupflg = false;
@@ -17,7 +17,6 @@ function buildGraph(graph, path, root) {
       if (ndupflg) {
         continue;
       }
-
       nprivilege = "";
       nsub = "";
       ncategory = "";
@@ -116,19 +115,38 @@ function buildGraph(graph, path, root) {
       });
     } else {
       // Relationship
-      var ldupflg = false;
-      for (nidx in graph.edges) {
-        if (graph.edges[nidx].data.objid == objid) {
-          ldupflg = true;
-        }
-      }
-      if (ldupflg) {
+      if (objidList.indexOf(objid) >= 0) {
         continue;
+      } else {
+        objidList.push(objid)
       }
+
       if (path[idx].type == "Event") {
         var label_count = document.getElementById("label-count").checked;
         var label_type = document.getElementById("label-type").checked;
         var label_authname = document.getElementById("label-authname").checked;
+        var sourceid = parseInt(path[parseInt(idx) - 1].identity.low) + 100
+        var targetid = parseInt(path[parseInt(idx) + 1].identity.low) + 100
+
+        var filterdArray = $.grep(graph.edges,
+          function(elem, index, array) {
+            return (!(elem.data.source == sourceid && elem.data.target == targetid && elem.data.label == path[idx].type &&
+              elem.data.eid == path[idx].properties.id && elem.data.logontype == path[idx].properties.logintype &&
+              elem.data.status == path[idx].properties.status && elem.data.authname == path[idx].properties.authname));
+          }
+        );
+        var matchArray = $.grep(graph.edges,
+          function(elem, index, array) {
+            return (elem.data.source == sourceid && elem.data.target == targetid && elem.data.label == path[idx].type &&
+              elem.data.eid == path[idx].properties.id && elem.data.logontype == path[idx].properties.logintype &&
+              elem.data.status == path[idx].properties.status && elem.data.authname == path[idx].properties.authname);
+          }
+        );
+        var ecount = parseInt(path[idx].properties.count)
+        if (Object.keys(matchArray).length) {
+          ecount = ecount + parseInt(matchArray[0].data.count)
+        }
+        graph.edges = filterdArray
         var ename = path[idx].properties.id;
         if (label_count) {
           ename += " : " + path[idx].properties.count;
@@ -142,16 +160,16 @@ function buildGraph(graph, path, root) {
         graph.edges.push({
           "data": {
             "id": objid,
-            "source": parseInt(path[parseInt(idx) - 1].identity.low) + 100,
-            "target": parseInt(path[parseInt(idx) + 1].identity.low) + 100,
+            "source": sourceid,
+            "target": targetid,
             "objid": objid,
             "elabel": ename,
             "label": path[idx].type,
             "distance": 5,
             "ntype": "edge",
-            "eid": path[idx].properties.id,
-            "count": path[idx].properties.count,
-            "logontype": path[idx].properties.logintype,
+            "eid": parseInt(path[idx].properties.id),
+            "count": ecount,
+            "logontype": String(path[idx].properties.logintype),
             "status": path[idx].properties.status,
             "authname": path[idx].properties.authname
           }
@@ -171,7 +189,6 @@ function buildGraph(graph, path, root) {
       }
     }
   }
-
   return (graph);
 }
 
@@ -181,7 +198,6 @@ function drawGraph(graph, rootNode) {
   var flagCircle = document.getElementById("modeCircle").checked;
   var flagTree = document.getElementById("modeTree").checked;
   var flagMode = "";
-
   if (flagGrid) {
     flagMode = "grid";
   }
@@ -194,8 +210,6 @@ function drawGraph(graph, rootNode) {
   if (flagTree) {
     flagMode = "breadthfirst";
   }
-
-
   cy = cytoscape({
     container: document.getElementById("cy"),
     boxSelectionEnabled: false,
@@ -242,11 +256,9 @@ function drawGraph(graph, rootNode) {
       padding: 10
     }
   });
-
   cy.on("layoutstop", function() {
     loading.classList.add("loaded");
   });
-
   cy.nodes().forEach(function(ele) {
     ele.qtip({
       content: {
@@ -263,7 +275,6 @@ function drawGraph(graph, rootNode) {
       }
     });
   });
-
   cy.edges().forEach(function(ele) {
     ele.qtip({
       content: {
@@ -282,6 +293,10 @@ function drawGraph(graph, rootNode) {
   });
 }
 
+/*
+qtipNode
+This function generate the description text for each node.
+*/
 function qtipNode(ndata) {
   var qtext = 'Name: ' + ndata._private.data["nlabel"];
   if (ndata._private.data["ntype"] == "User") {
@@ -296,14 +311,16 @@ function qtipNode(ndata) {
     qtext += '<br>Category: ' + ndata._private.data["ncategory"];
     qtext += '<br>Subcategory: ' + ndata._private.data["nsub"];
   }
-
   if (ndata._private.data["ntype"] != "Policy") {
     qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
   }
-
   return qtext;
 }
 
+/*
+qtipEdge
+This function generate the description text for each edge.
+*/
 function qtipEdge(ndata) {
   var qtext = "";
   if (ndata._private.data["label"] == "Event") {
@@ -334,92 +351,164 @@ function qtipEdge(ndata) {
   return qtext;
 }
 
+/*
+createAllQuery
+This function execute neo4j query and show all users in specific time period with graph.
+The result is filtered by Event ID selected in the check box.
+*/
 function createAllQuery() {
-  eidStr = getQueryID();
+  var eidStr = getQueryID();
+  var dateStr = getDateRange();
   eidStr = eidStr.slice(4);
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE ' + eidStr + ' RETURN user, event, ip';
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE ' + eidStr + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+createSystemQuery
+This function execute neo4j query and show all system privilege users in specific time period  with graph.
+The result is filtered by Event ID selected in the check box.
+*/
 function createSystemQuery() {
-  eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE user.rights = "system" ' + eidStr + ' RETURN user, event, ip';
+  var eidStr = getQueryID();
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE user.rights = "system" ' + eidStr + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+createRDPQuery
+This function execute neo4j query and show RDP logon users in specific time period with graph.
+The result is filtered by Event ID selected in the check box.
+*/
 function createRDPQuery() {
-  eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 10 ' + eidStr + ' RETURN user, event, ip';
+  var eidStr = getQueryID();
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 10 ' + eidStr + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+createNetQuery
+This function execute neo4j query and show users who logon via network in specific time period with graph.
+The result is filtered by Event ID selected in the check box.
+*/
 function createNetQuery() {
-  eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 3 ' + eidStr + ' RETURN user, event, ip';
+  var eidStr = getQueryID();
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 3 ' + eidStr + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+createBatchQuery
+This function execute neo4j query and show users who logon by batch script in specific time period with graph.
+The result is filtered by Event ID selected in the check box.
+*/
 function createBatchQuery() {
-  eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 4 ' + eidStr + ' RETURN user, event, ip';
+  var eidStr = getQueryID();
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 4 ' + eidStr + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+createServiceQuery
+This function execute neo4j query and show users who logon from windows service in specific time period with graph.
+The result is filtered by Event ID selected in the check box.
+*/
 function createServiceQuery() {
-  eidStr = getQueryID();
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 5 ' + eidStr + ' RETURN user, event, ip';
+  var eidStr = getQueryID();
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.logintype = 5 ' + eidStr + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+create14068Query
+This function execute neo4j query and show users who attempted to exploit MS14-068 in specific time period with graph.
+*/
 function create14068Query() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.status =~ ".*0F" AND event.id = 4769 RETURN user, event, ip';
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.status =~ ".*0F" AND event.id = 4769 ' + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+createFailQuery
+This function execute neo4j query and show users who failed to logon in specific time period with graph.
+*/
 function createFailQuery() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4625 RETURN user, event, ip';
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4625 ' + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+createNTLMQuery
+This function execute neo4j query and show users who login with NTLM authentication in specific time period with graph.
+*/
 function createNTLMQuery() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 RETURN user, event, ip';
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE event.id = 4624 and event.authname = "NTLM" and event.logintype = 3 ' + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+adddelUserQuery
+This function execute neo4j query and show users who had be created or deleted in specific time period with graph.
+*/
 function adddelUsersQuery() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE (user.status =~ "Created.*") OR (user.status =~ ".*Deleted.*") OR (user.status =~ ".*RemoveGroup.*") OR (user.status =~ ".*AddGroup.*") RETURN user, event, ip';
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE (user.status =~ "Created.*") OR (user.status =~ ".*Deleted.*") OR (user.status =~ ".*RemoveGroup.*") OR (user.status =~ ".*AddGroup.*") ' + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+dcsQuery
+This function execute neo4j query and show users who executed DCSync or DCShadow in specific time period with graph.
+*/
 function dcsQuery() {
-  queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE (user.status =~ ".*DCSync.*") OR (user.status =~ ".*DCShadow.*") RETURN user, event, ip';
+  var dateStr = getDateRange();
+  var queryStr = 'MATCH (user)-[event:Event]-(ip) WHERE (user.status =~ ".*DCSync.*") OR (user.status =~ ".*DCShadow.*") ' + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+dcsQuery
+This function execute neo4j query and show users who executed DCSync or DCShadow in specific time period with graph.
+*/
 function createDomainQuery() {
-  queryStr = 'MATCH (user)-[event:Group]-(ip) RETURN user, event, ip';
+  var queryStr = 'MATCH (user)-[event:Group]-(ip) RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
+/*
+policyQuery
+This function execute neo4j query and show users who changed the audit policy in specific time period with graph.
+*/
 function policyQuery() {
-  queryStr = 'MATCH (user)-[event:Policy]-(ip) RETURN user, event, ip';
+  var dateStr = getDateRange();
+  dateStr = dateStr.slice(5);
+  queryStr = 'MATCH (user)-[event:Policy]-(ip) WHERE ' + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, "noRoot");
 }
 
 function createRankQuery(setStr, qType) {
+  var dateStr = getDateRange();
   if (qType == "User") {
     whereStr = 'user.user = "' + setStr + '" ';
   }
@@ -429,7 +518,7 @@ function createRankQuery(setStr, qType) {
 
   if (qType != "Domain") {
     eidStr = getQueryID();
-    queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
+    queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + dateStr + ' RETURN user, event, ip';
   } else {
     queryStr = 'MATCH (user)-[event:Group]-(ip) WHERE user.domain = "' + setStr + '" RETURN user, event, ip'
   }
@@ -437,6 +526,10 @@ function createRankQuery(setStr, qType) {
   executeQuery(queryStr, setStr);
 }
 
+/*
+getQueryID
+This function generate the neo4j query strings to filter Windows Event ID and ID count.
+*/
 function getQueryID() {
   var id4624Ch = document.getElementById("id4624").checked;
   var id4625Ch = document.getElementById("id4625").checked;
@@ -466,9 +559,26 @@ function getQueryID() {
   return eidStr;
 }
 
+/*
+getDateRange
+This function generates a neo4j query strings to filter events in specific time period.
+*/
+function getDateRange() {
+  var fromDate = new Date(document.getElementById("from-date").value).getTime() / 1000;
+  var toDate = new Date(document.getElementById("to-date").value).getTime() / 1000;
+  var dateStr = " AND (event.date >= " + fromDate + " AND event.date <= " + toDate + ")";
+
+  return dateStr;
+}
+
+/*
+createQuery
+This function generates a neo4j query strings from search box and execute the query.
+*/
 function createQuery() {
   var selectVal = document.getElementById("InputSelect").value;
   var setStr = document.getElementById("query-input").value;
+  var dateStr = getDateRange();
 
   if (selectVal == "Username") {
     whereStr = 'user.user =~ "' + setStr + '" ';
@@ -492,25 +602,36 @@ function createQuery() {
   }
 
   eidStr = getQueryID()
-  queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + ' RETURN user, event, ip';
+  queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + dateStr + ' RETURN user, event, ip';
   //console.log(queryStr);
   executeQuery(queryStr, setStr);
 }
 
+/*
+searchPath
+This function execute a neo4j query strings to search the shortest path to system privilege in specific time period.
+*/
 function searchPath() {
   var setStr = document.getElementById("query-input").value;
+  var dateStr = getDateRange();
+  dateStr = dateStr.slice(5);
 
   queryStr = 'MATCH (from:Username) WHERE from.user = "' + setStr + '" \
               MATCH (to:Username) WHERE to.rights = "system" \
               MATCH (user:Username) WHERE user IN shortestPath((from)-[:Event*]-(to)) \
               MATCH (ip:IPAddress) WHERE ip IN shortestPath((from)-[:Event*]-(to)) \
-              MATCH (user)-[event]-(ip)\
+              MATCH (user)-[event]-(ip) WHERE ' + dateStr + ' \
               RETURN user, ip, event'
 
   //console.log(queryStr);
   executeQuery(queryStr, setStr);
 }
 
+/*
+sendQuery
+This function sends the query to neo4j.
+If the query success, this function build the graph and draw it from the neo4j query result.
+*/
 function sendQuery(queryStr, root) {
   var graph = {
     "nodes": [],
@@ -552,8 +673,12 @@ function sendQuery(queryStr, root) {
     });
 }
 
+/*
+executeQuery
+This function executes the neo4j query.
+*/
 function executeQuery(queryStr, root) {
-  var countStr = queryStr.replace("user, event, ip" , "COUNT(event)");
+  var countStr = queryStr.replace("user, event, ip", "COUNT(event)");
 
   session.run(countStr)
     .subscribe({
@@ -579,7 +704,106 @@ function executeQuery(queryStr, root) {
     });
 }
 
+/*
+diffQuery
+This function compare 2 days events from neo4j.
+If the query success, this function build the graph and draw it from the neo4j query result.
+*/
+function diffQuery() {
+  var graph1 = {
+    "nodes": [],
+    "edges": []
+  };
+
+  root = "noRoot"
+  var date1st = new Date(document.getElementById("from-day").value).getTime() / 1000;
+
+  queryStr1st = 'MATCH (user)-[event:Event]-(ip)  WHERE event.date >= ' + date1st + ' AND event.date <= ' + (date1st + 86400) + ' RETURN user, event, ip';
+
+  session.run(queryStr1st)
+    .subscribe({
+      onNext: function(record) {
+        //console.log(record.get('user'), record.get('event'), record.get('ip'));
+        graph1 = buildGraph(graph1, [record.get("user"), record.get("event"), record.get("ip")], root);
+      },
+      onCompleted: function() {
+        session.close();
+        if (graph1.nodes.length == 0) {
+          searchError();
+        } else {
+          diffNext(graph1);
+        }
+      },
+      onError: function(error) {
+        searchError();
+        console.log("Error: ", error);
+      }
+    });
+}
+
+function diffNext(graph1) {
+  var graph2 = {
+    "nodes": [],
+    "edges": []
+  };
+
+  root = "noRoot"
+  var date2nd = new Date(document.getElementById("to-day").value).getTime() / 1000;
+
+  queryStr2nd = 'MATCH (user)-[event:Event]-(ip)  WHERE event.date >= ' + date2nd + ' AND event.date <= ' + (date2nd + 86400) + ' RETURN user, event, ip';
+
+  var loading = document.getElementById('loading');
+  loading.classList.remove('loaded');
+
+  session.run(queryStr2nd)
+    .subscribe({
+      onNext: function(record) {
+        //console.log(record.get('user'), record.get('event'), record.get('ip'));
+        graph2 = buildGraph(graph2, [record.get("user"), record.get("event"), record.get("ip")], root);
+      },
+      onCompleted: function() {
+        session.close();
+        if (graph2.nodes.length == 0) {
+          searchError();
+          loading.classList.add("loaded");
+        } else {
+          graph2.edges = getArrayDiff(graph1, graph2);
+          graph2.nodes = nodeConcat(graph1, graph2);
+          if (graph2.edges.length > 0) {
+            drawGraph(graph2, graph2.nodes[0].data.id);
+          } else{
+            searchError();
+            loading.classList.add("loaded");
+          }
+        }
+      },
+      onError: function(error) {
+        searchError();
+        console.log("Error: ", error);
+      }
+    });
+}
+
+function getArrayDiff(arr1, arr2) {
+  let arr = arr1.edges.concat(arr2.edges);
+  return arr.filter((v, i)=> {
+    return !(arr1.edges.findIndex(obj => obj.data.source === v.data.source, obj => obj.data.target === v.data.target) >= 0 &&
+             arr2.edges.findIndex(obj => obj.data.source === v.data.source, obj => obj.data.target === v.data.target) >= 0);
+  });
+}
+
+function nodeConcat(arr1, arr2) {
+  let arr = arr1.nodes.concat(arr2.nodes);
+  return arr.filter((v, i)=> {
+    console.log(arr2.edges)
+    console.log(arr)
+    return (arr2.edges.findIndex(obj => obj.data.source === v.data.id) >= 0 ||
+            arr2.edges.findIndex(obj => obj.data.target === v.data.id) >= 0);
+  });
+}
+
 var setqueryStr = "";
+
 function contQuery() {
   sendQuery(setqueryStr, "noRoot");
 }
@@ -813,7 +1037,7 @@ function createTimeline(queryStr, tableType) {
   var html = '<div class="table-responsive"><table class="table table-bordered table-condensed table-striped table-wrapper" style="background-color:#EEE;"><thead><tr>\
                     <th ' + span + '>Username</th>';
 
-  for (i = 0; i < chartArray.length; i ++) {
+  for (i = 0; i < chartArray.length; i++) {
     if (chartArray[i]) {
       chartArray[i].destroy();
     }
@@ -960,9 +1184,9 @@ function createTimeline(queryStr, tableType) {
         var timelineElem = document.getElementById("cy");
         timelineElem.innerHTML = html;
 
-        $(function(){
+        $(function() {
           $(".table.table-wrapper").floatThead({
-            responsiveContainer: function($table){
+            responsiveContainer: function($table) {
               return $table.closest(".table-responsive");
             }
           });
@@ -976,6 +1200,7 @@ function createTimeline(queryStr, tableType) {
 }
 
 var chartArray = new Array();
+
 function createTimelineGraph(queryStr) {
   var users = new Array();
   var dates = new Array();
@@ -988,7 +1213,8 @@ function createTimelineGraph(queryStr) {
         dateData = record.get("date");
         nodeData = record.get("user");
         users.push([nodeData.properties.user, nodeData.properties.counts4624, nodeData.properties.counts4625, nodeData.properties.counts4768,
-                    nodeData.properties.counts4769, nodeData.properties.counts4776, nodeData.properties.detect]);
+          nodeData.properties.counts4769, nodeData.properties.counts4776, nodeData.properties.detect
+        ]);
         starttime = dateData.properties.start;
         endtime = dateData.properties.end;
       },
@@ -1008,123 +1234,123 @@ function createTimelineGraph(queryStr) {
             type: "line",
             data: {
               labels: dates,
-              datasets: [
-              {
-                label: "4624",
-                borderColor: "rgb(141, 147, 200)",
-                backgroundColor: "rgb(141, 147, 200)",
-                pointHoverBorderColor: "rgb(255, 0, 0)",
-                lineTension: 0,
-                fill: false,
-                data: users[i][1].split(","),
-                pointRadius: 5,
-                pointHoverRadius: 10,
-              },
-              {
-                label: "4625",
-                borderColor: "rgb(89, 195, 225)",
-                backgroundColor: "rgb(89, 195, 225)",
-                pointHoverBorderColor: "rgb(255, 0, 0)",
-                lineTension: 0,
-                fill: false,
-                data: users[i][2].split(","),
-                pointRadius: 5,
-                pointHoverRadius: 10,
-              },
-              {
-                label: "4768",
-                borderColor: "rgb(30, 44, 92)",
-                backgroundColor: "rgb(30, 44, 92)",
-                pointHoverBorderColor: "rgb(255, 0, 0)",
-                lineTension: 0,
-                fill: false,
-                data: users[i][3].split(","),
-                pointRadius: 5,
-                pointHoverRadius: 10,
-              },
-              {
-                label: "4769",
-                borderColor: "rgb(1, 96, 140)",
-                backgroundColor: "rgb(1, 96, 140)",
-                pointHoverBorderColor: "rgb(255, 0, 0)",
-                lineTension: 0,
-                fill: false,
-                data: users[i][4].split(","),
-                pointRadius: 5,
-                pointHoverRadius: 10,
-              },
-              {
-                label: "4776",
-                borderColor: "rgb(0, 158, 150)",
-                backgroundColor: "rgb(0, 158, 150)",
-                pointHoverBorderColor: "rgb(255, 0, 0)",
-                lineTension: 0,
-                fill: false,
-                data: users[i][5].split(","),
-                pointRadius: 5,
-                pointHoverRadius: 10,
-              },
-              {
-                label: "Anomaly Score",
-                borderColor: "rgb(230, 0, 57)",
-                backgroundColor: "rgb(230, 0, 57)",
-                pointHoverBorderColor: "rgb(255, 0, 0)",
-                lineTension: 0,
-                fill: false,
-                data: users[i][6].split(","),
-                pointRadius: 5,
-                pointHoverRadius: 10,
-                yAxisID: "y-right",
-              },
+              datasets: [{
+                  label: "4624",
+                  borderColor: "rgb(141, 147, 200)",
+                  backgroundColor: "rgb(141, 147, 200)",
+                  pointHoverBorderColor: "rgb(255, 0, 0)",
+                  lineTension: 0,
+                  fill: false,
+                  data: users[i][1].split(","),
+                  pointRadius: 5,
+                  pointHoverRadius: 10,
+                },
+                {
+                  label: "4625",
+                  borderColor: "rgb(89, 195, 225)",
+                  backgroundColor: "rgb(89, 195, 225)",
+                  pointHoverBorderColor: "rgb(255, 0, 0)",
+                  lineTension: 0,
+                  fill: false,
+                  data: users[i][2].split(","),
+                  pointRadius: 5,
+                  pointHoverRadius: 10,
+                },
+                {
+                  label: "4768",
+                  borderColor: "rgb(30, 44, 92)",
+                  backgroundColor: "rgb(30, 44, 92)",
+                  pointHoverBorderColor: "rgb(255, 0, 0)",
+                  lineTension: 0,
+                  fill: false,
+                  data: users[i][3].split(","),
+                  pointRadius: 5,
+                  pointHoverRadius: 10,
+                },
+                {
+                  label: "4769",
+                  borderColor: "rgb(1, 96, 140)",
+                  backgroundColor: "rgb(1, 96, 140)",
+                  pointHoverBorderColor: "rgb(255, 0, 0)",
+                  lineTension: 0,
+                  fill: false,
+                  data: users[i][4].split(","),
+                  pointRadius: 5,
+                  pointHoverRadius: 10,
+                },
+                {
+                  label: "4776",
+                  borderColor: "rgb(0, 158, 150)",
+                  backgroundColor: "rgb(0, 158, 150)",
+                  pointHoverBorderColor: "rgb(255, 0, 0)",
+                  lineTension: 0,
+                  fill: false,
+                  data: users[i][5].split(","),
+                  pointRadius: 5,
+                  pointHoverRadius: 10,
+                },
+                {
+                  label: "Anomaly Score",
+                  borderColor: "rgb(230, 0, 57)",
+                  backgroundColor: "rgb(230, 0, 57)",
+                  pointHoverBorderColor: "rgb(255, 0, 0)",
+                  lineTension: 0,
+                  fill: false,
+                  data: users[i][6].split(","),
+                  pointRadius: 5,
+                  pointHoverRadius: 10,
+                  yAxisID: "y-right",
+                },
               ]
             },
             options: {
               responsive: true,
               legend: {
-      					position: "bottom",
+                position: "bottom",
                 fontSize: 15,
-      				},
-      				scales: {
-      					xAxes: [{
-      						display: true,
-      						scaleLabel: {
-      							display: true,
-                    fontSize: 15,
-      							labelString: "Date"
-      						}
-      					}],
-      					yAxes: [{
-      						display: true,
-      						scaleLabel: {
-      							display: true,
-                    fontSize: 15,
-      							labelString: "Count"
-      						}
-      					},
-                {
-      						display: true,
-                  id: "y-right",
-                  position: "right",
-      						scaleLabel: {
-      							display: true,
-                    fontSize: 15,
-      							labelString: "Score"
-      						},
-                  ticks: {
-                    max: 20
-                  }
-      					}]
-      				},
-              title: {
+              },
+              scales: {
+                xAxes: [{
                   display: true,
-                  fontSize: 18,
-                  text: users[i][0]
+                  scaleLabel: {
+                    display: true,
+                    fontSize: 15,
+                    labelString: "Date"
+                  }
+                }],
+                yAxes: [{
+                    display: true,
+                    scaleLabel: {
+                      display: true,
+                      fontSize: 15,
+                      labelString: "Count"
+                    }
+                  },
+                  {
+                    display: true,
+                    id: "y-right",
+                    position: "right",
+                    scaleLabel: {
+                      display: true,
+                      fontSize: 15,
+                      labelString: "Score"
+                    },
+                    ticks: {
+                      max: 20
+                    }
+                  }
+                ]
+              },
+              title: {
+                display: true,
+                fontSize: 18,
+                text: users[i][0]
               },
               elements: {
-  						  point: {
-  							  pointStyle: "crossRot"
-  					  	}
-  					  }
+                point: {
+                  pointStyle: "crossRot"
+                }
+              }
             }
           });
         }
@@ -1139,21 +1365,21 @@ function createTimelineGraph(queryStr) {
     });
 }
 
-function addCanvas(users){
-    var canvasArray = new Array();
-    var obj = document.getElementById("addcanvas");
-    obj.textContent = null;
+function addCanvas(users) {
+  var canvasArray = new Array();
+  var obj = document.getElementById("addcanvas");
+  obj.textContent = null;
 
-    for (i = 1; i <= users.length; i++) {
-      var canvas = document.createElement("canvas");
-      canvas.id = "canvas" + i;
-      canvas.style = "height:400px;";
-      canvasArray.push(canvas);
+  for (i = 1; i <= users.length; i++) {
+    var canvas = document.createElement("canvas");
+    canvas.id = "canvas" + i;
+    canvas.style = "height:400px;";
+    canvasArray.push(canvas);
 
-      obj.appendChild(canvas);
-    }
+    obj.appendChild(canvas);
+  }
 
-    return canvasArray;
+  return canvasArray;
 }
 
 function createAlltimeline() {
@@ -1201,7 +1427,10 @@ function clickTimeline(setStr) {
   }
 }
 
-
+/*
+logdeleteCheck
+push alert if the event log had deleted.
+*/
 function logdeleteCheck() {
   var queryStr = "MATCH (date:Deletetime) RETURN date";
   var ddata = "";
@@ -1231,6 +1460,10 @@ function logdeleteCheck() {
     });
 }
 
+/*
+searchError
+push alert if search has failed.
+*/
 function searchError() {
   var elemMsg = document.getElementById("error");
   elemMsg.innerHTML =
@@ -1241,6 +1474,10 @@ function searchError() {
   });
 }
 
+/*
+file_upload
+Upload EVTX file or XML file to LogonTracer Server.
+*/
 function file_upload() {
   var upfile = document.getElementById("lefile");
   var timezone = document.getElementById("utcTime").value;
@@ -1301,6 +1538,10 @@ function abortHandler(event) {
   document.getElementById("status").innerHTML = '<div class="alert alert-info">Upload Aborted</div>';
 }
 
+/*
+parseEVTX
+Get EVTX parsing progress from log.
+*/
 function parseEVTX() {
   var xmlhttp2 = new XMLHttpRequest();
   xmlhttp2.open("GET", "/log");
@@ -1331,7 +1572,76 @@ function parseEVTX() {
   }
 }
 
-var formatDate = function (date) {
+/*
+loaddate
+load date info from neo4j
+*/
+function loaddate() {
+  var queryStr = 'MATCH (date:Date) RETURN date';
+
+  session.run(queryStr)
+    .subscribe({
+      onNext: function(record) {
+        dateData = record.get("date");
+        starttime = dateData.properties.start;
+        endtime = dateData.properties.end;
+      },
+      onCompleted: function() {
+        session.close();
+        var minDate = new Date(starttime);
+        var maxDate = new Date(endtime);
+        maxDate.setTime(maxDate.getTime() + 3600000);
+
+        var minDay = new Date(starttime);
+        var maxDay = new Date(endtime);
+        var setminDate = new Date(minDay.getFullYear(), minDay.getMonth(), minDay.getDate())
+        minDay.setTime(setminDate.getTime());
+        var setmaxDate = new Date(maxDay.getFullYear(), maxDay.getMonth(), maxDay.getDate())
+        maxDay.setTime(setmaxDate.getTime());
+
+        $('.fromdate').datetimepicker({
+          locale: "en",
+          format: "YYYY-MM-DD HH:00:00",
+          useCurrent: false,
+          defaultDate: minDate,
+          maxDate: maxDate,
+          minDate: minDate
+        });
+
+        $('.todate').datetimepicker({
+          locale: "en",
+          format: "YYYY-MM-DD HH:00:00",
+          useCurrent: false,
+          defaultDate: maxDate,
+          maxDate: maxDate,
+          minDate: minDate
+        });
+
+        $('.fromday').datetimepicker({
+          locale: "en",
+          format: "YYYY-MM-DD",
+          useCurrent: false,
+          defaultDate: minDay,
+          maxDate: maxDay,
+          minDate: minDay
+        });
+
+        $('.today').datetimepicker({
+          locale: "en",
+          format: "YYYY-MM-DD",
+          useCurrent: false,
+          defaultDate: maxDay,
+          maxDate: maxDay,
+          minDate: minDay
+        });
+      },
+      onError: function(error) {
+        console.log("Error: ", error);
+      }
+    });
+}
+
+var formatDate = function(date) {
   format = "YYYY-MM-DD hh:00:00";
   format = format.replace(/YYYY/g, date.getFullYear());
   format = format.replace(/MM/g, ('0' + (date.getMonth() + 1)).slice(-2));

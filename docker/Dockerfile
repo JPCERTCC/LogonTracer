@@ -26,7 +26,7 @@ RUN apk add --no-cache \
     curl \
     python \
     py-pip \
-    libssl1.0
+    libssl1.1
 
 ## python3.6 and modules install
 ENV PYTHON_VERSION=3.6.2 \
@@ -51,6 +51,8 @@ WORKDIR /usr/local/src
 
 RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && cd LogonTracer \
+    && pip3.6 install --upgrade pip \
+    && pip3.6 install --upgrade setuptools \
     && pip3.6 install numpy \
     && pip3.6 install -r requirements.txt \
     && unlink /var/lib/neo4j/data \

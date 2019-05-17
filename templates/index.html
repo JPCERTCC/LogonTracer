@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.css" integrity="sha384-EG4MkHYaMXjB6f2q1t0Jfs+W6DpGsGZls4D6PYHr9yhXwZf27Z10ReappeV2ZXcU" crossorigin="anonymous">
   <link rel="stylesheet" href="https://gitcdn.github.io/bootstrap-toggle/2.2.2/css/bootstrap-toggle.min.css" integrity="sha384-yBEPaZw444dClEfen526Q6x4nwuzGO6PreKpbRVSLFCci3oYGE5DnD1pNsubCxYW" crossorigin="anonymous">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" integrity="sha384-CmLV3WR+cw/TcN50vJSYAs2EAzhDD77tQvGcmoZ1KEzxtpl2K5xkrpFz9N2H9ClN" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datetimepicker/4.17.47/css/bootstrap-datetimepicker.css" integrity="sha384-BxjoNa5Gy6HWpewxZeRKXOU9soDrevzGlc0x2UrFD5yPVuBIz/3YUxvzchy7Q1+k" crossorigin="anonymous">
   <link rel="stylesheet" href="static/css/style.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.js" integrity="sha384-6pAYkjo39N26cI9QEzy7zTD9xr9XzSnaWywG02LeFyoJnBEyYvWvqomLU+uGAlaw" crossorigin="anonymous"></script>
@@ -15,6 +16,8 @@
   <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.4.2/dist/cytoscape.min.js" integrity="sha384-vTbGUxFr0qyAqYeS+nIqQ6Row8uIp1PgvAWiA4GuEtdkD8scsArkL9QgZHWaHuv5" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape-qtip@2.7.1/cytoscape-qtip.min.js" integrity="sha384-0S5MX36ySZW8tkZEooDZdxYdGvtwdVxA/1bl0U0zoqsrHBJbv4LxKxc8Hp8LpxlE" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js" integrity="sha384-sIzeKWIAHvT0Vm8QbfLCqZwBG0WMCkWVAOYd/330YSNeeQ1Y57N3T9lQz5Ry/EHH" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap-datetimepicker/4.17.47/js/bootstrap-datetimepicker.min.js" integrity="sha384-eRwUWQDbnWMRrNpCKFsqmkfL7PMM8a4uUw5AvjTuLRoYFfozRz7g9BS696LvdNrE" crossorigin="anonymous"></script>
   <!-- Neo4j JavaScript Driver -->
   <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@1.7.3/lib/browser/neo4j-web.min.js" integrity="sha384-XVrDQNh79isRQKoUzX8pCHmnP2HmtLQJTDMfzI5/4gxbjqz7mHlGjTKyQxVGKR7k" crossorigin="anonymous"></script>
   <script src="static/js/script.js"></script>
@@ -38,28 +41,7 @@
           </div>
           <input type="button" class="btn btn-default" value="+" onclick="ItemField.add();" />
           <input type="button" class="btn btn-default" value="-" onclick="ItemField.del();" />
-          <div class="checkbox">
-            <a data-toggle="tooltip" data-placement="bottom" data-original-title="Select Event ID to visualize.">Event ID: </a>
-            <label data-toggle="tooltip" data-placement="bottom" data-original-title="Successful logon">
-              <input type="checkbox" id="id4624" checked="checked"> 4624
-            </label>
-            <label data-toggle="tooltip" data-placement="bottom" data-original-title="Logon failure">
-              <input type="checkbox" id="id4625" checked="checked"> 4625
-            </label>
-            <label data-toggle="tooltip" data-placement="bottom" data-original-title="Kerberos Authentication (TGT Request)">
-              <input type="checkbox" id="id4768" checked="checked"> 4768
-            </label>
-            <label data-toggle="tooltip" data-placement="bottom" data-original-title="Kerberos Service Ticket (ST Request)">
-              <input type="checkbox" id="id4769" checked="checked"> 4769
-            </label>
-            <label data-toggle="tooltip" data-placement="bottom" data-original-title="NTLM Authentication">
-              <input type="checkbox" id="id4776" checked="checked"> 4776
-            </label>
-          </div>
-          <a data-toggle="tooltip" data-placement="bottom" data-original-title="Set the lower limit of Event ID to visualize."> Count: </a>
-          <div class="form-group">
-            <input class="form-control" type="text" value=0 id="count-input" size="1">
-          </div>
+          <input type="button" class="btn btn-default" data-toggle="modal" value="Filter" data-target="#Filters">
           <button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="bottom" data-original-title="Username/IPAddress/Hostname search" onclick="createQuery()">search</button>
           <button type="button" class="btn btn-default" data-toggle="tooltip" data-placement="bottom" data-original-title="Search for how exploit the administrator account from the account. (only one Username)" onclick="searchPath()">search path</button>
           <div class="btn-group">
@@ -95,6 +77,8 @@
           <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing deleted or added users." onclick="adddelUsersQuery()">Add/Delete Users</button>
           <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing all domain names. If an attacker is intrude into a network, there may be a malicious domain name." onclick="createDomainQuery()">Domain Check</button>
           <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing changed audit policy." onclick="policyQuery()">Audit Policy Change</button>
+          <button type="button" class="list-group-item" data-toggle="modal" data-target="#Diff">Diff Graph</button>
+          <button type="button" class="list-group-item" data-toggle="tooltip" data-placement="bottom" data-original-title="Displays hourly event log counts in time series." onclick="window.open('timeline')">Create Timeline</button>
         </div>
         <hr>
         <a data-toggle="tooltip" data-placement="bottom" data-original-title="Add value to edges of visualization graph.">Add event value</a><br>
@@ -121,9 +105,6 @@
         <hr>
         <a data-toggle="tooltip" data-placement="bottom" data-original-title="Enable visualization of malicious account ranking.">Rank visualize mode</a><br>
         <input type="checkbox" data-toggle="toggle" data-on="Enabled" data-height="35" data-off="Disabled" id="rankMode">
-        <hr>
-        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Displays hourly event log counts in time series.">Timeline</a><br>
-        <button class="btn btn-default" onClick="window.open('timeline')">Create Timeline</button>
         <hr>
         <a data-toggle="tooltip" data-placement="bottom" data-original-title="Import event logs in EVTX or XML format.">Upload</a><br>
         <button class="btn btn-default" data-toggle="modal" data-target="#UploadEVTX">Upload Event Log</button>
@@ -155,8 +136,9 @@
     <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
-          <button type="button" class="close" data-dismiss="modal"><span>×</span></button>
+          <button type="button" class="close" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span></button>
           <h4 class="modal-title">Upload Event Log File</h4>
+          <p>Import the event log. Supported file format is EVTX or XML (exported Event Viewer or PowerShell).</p>
         </div>
         <div class="modal-body">
           <div id="zoneTime"></div>
@@ -178,6 +160,117 @@
           <button type="submit" class="btn btn-primary" onclick="file_upload()">Upload</button>
           <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
           <a href="log" target="_blank"><button type="button" class="btn btn-default">Log</button></a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Filter -->
+  <div class="modal fade" id="Filters" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span></button>
+          <h4 class="modal-title">Event Log Filter</h4>
+          <p>Filter event log by date, count and id.</p>
+        </div>
+        <div class="modal-body">
+          <div class="container-fluid">
+            <div class="row">
+              <h4 class="col-md-2">Date<h4>
+                <div class="col-md-10 ml-auto">
+                  <div class="form-group">
+                    <div class="input-group fromdate">
+                      <input type="text" placeholder="From" id="from-date" class="form-control" />
+                      <span class="input-group-addon">
+                        <span class="glyphicon glyphicon-calendar"></span>
+                      </span>
+                    </div>
+                  </div>
+                  <div class="form-group">
+                    <div class="input-group todate">
+                      <input type="text" placeholder="To" id="to-date" class="form-control" />
+                      <span class="input-group-addon">
+                        <span class="glyphicon glyphicon-calendar"></span>
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <hr>
+              <div class="row">
+                <h4 class="col-md-3">Event ID</h4>
+                <div class="col-md-9 ml-auto">
+                  <div class="checkbox">
+                    <label data-toggle="tooltip" data-placement="bottom" data-original-title="Successful logon">
+                      <input type="checkbox" id="id4624" checked="checked"> 4624
+                    </label>
+                    <label data-toggle="tooltip" data-placement="bottom" data-original-title="Logon failure">
+                      <input type="checkbox" id="id4625" checked="checked"> 4625
+                    </label>
+                    <label data-toggle="tooltip" data-placement="bottom" data-original-title="Kerberos Authentication (TGT Request)">
+                      <input type="checkbox" id="id4768" checked="checked"> 4768
+                    </label>
+                    <label data-toggle="tooltip" data-placement="bottom" data-original-title="Kerberos Service Ticket (ST Request)">
+                      <input type="checkbox" id="id4769" checked="checked"> 4769
+                    </label>
+                    <label data-toggle="tooltip" data-placement="bottom" data-original-title="NTLM Authentication">
+                      <input type="checkbox" id="id4776" checked="checked"> 4776
+                    </label>
+                  </div>
+                </div>
+              </div>
+              <hr>
+              <div class="row">
+                <h4 class="col-md-2">Count<h4>
+                <div class="col-md-5 ml-auto">
+                  <div class="form-group">
+                    <input class="form-control" type="text" value=0 id="count-input" data-toggle="tooltip" data-placement="bottom" data-original-title="Set the lower limit of Event ID to visualize.">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Diff Graph -->
+  <div class="modal fade" id="Diff" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <button type="button" class="close" data-dismiss="modal"><span class="glyphicon glyphicon-remove"></span></button>
+          <h4 class="modal-title">Diff Graph</h4>
+          <p>Compare two days and view unique events.</p>
+        </div>
+        <div class="modal-body">
+          <div class="container-fluid">
+            <div class="row">
+              <div class="form-group">
+                <div class="input-group fromday">
+                  <input type="text" placeholder="From" id="from-day" class="form-control" />
+                  <span class="input-group-addon">
+                    <span class="glyphicon glyphicon-calendar"></span>
+                  </span>
+                </div>
+              </div>
+              <div class="form-group">
+                <div class="input-group today">
+                  <input type="text" placeholder="To" id="to-day" class="form-control" />
+                  <span class="input-group-addon">
+                    <span class="glyphicon glyphicon-calendar"></span>
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" data-dismiss="modal" onclick="diffQuery()">Compare</button>
+          <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
         </div>
       </div>
     </div>
@@ -213,6 +306,7 @@
     pagerankQuery(userqueryStr, "User", rankpageUser);
     pagerankQuery(ipqueryStr, "Host", rankpageHost);
     logdeleteCheck();
+    loaddate();
 
     var loading = document.getElementById('loading');
     loading.classList.add('loaded');
