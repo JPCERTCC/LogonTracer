@@ -77,6 +77,8 @@ NEO4J_SERVER = "localhost"
 NEO4J_PORT = "7474"
 # Web application port
 WEB_PORT = 8080
+# Web application address
+WEB_HOST = "0.0.0.0"
 
 # Check Event Id
 EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719, 5137, 5141]
@@ -177,6 +179,8 @@ parser.add_argument("-l", "--learn", action="store_true", default=False,
                     help="Machine learning event logs using Hidden Markov Model.")
 parser.add_argument("-o", "--port", dest="port", action="store", type=int, metavar="PORT",
                     help="Port number to be started web application. (default: 8080).")
+parser.add_argument("--host", dest="host", action="store", type=str, metavar="HOST",
+                    help="Host address to bind the web application. (default: 0.0.0.0).")
 parser.add_argument("-s", "--server", dest="server", action="store", type=str, metavar="SERVER",
                     help="Neo4j server. (default: localhost)")
 parser.add_argument("-u", "--user", dest="user", action="store", type=str, metavar="USERNAME",
@@ -263,6 +267,8 @@ if args.server:
 if args.port:
     WEB_PORT = args.port
 
+if args.host:
+    WEB_HOST = args.host
 
 # Web application index.html
 @app.route('/')
@@ -1062,7 +1068,7 @@ def main():
 
     if args.run:
         try:
-            app.run(threaded=True, host="0.0.0.0", port=WEB_PORT)
+            app.run(threaded=True, host=WEB_HOST, port=WEB_PORT)
         except:
             sys.exit("[!] Can't runnning web application.")
 
