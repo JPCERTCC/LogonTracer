@@ -2,6 +2,7 @@ numpy
 py2neo==3.1.2
 python-evtx
 lxml
+scipy==1.2.1
 changefinder
 flask
 hmmlearn
