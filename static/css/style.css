@@ -18,3 +18,7 @@ table.floatThead-table {
   border-bottom: none;
   background-color: #efefef;
 }
+
+.dropdown-menu {
+  z-index: 10000;
+}
