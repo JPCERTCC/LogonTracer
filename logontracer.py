@@ -862,7 +862,7 @@ def parse_evtx(evtx_list):
                             sids[username] = sid
 
                         if hostname != "-" and ipaddress != "-":
-                            hosts[hostname] = ipaddress
+                            hosts[ipaddress] = hostname
 
                         if authname in "NTML" and authname not in ntmlauth:
                             ntmlauth.append(username)

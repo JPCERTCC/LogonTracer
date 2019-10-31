@@ -304,7 +304,7 @@ function qtipNode(ndata) {
     qtext += '<br>SID: ' + ndata._private.data["nsid"];
     qtext += '<br>Status: ' + ndata._private.data["nstatus"];
   } else if (ndata._private.data["ntype"] == "Host") {
-    qtext += '<br>Hostname: ' + ndata._private.data["nhostname"];
+    qtext += '<br>IP or Hostname: ' + ndata._private.data["nhostname"];
   } else if (ndata._private.data["ntype"] == "Policy") {
     qtext = "";
     qtext += 'Date: ' + ndata._private.data["nlabel"];
@@ -583,9 +583,9 @@ function createQuery() {
   if (selectVal == "Username") {
     whereStr = 'user.user =~ "' + setStr + '" ';
   } else if (selectVal == "IPAddress") {
-    whereStr = 'ip.IP =~ "' + setStr + '" ';
-  } else {
     whereStr = 'ip.hostname =~ "' + setStr + '" ';
+  } else {
+    whereStr = 'ip.IP =~ "' + setStr + '" ';
   }
 
   for (i = 1; i <= currentNumber; i++) {
