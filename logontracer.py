@@ -536,13 +536,13 @@ def xml_records(filename):
                     yield xml, e
 
     if args.xmls:
+        xdata = ""
         with open(filename, 'r') as fx:
-            xdata = fx.read()
-            fixdata = xdata.replace("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>", "").replace("</Events>", "").replace("<Events>", "")
+            for line in fx:
+                xdata += line.replace("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>", "").replace("</Events>", "").replace("<Events>", "")
             # fixdata = xdata.replace("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\"?>", "")
+            xml_list = re.split("<Event xmlns=[\'\"]http://schemas.microsoft.com/win/2004/08/events/event[\'\"]>", xdata)
             del xdata
-            xml_list = re.split("<Event xmlns=[\'\"]http://schemas.microsoft.com/win/2004/08/events/event[\'\"]>", fixdata)
-            del fixdata
             for xml in xml_list:
                 if xml.startswith("<System>"):
                     try:
@@ -605,7 +605,7 @@ def parse_evtx(evtx_list):
     for evtx_file in evtx_list:
         if args.evtx:
             with open(evtx_file, "rb") as fb:
-                fb_data = fb.read()[0:8]
+                fb_data = fb.read(8)
                 if fb_data != EVTX_HEADER:
                     sys.exit("[!] This file is not EVTX format {0}.".format(evtx_file))
 
@@ -625,11 +625,11 @@ def parse_evtx(evtx_list):
 
         if args.xmls:
             with open(evtx_file, "r") as fb:
-                fb_data = fb.read()
-                if "<?xml" not in fb_data[0:6]:
+                fb_header = fb.read(6)
+                if "<?xml" not in fb_header:
                     sys.exit("[!] This file is not XML format {0}.".format(evtx_file))
-                record_sum += fb_data.count("<System>")
-                del fb_data
+                for line in fb:
+                    record_sum += line.count("<System>")
 
     print("[*] Last record number is %i." % record_sum)
 
