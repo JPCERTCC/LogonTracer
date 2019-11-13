@@ -298,7 +298,7 @@ def do_upload():
 
     if os.path.exists(UPLOAD_DIR) is False:
         os.mkdir(UPLOAD_DIR)
-        print("[*] make upload folder %s." % UPLOAD_DIR)
+        print("[+] make upload folder %s." % UPLOAD_DIR)
 
     try:
         timezone = request.form["timezone"]
@@ -582,7 +582,7 @@ def parse_evtx(evtx_list):
         try:
             datetime.timezone(datetime.timedelta(hours=args.timezone))
             tzone = args.timezone
-            print("[*] Time zone is %s." % args.timezone)
+            print("[+] Time zone is %s." % args.timezone)
         except:
             sys.exit("[!] Can't load time zone '%s'." % args.timezone)
     else:
@@ -591,14 +591,14 @@ def parse_evtx(evtx_list):
     if args.fromdate:
         try:
             fdatetime = datetime.datetime.strptime(args.fromdate, "%Y%m%d%H%M%S")
-            print("[*] Parse the EVTX from %s." % fdatetime.strftime("%Y-%m-%d %H:%M:%S"))
+            print("[+] Parse the EVTX from %s." % fdatetime.strftime("%Y-%m-%d %H:%M:%S"))
         except:
             sys.exit("[!] From date does not match format '%Y%m%d%H%M%S'.")
 
     if args.todate:
         try:
             tdatetime = datetime.datetime.strptime(args.todate, "%Y%m%d%H%M%S")
-            print("[*] Parse the EVTX from %s." % tdatetime.strftime("%Y-%m-%d %H:%M:%S"))
+            print("[+] Parse the EVTX from %s." % tdatetime.strftime("%Y-%m-%d %H:%M:%S"))
         except:
             sys.exit("[!] To date does not match format '%Y%m%d%H%M%S'.")
 
@@ -631,13 +631,13 @@ def parse_evtx(evtx_list):
                 for line in fb:
                     record_sum += line.count("<System>")
 
-    print("[*] Last record number is %i." % record_sum)
+    print("[+] Last record number is %i." % record_sum)
 
     # Parse Event log
-    print("[*] Start parsing the EVTX file.")
+    print("[+] Start parsing the EVTX file.")
 
     for evtx_file in evtx_list:
-        print("[*] Parse the EVTX file %s." % evtx_file)
+        print("[+] Parse the EVTX file %s." % evtx_file)
 
         for node, err in xml_records(evtx_file):
             if err is not None:
@@ -646,7 +646,7 @@ def parse_evtx(evtx_list):
             eventid = int(node.xpath("/Event/System/EventID")[0].text)
 
             if not count % 100:
-                sys.stdout.write("\r[*] Now loading %i records." % count)
+                sys.stdout.write("\r[+] Now loading %i records." % count)
                 sys.stdout.flush()
 
             if eventid in EVENT_ID:
@@ -896,11 +896,13 @@ def parse_evtx(evtx_list):
                 else:
                     deletelog.append("-")
 
-    print("\n[*] Load finished.")
-    print("[*] Total Event log is %i." % count)
+    print("\n[+] Load finished.")
+    print("[+] Total Event log is %i." % count)
 
-    if not username_set:
+    if not username_set or not len(event_set):
         sys.exit("[!] This event log did not include logs to be visualized. Please check the details of the event log.")
+    else:
+        print("[+] Fildered Event log is %i." % len(event_set))
 
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
@@ -921,23 +923,23 @@ def parse_evtx(evtx_list):
         ml_frame = ml_frame.replace(hosts)
     ml_frame = ml_frame.sort_values(by="date")
     if args.learn:
-        print("[*] Learning event logs using Hidden Markov Model.")
+        print("[+] Learning event logs using Hidden Markov Model.")
         learnhmm(ml_frame, username_set, datetime.datetime(*starttime.timetuple()[:3]))
 
     # Calculate ChangeFinder
-    print("[*] Calculate ChangeFinder.")
+    print("[+] Calculate ChangeFinder.")
     timelines, detects, detect_cf = adetection(count_set, username_set, starttime, tohours)
 
     # Calculate Hidden Markov Model
-    print("[*] Calculate Hidden Markov Model.")
+    print("[+] Calculate Hidden Markov Model.")
     detect_hmm = decodehmm(ml_frame, username_set, datetime.datetime(*starttime.timetuple()[:3]))
 
     # Calculate PageRank
-    print("[*] Calculate PageRank.")
+    print("[+] Calculate PageRank.")
     ranks = pagerank(event_set, admins, detect_hmm, detect_cf, ntmlauth)
 
     # Create node
-    print("[*] Creating a graph data.")
+    print("[+] Creating a graph data.")
 
     try:
         graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD + "@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
@@ -1030,7 +1032,7 @@ def parse_evtx(evtx_list):
 
     tx.process()
     tx.commit()
-    print("[*] Creation of a graph data finished.")
+    print("[+] Creation of a graph data finished.")
 
 
 def main():
@@ -1064,7 +1066,7 @@ def main():
     except:
         sys.exit("[!] Can't connect Neo4j Database.")
 
-    print("[*] Script start. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+    print("[+] Script start. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 
     if args.run:
         try:
@@ -1075,7 +1077,7 @@ def main():
     # Delete database data
     if args.delete:
         GRAPH.delete_all()
-        print("[*] Delete all nodes and relationships from this Neo4j database.")
+        print("[+] Delete all nodes and relationships from this Neo4j database.")
 
     if args.evtx:
         for evtx_file in args.evtx:
@@ -1089,7 +1091,7 @@ def main():
                 sys.exit("[!] Can't open file {0}.".format(xml_file))
         parse_evtx(args.xmls)
 
-    print("[*] Script end. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+    print("[+] Script end. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 
 
 if __name__ == "__main__":
