@@ -1068,6 +1068,8 @@ def main():
 
     print("[+] Script start. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 
+    print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, GRAPH.dbms.kernel_version))))
+
     if args.run:
         try:
             app.run(threaded=True, host=WEB_HOST, port=WEB_PORT)
