@@ -202,54 +202,54 @@ parser.add_argument("--delete", action="store_true", default=False,
 args = parser.parse_args()
 
 statement_user = """
-  MERGE (user:Username{ user:{user} }) set user.rights={rights}, user.sid={sid}, user.rank={rank}, user.status={status}, user.counts={counts}, user.counts4624={counts4624}, user.counts4625={counts4625}, user.counts4768={counts4768}, user.counts4769={counts4769}, user.counts4776={counts4776}, user.detect={detect}
+  MERGE (user:Username{{ user:'{user}' }}) set user.rights='{rights}', user.sid='{sid}', user.rank={rank}, user.status='{status}', user.counts='{counts}', user.counts4624='{counts4624}', user.counts4625='{counts4625}', user.counts4768='{counts4768}', user.counts4769='{counts4769}', user.counts4776='{counts4776}', user.detect='{detect}'
   RETURN user
   """
 
 statement_ip = """
-  MERGE (ip:IPAddress{ IP:{IP} }) set ip.rank={rank}, ip.hostname={hostname}
+  MERGE (ip:IPAddress{{ IP:'{IP}' }}) set ip.rank={rank}, ip.hostname='{hostname}'
   RETURN ip
   """
 
 statement_r = """
-  MATCH (user:Username{ user:{user} })
-  MATCH (ip:IPAddress{ IP:{IP} })
-  CREATE (ip)-[event:Event]->(user) set event.id={id}, event.logintype={logintype}, event.status={status}, event.count={count}, event.authname={authname}, event.date={date}
+  MATCH (user:Username{{ user:'{user}' }})
+  MATCH (ip:IPAddress{{ IP:'{IP}' }})
+  CREATE (ip)-[event:Event]->(user) set event.id={id}, event.logintype={logintype}, event.status='{status}', event.count={count}, event.authname='{authname}', event.date={date}
 
   RETURN user, ip
   """
 
 statement_date = """
-  MERGE (date:Date{ date:{Daterange} }) set date.start={start}, date.end={end}
+  MERGE (date:Date{{ date:'{Daterange}' }}) set date.start='{start}', date.end='{end}'
   RETURN date
   """
 
 statement_domain = """
-  MERGE (domain:Domain{ domain:{domain} })
+  MERGE (domain:Domain{{ domain:'{domain}' }})
   RETURN domain
   """
 
 statement_dr = """
-  MATCH (domain:Domain{ domain:{domain} })
-  MATCH (user:Username{ user:{user} })
+  MATCH (domain:Domain{{ domain:'{domain}' }})
+  MATCH (user:Username{{ user:'{user}' }})
   CREATE (user)-[group:Group]->(domain)
 
   RETURN user, domain
   """
 
 statement_del = """
-  MERGE (date:Deletetime{ date:{deletetime} }) set date.user={user}, date.domain={domain}
+  MERGE (date:Deletetime{{ date:'{deletetime}' }}) set date.user='{user}', date.domain='{domain}'
   RETURN date
   """
 
 statement_pl = """
-  MERGE (id:ID{ id:{id} }) set id.changetime={changetime}, id.category={category}, id.sub={sub}
+  MERGE (id:ID{{ id:{id} }}) set id.changetime={changetime}, id.category={category}, id.sub={sub}
   RETURN id
   """
 
 statement_pr = """
-  MATCH (id:ID{ id:{id} })
-  MATCH (user:Username{ user:{user} })
+  MATCH (id:ID{{ id:{id} }})
+  MATCH (user:Username{{ user:{user} }})
   CREATE (user)-[group:Policy]->(id) set group.date={date}
 
   RETURN user, id
@@ -674,7 +674,7 @@ def parse_evtx(evtx_list):
                     endtime = stime
 
                 event_data = node.xpath("/Event/EventData/Data")
-                logintype = "-"
+                logintype = 0
                 username = "-"
                 domain = "-"
                 ipaddress = "-"
@@ -955,7 +955,7 @@ def parse_evtx(evtx_list):
         else:
             hostname = ipaddress
         # add the IPAddress node to neo4j
-        tx.append(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname})
+        tx.run(statement_ip.format(**{"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname}))
 
     i = 0
     for username in username_set:
@@ -984,33 +984,33 @@ def parse_evtx(evtx_list):
             ustatus = "-"
 
         # add the username node to neo4j
-        tx.append(statement_user, {"user": username[:-1], "rank": ranks[username], "rights": rights, "sid": sid, "status": ustatus,
-                                   "counts": ",".join(map(str, timelines[i*6])), "counts4624": ",".join(map(str, timelines[i*6+1])),
-                                   "counts4625": ",".join(map(str, timelines[i*6+2])), "counts4768": ",".join(map(str, timelines[i*6+3])),
-                                   "counts4769": ",".join(map(str, timelines[i*6+4])), "counts4776": ",".join(map(str, timelines[i*6+5])),
-                                   "detect": ",".join(map(str, detects[i]))})
+        tx.run(statement_user.format(**{"user": username[:-1], "rank": ranks[username], "rights": rights, "sid": sid, "status": ustatus,
+                                         "counts": ",".join(map(str, timelines[i*6])), "counts4624": ",".join(map(str, timelines[i*6+1])),
+                                         "counts4625": ",".join(map(str, timelines[i*6+2])), "counts4768": ",".join(map(str, timelines[i*6+3])),
+                                         "counts4769": ",".join(map(str, timelines[i*6+4])), "counts4776": ",".join(map(str, timelines[i*6+5])),
+                                         "detect": ",".join(map(str, detects[i]))}))
         i += 1
 
     for domain in domains:
         # add the domain node to neo4j
-        tx.append(statement_domain, {"domain": domain})
+        tx.run(statement_domain.format(**{"domain": domain}))
 
     for _, events in event_set_bydate.iterrows():
         # add the (username)-(event)-(ip) link to neo4j
-        tx.append(statement_r, {"user": events["username"][:-1], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
-                                "status": events["status"], "count": events["count"], "authname": events["authname"], "date": events["date"]})
+        tx.run(statement_r.format(**{"user": events["username"][:-1], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
+                                      "status": events["status"], "count": events["count"], "authname": events["authname"], "date": events["date"]}))
 
     for username, domain in domain_set_uniq:
         # add (username)-()-(domain) link to neo4j
-        tx.append(statement_dr, {"user": username[:-1], "domain": domain})
+        tx.run(statement_dr.format(**{"user": username[:-1], "domain": domain}))
 
     # add the date node to neo4j
-    tx.append(statement_date, {"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
-                               "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")})
+    tx.run(statement_date.format(**{"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
+                                     "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")}))
 
     if len(deletelog):
         # add the delete flag node to neo4j
-        tx.append(statement_del, {"deletetime": deletelog[0], "user": deletelog[1], "domain": deletelog[2]})
+        tx.run(statement_del.format(**{"deletetime": deletelog[0], "user": deletelog[1], "domain": deletelog[2]}))
 
     if len(policylist):
         id = 0
@@ -1025,9 +1025,9 @@ def parse_evtx(evtx_list):
                 sub = policy[3]
             username = policy[1]
             # add the policy id node to neo4j
-            tx.append(statement_pl, {"id": id, "changetime": policy[0], "category": category, "sub": sub})
+            tx.run(statement_pl.format(**{"id": id, "changetime": policy[0], "category": category, "sub": sub}))
             # add (username)-(policy)-(id) link to neo4j
-            tx.append(statement_pr, {"user": username[:-1], "id": id, "date": policy[4]})
+            tx.run(statement_pr.format(**{"user": username[:-1], "id": id, "date": policy[4]}))
             id += 1
 
     tx.process()

@@ -1,5 +1,5 @@
 numpy
-py2neo==3.1.2
+py2neo
 python-evtx
 lxml
 scipy==1.2.1
