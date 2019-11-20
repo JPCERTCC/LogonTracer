@@ -1550,7 +1550,7 @@ function parseEVTX() {
     if (xmlhttp2.readyState == 4) {
       if (xmlhttp2.status == 200) {
         var logdata = xmlhttp2.responseText.split(/\r\n|\r|\n/);
-        var allrecode = logdata[3].split(" ")[5].replace(".", "");
+        var allrecode = logdata[4].split(" ")[5].replace(".", "");
         var nowdata = logdata[logdata.length - 2];
         if (nowdata.indexOf("Now loading") != -1) {
           var recordnum = nowdata.split(" ")[3];
