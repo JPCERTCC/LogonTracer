@@ -149,7 +149,7 @@ function buildGraph(graph, path, root) {
         graph.edges = filterdArray
         var ename = path[idx].properties.id;
         if (label_count) {
-          ename += " : " + path[idx].properties.count;
+          ename += " : " + ecount;
         }
         if (label_type) {
           ename += " : " + path[idx].properties.logintype;
