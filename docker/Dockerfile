@@ -26,10 +26,11 @@ RUN apk add --no-cache \
     curl \
     python \
     py-pip \
-    libssl1.1
+    libffi-dev \
+    libssl1.0
 
 ## python3.6 and modules install
-ENV PYTHON_VERSION=3.6.2 \
+ENV PYTHON_VERSION=3.7.5 \
     LANG=C.UTF-8
 
 WORKDIR /usr/local/src
@@ -51,10 +52,11 @@ WORKDIR /usr/local/src
 
 RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && cd LogonTracer \
-    && pip3.6 install --upgrade pip \
-    && pip3.6 install --upgrade setuptools \
-    && pip3.6 install numpy \
-    && pip3.6 install -r requirements.txt \
+    && pip3.7 install --upgrade pip \
+    && pip3.7 install --upgrade setuptools \
+    && pip3.7 install cython \
+    && pip3.7 install numpy \
+    && pip3.7 install -r requirements.txt \
     && unlink /var/lib/neo4j/data \
     && mkdir -p /var/lib/neo4j/data/databases \
     && tar xzf sample/graph.db.tar.gz -C /var/lib/neo4j/data/databases \
@@ -80,7 +82,7 @@ RUN echo "#!/bin/bash" > setup.sh \
 RUN echo "#!/bin/bash" > run.sh \
     && echo "sleep 40" >> run.sh \
     && echo "cd /usr/local/src/LogonTracer" >> run.sh \
-    && echo "python3 logontracer.py -r -o 8080 -u neo4j -p password -s \${LTHOSTNAME}" >> run.sh \
+    && echo "python3.7 logontracer.py -r -o 8080 -u neo4j -p password -s \${LTHOSTNAME}" >> run.sh \
     && chmod 755 run.sh
 
 ## delete build apk
