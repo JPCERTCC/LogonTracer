@@ -85,6 +85,9 @@ RUN echo "#!/bin/bash" > run.sh \
     && echo "python3.7 logontracer.py -r -o 8080 -u neo4j -p password -s \${LTHOSTNAME}" >> run.sh \
     && chmod 755 run.sh
 
+## Make Python3 slink
+RUN ln -s /usr/local/bin/python3.7 /usr/bin/python3
+
 ## delete build apk
 WORKDIR /var/lib/neo4j
 RUN apk del --purge build-temp
