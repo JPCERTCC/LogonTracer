@@ -26,7 +26,7 @@ except ImportError:
     has_evtx = False
 
 try:
-    from py2neo import Graph
+    from py2neo import Graph, Database
     has_py2neo = True
 except ImportError:
     has_py2neo = False
@@ -1063,12 +1063,13 @@ def main():
     try:
         graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD + "@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
         GRAPH = Graph(graph_http)
+        db = Database(host=NEO4J_SERVER, user=NEO4J_USER, password=NEO4J_PASSWORD, bolt=True)
     except:
         sys.exit("[!] Can't connect Neo4j Database.")
 
     print("[+] Script start. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 
-    print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, GRAPH.dbms.kernel_version))))
+    print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, db.kernel_version))))
 
     if args.run:
         try:
