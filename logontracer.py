@@ -243,14 +243,14 @@ statement_del = """
   """
 
 statement_pl = """
-  MERGE (id:ID{{ id:{id} }}) set id.changetime={changetime}, id.category={category}, id.sub={sub}
+  MERGE (id:ID{{ id:{id} }}) set id.changetime='{changetime}', id.category='{category}', id.sub='{sub}'
   RETURN id
   """
 
 statement_pr = """
   MATCH (id:ID{{ id:{id} }})
-  MATCH (user:Username{{ user:{user} }})
-  CREATE (user)-[group:Policy]->(id) set group.date={date}
+  MATCH (user:Username{{ user:'{user}' }})
+  CREATE (user)-[group:Policy]->(id) set group.date='{date}'
 
   RETURN user, id
   """
