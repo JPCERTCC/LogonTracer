@@ -1090,7 +1090,7 @@ function createTimeline(queryStr, tableType) {
 
         nrangeHours = 0;
         startDate = new Date(starttime);
-        for (i = 1; i <= rangeHours; i++) {
+        for (i = 1; i < rangeHours; i++) {
           startDate.setHours(startDate.getHours() + 1);
           if (startDate.getDate() != thisday) {
             html += '<th bgcolor="' + bgcolorTbl[thisdow + weekd] + '" colspan="' + (i - nrangeHours) + '">' + thisday + '(' + weekTbl[thisdow + weekd] + ')</th>';
@@ -1224,8 +1224,8 @@ function createTimelineGraph(queryStr) {
         var startDate = new Date(starttime);
         var rangeHours = Math.floor((Date.parse(endtime) - Date.parse(starttime)) / (1000 * 60 * 60)) + 1;
         for (i = 1; i <= rangeHours; i++) {
-          startDate.setHours(startDate.getHours() + 1);
           dates.push(formatDate(startDate))
+          startDate.setHours(startDate.getHours() + 1);
         }
 
         for (i = 0; i < users.length; i++) {
