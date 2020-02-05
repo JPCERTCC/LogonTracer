@@ -22,3 +22,12 @@ table.floatThead-table {
 .dropdown-menu {
   z-index: 10000;
 }
+
+.custom-checkbox .custom-control-input:checked ~ .custom-control-label::before {
+  background-color:blue;
+}
+
+.my_svg {
+  height: 50px;
+  width: 190px;
+}
