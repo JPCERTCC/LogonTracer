@@ -1163,7 +1163,10 @@ def main():
 
     print("[+] Script start. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 
-    print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, db.kernel_version))))
+    try:
+        print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, db.kernel_start_time))))
+    except KeyError:
+        print("[!] Can't get Neo4j kernel version.")
 
     if args.run:
         try:
