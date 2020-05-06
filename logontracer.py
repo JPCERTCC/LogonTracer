@@ -1165,7 +1165,7 @@ def main():
 
     try:
         print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, db.kernel_start_time))))
-    except KeyError:
+    except:
         print("[!] Can't get Neo4j kernel version.")
 
     if args.run:
