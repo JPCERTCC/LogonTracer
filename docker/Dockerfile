@@ -30,13 +30,14 @@ RUN apk add --no-cache \
     libssl1.0
 
 ## python3.6 and modules install
-ENV PYTHON_VERSION=3.7.5 \
+ENV PYTHON_VERSION=3.7.6 \
     LANG=C.UTF-8
 
 WORKDIR /usr/local/src
 RUN apk add --no-cache lapack-dev\
     libxml2-dev \
     libxslt-dev \
+    xz-dev \
     && curl --fail --silent --show-error --location --output python.tgz https://www.python.org/ftp/python/${PYTHON_VERSION}/Python-${PYTHON_VERSION}.tgz \
     && tar zxf python.tgz \
     && rm python.tgz \
@@ -56,6 +57,8 @@ RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && pip3.7 install --upgrade setuptools \
     && pip3.7 install cython \
     && pip3.7 install numpy \
+    && pip3.7 install scipy==1.2.1 \
+    && pip3.7 install statsmodels==0.10.2 \
     && pip3.7 install -r requirements.txt \
     && unlink /var/lib/neo4j/data \
     && mkdir -p /var/lib/neo4j/data/databases \
