@@ -73,7 +73,7 @@
   <script type="text/javascript">
     var neo = neo4j.default;
     //Neo4j access settings
-    var driver = neo.driver("bolt://{{ server_ip }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
+    var driver = neo.driver("bolt://{{ server_ip }}:{{ ws_port }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
     var session = driver.session();
     //createAlltimeline();
 

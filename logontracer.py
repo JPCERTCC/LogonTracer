@@ -81,6 +81,8 @@ NEO4J_PORT = "7474"
 WEB_PORT = 8080
 # Web application address
 WEB_HOST = "0.0.0.0"
+# Websocket port
+WS_PORT = 7687
 
 # Check Event Id
 EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719, 5137, 5141]
@@ -277,13 +279,13 @@ if args.host:
 # Web application index.html
 @app.route('/')
 def index():
-    return render_template("index.html", server_ip=NEO4J_SERVER, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
+    return render_template("index.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
 
 
 # Timeline view
 @app.route('/timeline')
 def timeline():
-    return render_template("timeline.html", server_ip=NEO4J_SERVER, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
+    return render_template("timeline.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
 
 
 # Web application logs
