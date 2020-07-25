@@ -688,6 +688,7 @@ function sendQuery(queryStr, root) {
   var loading = document.getElementById('loading');
   loading.classList.remove('loaded');
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -727,6 +728,7 @@ This function executes the neo4j query.
 function executeQuery(queryStr, root) {
   var countStr = queryStr.replace("user, event, ip", "COUNT(event)");
 
+  var session = driver.session();
   session.run(countStr)
     .subscribe({
       onNext: function(record) {
@@ -767,6 +769,7 @@ function diffQuery() {
 
   queryStr1st = 'MATCH (user)-[event:Event]-(ip)  WHERE event.date >= ' + date1st + ' AND event.date <= ' + (date1st + 86400) + ' RETURN user, event, ip';
 
+  var session = driver.session();
   session.run(queryStr1st)
     .subscribe({
       onNext: function(record) {
@@ -802,6 +805,7 @@ function diffNext(graph1) {
   var loading = document.getElementById('loading');
   loading.classList.remove('loaded');
 
+  var session = driver.session();
   session.run(queryStr2nd)
     .subscribe({
       onNext: function(record) {
@@ -894,6 +898,8 @@ function pagerankQuery(queryStr, dataType, currentPage) {
     '</th></tr></thead><tbody class="col-sm-2 col-md-2">';
   var startRunk = currentPage * 10;
   queryStr = queryStr + " SKIP " + startRunk + " LIMIT " + 10;
+
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -932,6 +938,7 @@ function exportCSV() {
   var queryStr = 'MATCH (user:Username)-[event:Event]-(ip:IPAddress) RETURN user, ip, event';
   var events = new Array();
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -993,6 +1000,7 @@ function downloadCSV(csvType) {
   var queryStr = 'MATCH (date:Date) MATCH (user:Username) RETURN date, user';
   var users = new Array();
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1090,6 +1098,7 @@ function createTimeline(queryStr, tableType) {
     }
   }
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1267,6 +1276,7 @@ function createTimelineGraph(queryStr) {
   var starttime = "";
   var endtime = "";
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1495,6 +1505,7 @@ function logdeleteCheck() {
   var queryStr = "MATCH (date:Deletetime) RETURN date";
   var ddata = "";
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1646,6 +1657,7 @@ load date info from neo4j
 function loaddate() {
   var queryStr = 'MATCH (date:Date) RETURN date';
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
