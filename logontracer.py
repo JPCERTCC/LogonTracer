@@ -191,6 +191,8 @@ parser.add_argument("-u", "--user", dest="user", action="store", type=str, metav
                     help="Neo4j account name. (default: neo4j)")
 parser.add_argument("-p", "--password", dest="password", action="store", type=str, metavar="PASSWORD",
                     help="Neo4j password. (default: password).")
+parser.add_argument("--wsport", dest="wsport", action="store", type=str, metavar="PORT",
+                    help="Neo4j websocket port number.  (default: 7687).")
 parser.add_argument("-e", "--evtx", dest="evtx", nargs="*", action="store", type=str, metavar="EVTX",
                     help="Import to the AD EVTX file. (multiple files OK)")
 parser.add_argument("-x", "--xml", dest="xmls", nargs="*", action="store", type=str, metavar="XML",
@@ -275,6 +277,9 @@ if args.port:
 
 if args.host:
     WEB_HOST = args.host
+
+if args.wsport:
+    WS_PORT = args.wsport
 
 # Web application index.html
 @app.route('/')
