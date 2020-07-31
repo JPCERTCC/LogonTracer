@@ -663,10 +663,10 @@ function searchPath() {
   var dateStr = getDateRange();
   dateStr = dateStr.slice(5);
 
-  queryStr = 'MATCH (from:Username) WHERE from.user = "' + setStr + '" \
-              MATCH (to:Username) WHERE to.rights = "system" \
-              MATCH (user:Username) WHERE user IN shortestPath((from)-[:Event*]-(to)) \
-              MATCH (ip:IPAddress) WHERE ip IN shortestPath((from)-[:Event*]-(to)) \
+  queryStr = 'MATCH (from:Username { user:"' + setStr + '" }), (to:Username { rights:"system"}), p = shortestPath((from)-[:Event*]-(to)) \
+              WITH p \
+              MATCH (user:Username) WHERE user IN nodes(p) \
+              MATCH (ip:IPAddress) WHERE ip IN nodes(p) \
               MATCH (user)-[event]-(ip) WHERE ' + dateStr + ' \
               RETURN user, ip, event'
 
