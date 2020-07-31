@@ -628,22 +628,22 @@ function createQuery() {
   var dateStr = getDateRange();
 
   if (selectVal == "Username") {
-    whereStr = 'user.user =~ "' + setStr + '" ';
+    whereStr = 'user.user CONTAINS "' + setStr + '" ';
   } else if (selectVal == "IPAddress") {
-    whereStr = 'ip.hostname =~ "' + setStr + '" ';
+    whereStr = 'ip.hostname CONTAINS "' + setStr + '" ';
   } else {
-    whereStr = 'ip.IP =~ "' + setStr + '" ';
+    whereStr = 'ip.IP CONTAINS "' + setStr + '" ';
   }
 
   for (i = 1; i <= currentNumber; i++) {
     if (document.getElementById("query-input" + i).value) {
       ruleStr = document.getElementById("InputRule" + i).value;
       if (document.getElementById("InputSelect" + i).value == "Username") {
-        whereStr += ruleStr + ' user.user =~ "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' user.user CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
       } else if (document.getElementById("InputSelect" + i).value == "IPAddress") {
-        whereStr += ruleStr + ' ip.IP =~ "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' ip.IP CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
       } else {
-        whereStr += ruleStr + ' ip.hostname =~ "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' ip.hostname CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
       }
     }
   }
@@ -1462,7 +1462,7 @@ function searchTimeline() {
   var setStr = document.getElementById("query-input").value;
 
   if (selectVal == "Username") {
-    whereStr = 'user.user =~ "' + setStr + '" ';
+    whereStr = 'user.user CONTAINS "' + setStr + '" ';
   } else {
     searchError();
   }
@@ -1470,7 +1470,7 @@ function searchTimeline() {
   for (i = 1; i <= currentNumber; i++) {
     if (document.getElementById("query-input" + i).value) {
       if (document.getElementById("InputSelect" + i).value == "Username") {
-        whereStr += 'or user.user =~ "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += 'or user.user CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
       } else {
         searchError();
       }
@@ -1486,7 +1486,7 @@ function searchTimeline() {
 }
 
 function clickTimeline(setStr) {
-  whereStr = 'user.user =~ "' + setStr + '" ';
+  whereStr = 'user.user CONTAINS "' + setStr + '" ';
 
   var queryStr = 'MATCH (date:Date) MATCH (user:Username) WHERE (' + whereStr + ') RETURN date, user';
   var gtype = document.getElementById("timelineTypes").checked;
