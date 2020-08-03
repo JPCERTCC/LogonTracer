@@ -340,7 +340,7 @@ def do_upload():
         else:
             log_option = "--delete"
 
-        parse_command = "nohup python3 " + FPATH + "/logontracer.py " + log_option + " -z " + timezone + logoption + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " >  " + FPATH + "/static/logontracer.log 2>&1 &"
+        parse_command = "nohup python3 " + FPATH + "/logontracer.py " + log_option + " -z " + timezone + logoption + filelist + " -s " + NEO4J_SERVER + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " >  " + FPATH + "/static/logontracer.log 2>&1 &"
         subprocess.call("rm -f " + FPATH + "/static/logontracer.log > /dev/null", shell=True)
         subprocess.call(parse_command, shell=True)
         # parse_evtx(filename)
