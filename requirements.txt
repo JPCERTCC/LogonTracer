@@ -7,3 +7,4 @@ changefinder
 flask
 hmmlearn
 scikit-learn==0.19.2
+elasticsearch-dsl>=7.0.0,<8.0.0
