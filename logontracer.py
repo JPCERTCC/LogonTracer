@@ -8,6 +8,8 @@
 import os
 import sys
 import re
+import pickle
+import shutil
 import argparse
 import datetime
 import subprocess
@@ -86,6 +88,8 @@ NEO4J_PORT = "7474"
 WEB_PORT = 8080
 # Web application address
 WEB_HOST = "0.0.0.0"
+# Websocket port
+WS_PORT = 7687
 # Elastic Search server
 ES_SERVER = "localhost:9200"
 # Elastic index
@@ -208,6 +212,8 @@ parser.add_argument("-u", "--user", dest="user", action="store", type=str, metav
                     help="Neo4j account name. (default: neo4j)")
 parser.add_argument("-p", "--password", dest="password", action="store", type=str, metavar="PASSWORD",
                     help="Neo4j password. (default: password).")
+parser.add_argument("--wsport", dest="wsport", action="store", type=str, metavar="PORT",
+                    help="Neo4j websocket port number.  (default: 7687).")
 parser.add_argument("-e", "--evtx", dest="evtx", nargs="*", action="store", type=str, metavar="EVTX",
                     help="Import to the AD EVTX file. (multiple files OK)")
 parser.add_argument("-x", "--xml", dest="xmls", nargs="*", action="store", type=str, metavar="XML",
@@ -218,6 +224,8 @@ parser.add_argument("-f", "--from", dest="fromdate", action="store", type=str, m
                     help="Parse Security Event log from this time. (for example: 20170101000000)")
 parser.add_argument("-t", "--to", dest="todate", action="store", type=str, metavar="DATE",
                     help="Parse Security Event log to this time. (for example: 20170228235959)")
+parser.add_argument("--add", action="store_true", default=False,
+                    help="Add additional data to Neo4j database. (default: False)")
 parser.add_argument("--delete", action="store_true", default=False,
                     help="Delete all nodes and relationships from this Neo4j database. (default: False)")
 args = parser.parse_args()
@@ -291,6 +299,9 @@ if args.port:
 if args.host:
     WEB_HOST = args.host
 
+if args.wsport:
+    WS_PORT = args.wsport
+
 if args.esserver:
     ES_SERVER = args.esserver
 
@@ -300,16 +311,17 @@ if args.esindex:
 if args.esprefix:
     ES_PREFIX = args.esprefix
 
+
 # Web application index.html
 @app.route('/')
 def index():
-    return render_template("index.html", server_ip=NEO4J_SERVER, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
+    return render_template("index.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
 
 
 # Timeline view
 @app.route('/timeline')
 def timeline():
-    return render_template("timeline.html", server_ip=NEO4J_SERVER, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
+    return render_template("timeline.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=NEO4J_PASSWORD, neo4j_user=NEO4J_USER)
 
 
 # Web application logs
@@ -333,6 +345,7 @@ def do_upload():
     try:
         timezone = request.form["timezone"]
         logtype = request.form["logtype"]
+        addlog = request.form["addlog"]
         for i in range(0, len(request.files)):
             loadfile = "file" + str(i)
             file = request.files[loadfile]
@@ -353,8 +366,12 @@ def do_upload():
             return "FAIL"
         if not re.search(r"\A-{0,1}[0-9]{1,2}\Z", timezone):
             return "FAIL"
+        if addlog in "true":
+            log_option = "--add"
+        else:
+            log_option = "--delete"
 
-        parse_command = "nohup python3 " + FPATH + "/logontracer.py --delete -z " + timezone + logoption + filelist + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " >  " + FPATH + "/static/logontracer.log 2>&1 &"
+        parse_command = "nohup python3 " + FPATH + "/logontracer.py " + log_option + " -z " + timezone + logoption + filelist + " -s " + NEO4J_SERVER + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " >  " + FPATH + "/static/logontracer.log 2>&1 &"
         subprocess.call("rm -f " + FPATH + "/static/logontracer.log > /dev/null", shell=True)
         subprocess.call(parse_command, shell=True)
         # parse_evtx(filename)
@@ -583,30 +600,76 @@ def xml_records(filename):
 
 # Parse the EVTX file
 def parse_evtx(evtx_list):
-    event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname", "date"])
-    count_set = pd.DataFrame(index=[], columns=["dates", "eventid", "username"])
-    ml_frame = pd.DataFrame(index=[], columns=["date", "user", "host", "id"])
-    username_set = []
-    domain_set = []
-    admins = []
-    domains = []
-    ntmlauth = []
-    deletelog = []
-    policylist = []
-    addusers = {}
-    delusers = {}
-    addgroups = {}
-    removegroups = {}
-    sids = {}
-    hosts = {}
+    cache_dir = os.path.join(FPATH, 'cache')
+
+    # Load cache files
+    if args.add and os.path.exists(cache_dir) and len(os.listdir(cache_dir)):
+        print("[+] Load cashe files.")
+        event_set = pd.read_pickle(os.path.join(cache_dir, "event_set.pkl"))
+        count_set = pd.read_pickle(os.path.join(cache_dir, "count_set.pkl"))
+        ml_frame = pd.read_pickle(os.path.join(cache_dir, "ml_frame.pkl"))
+        with open(os.path.join(cache_dir, "username_set.pkl"), "rb") as f:
+            username_set = pickle.load(f)
+        with open(os.path.join(cache_dir, "domain_set.pkl"), "rb") as f:
+            domain_set = pickle.load(f)
+        with open(os.path.join(cache_dir, "admins.pkl"), "rb") as f:
+            admins = pickle.load(f)
+        with open(os.path.join(cache_dir, "domains.pkl"), "rb") as f:
+            domains = pickle.load(f)
+        with open(os.path.join(cache_dir, "ntmlauth.pkl"), "rb") as f:
+            ntmlauth = pickle.load(f)
+        with open(os.path.join(cache_dir, "deletelog.pkl"), "rb") as f:
+            deletelog = pickle.load(f)
+        with open(os.path.join(cache_dir, "policylist.pkl"), "rb") as f:
+            policylist = pickle.load(f)
+        with open(os.path.join(cache_dir, "addusers.pkl"), "rb") as f:
+            addusers = pickle.load(f)
+        with open(os.path.join(cache_dir, "delusers.pkl"), "rb") as f:
+            delusers = pickle.load(f)
+        with open(os.path.join(cache_dir, "addgroups.pkl"), "rb") as f:
+            addgroups = pickle.load(f)
+        with open(os.path.join(cache_dir, "removegroups.pkl"), "rb") as f:
+            removegroups = pickle.load(f)
+        with open(os.path.join(cache_dir, "sids.pkl"), "rb") as f:
+            sids = pickle.load(f)
+        with open(os.path.join(cache_dir, "hosts.pkl"), "rb") as f:
+            hosts = pickle.load(f)
+        with open(os.path.join(cache_dir, "dcsync.pkl"), "rb") as f:
+            dcsync = pickle.load(f)
+        with open(os.path.join(cache_dir, "dcshadow.pkl"), "rb") as f:
+            dcshadow = pickle.load(f)
+        with open(os.path.join(cache_dir, "date.pkl"), "rb") as f:
+            starttime, endtime = pickle.load(f)
+    else:
+        event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname", "date"])
+        count_set = pd.DataFrame(index=[], columns=["dates", "eventid", "username"])
+        ml_frame = pd.DataFrame(index=[], columns=["date", "user", "host", "id"])
+        username_set = []
+        domain_set = []
+        admins = []
+        domains = []
+        ntmlauth = []
+        deletelog = []
+        policylist = []
+        addusers = {}
+        delusers = {}
+        addgroups = {}
+        removegroups = {}
+        sids = {}
+        hosts = {}
+        dcsync = {}
+        dcshadow = {}
+        starttime = None
+        endtime = None
+
     dcsync_count = {}
-    dcsync = {}
     dcshadow_check = []
-    dcshadow = {}
     count = 0
     record_sum = 0
-    starttime = None
-    endtime = None
+
+    if os.path.exists(cache_dir) is False:
+        os.mkdir(cache_dir)
+        print("[+] make cache folder %s." % cache_dir)
 
     if args.timezone:
         try:
@@ -936,8 +999,47 @@ def parse_evtx(evtx_list):
 
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
+    # Create Event log cache files
+    print("[+] Create cache files.")
+    pd.to_pickle(event_set, os.path.join(cache_dir, "event_set.pkl"))
+    pd.to_pickle(count_set, os.path.join(cache_dir, "count_set.pkl"))
+    pd.to_pickle(ml_frame, os.path.join(cache_dir, "ml_frame.pkl"))
+    with open(os.path.join(cache_dir, "username_set.pkl"), "wb") as f:
+        pickle.dump(username_set, f)
+    with open(os.path.join(cache_dir, "domain_set.pkl"), "wb") as f:
+        pickle.dump(domain_set, f)
+    with open(os.path.join(cache_dir, "admins.pkl"), "wb") as f:
+        pickle.dump(admins, f)
+    with open(os.path.join(cache_dir, "domains.pkl"), "wb") as f:
+        pickle.dump(domains, f)
+    with open(os.path.join(cache_dir, "ntmlauth.pkl"), "wb") as f:
+        pickle.dump(ntmlauth, f)
+    with open(os.path.join(cache_dir, "deletelog.pkl"), "wb") as f:
+        pickle.dump(deletelog, f)
+    with open(os.path.join(cache_dir, "policylist.pkl"), "wb") as f:
+        pickle.dump(policylist, f)
+    with open(os.path.join(cache_dir, "addusers.pkl"), "wb") as f:
+        pickle.dump(addusers, f)
+    with open(os.path.join(cache_dir, "delusers.pkl"), "wb") as f:
+        pickle.dump(delusers, f)
+    with open(os.path.join(cache_dir, "addgroups.pkl"), "wb") as f:
+        pickle.dump(addgroups, f)
+    with open(os.path.join(cache_dir, "removegroups.pkl"), "wb") as f:
+        pickle.dump(removegroups, f)
+    with open(os.path.join(cache_dir, "sids.pkl"), "wb") as f:
+        pickle.dump(sids, f)
+    with open(os.path.join(cache_dir, "hosts.pkl"), "wb") as f:
+        pickle.dump(hosts, f)
+    with open(os.path.join(cache_dir, "dcsync.pkl"), "wb") as f:
+        pickle.dump(dcsync, f)
+    with open(os.path.join(cache_dir, "dcshadow.pkl"), "wb") as f:
+        pickle.dump(dcshadow, f)
+    with open(os.path.join(cache_dir, "date.pkl"), "wb") as f:
+        pickle.dump([starttime, endtime], f)
+
     if hosts:
         event_set = event_set.replace(hosts)
+
     event_set_bydate = event_set
     event_set_bydate["count"] = event_set_bydate.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname", "date"])["eventid"].transform("count")
     event_set_bydate = event_set_bydate.drop_duplicates()
@@ -1567,7 +1669,10 @@ def main():
 
     print("[+] Script start. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
 
-    print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, db.kernel_version))))
+    try:
+        print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, db.kernel_start_time))))
+    except:
+        print("[!] Can't get Neo4j kernel version.")
 
     if args.run:
         try:
@@ -1579,6 +1684,11 @@ def main():
     if args.delete:
         GRAPH.delete_all()
         print("[+] Delete all nodes and relationships from this Neo4j database.")
+
+        cache_dir = os.path.join(FPATH, 'cache')
+        if os.path.exists(cache_dir):
+            shutil.rmtree(cache_dir)
+            print("[+] Delete cache folder %s." % cache_dir)
 
     if args.evtx:
         for evtx_file in args.evtx:

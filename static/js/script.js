@@ -1,5 +1,49 @@
 function buildGraph(graph, path, root) {
   var objidList = []
+  var darkSwitch = document.getElementById("darkSwitch").checked;
+
+  if (darkSwitch) {
+    ncolor_sys = "#FF5917"
+    nbcolor_sys = "#000000"
+    nfcolor_sys = "#FF5917"
+    ncolor_user = "#5D86FF"
+    nbcolor_user = "#000000"
+    nfcolor_user = "#5D86FF"
+    ncolor_chenge = "#B59658"
+    nfcolor_root = "#ADADAD"
+    ncolor_host = "#44D37E"
+    nbcolor_host = "#000000"
+    nfcolor_host = "#44D37E"
+    ncolor_domain = "#9573FF"
+    nbcolor_domain = "#000000"
+    nfcolor_domain = "#9573FF"
+    ncolor_id = "#F9D46B"
+    nbcolor_id = "#000000"
+    nfcolor_id = "#F9D46B"
+    edge_color = "#007b7d"
+    ecolor = "#FAFAFA"
+  } else {
+    ncolor_sys = "#ff0000"
+    nbcolor_sys = "#ffc0cb"
+    nfcolor_sys = "#ff69b4"
+    ncolor_user = "#0000cd"
+    nbcolor_user = "#cee1ff"
+    nfcolor_user = "#6da0f2"
+    ncolor_chenge = "#404040"
+    nfcolor_root = "#404040"
+    ncolor_host = "#2e8b57"
+    nbcolor_host = "#98fb98"
+    nfcolor_host = "#3cb371"
+    ncolor_domain = "#8b2e86"
+    nbcolor_domain = "#fa98ef"
+    nfcolor_domain = "#b23aa2"
+    ncolor_id = "#8b6f2e"
+    nbcolor_id = "#f9d897"
+    nfcolor_id = "#b28539"
+    edge_color = "#CCCCCC"
+    ecolor = "#333333"
+  }
+
   for (idx in path) {
     if (Object.keys(path[idx]).length == 3) {
       objid = parseInt(path[idx].identity.low) + 100;
@@ -34,22 +78,22 @@ function buildGraph(graph, path, root) {
         nshape = "ellipse"
         ntype = "User"
         if (path[idx].properties.rights == "system") {
-          ncolor = "#ff0000"
-          nbcolor = "#ffc0cb"
-          nfcolor = "#ff69b4"
+          ncolor = ncolor_sys
+          nbcolor = nbcolor_sys
+          nfcolor = nfcolor_sys
           nprivilege = "SYSTEM"
         } else {
-          ncolor = "#0000cd"
-          nbcolor = "#cee1ff"
-          nfcolor = "#6da0f2"
+          ncolor = ncolor_user
+          nbcolor = nbcolor_user
+          nfcolor = nfcolor_user
           nprivilege = "Normal"
         }
         if (path[idx].properties.status != "-") {
-          ncolor = "#404040"
+          ncolor = ncolor_chenge
           nshape = "octagon"
         }
         if (root == path[idx].properties.user) {
-          nfcolor = "#404040"
+          nfcolor = nfcolor_root
         }
       }
       if (path[idx].labels[0] == "IPAddress") {
@@ -58,12 +102,12 @@ function buildGraph(graph, path, root) {
         nwidth = "25"
         nheight = "25"
         nfsize = "8"
-        ncolor = "#2e8b57"
-        nbcolor = "#98fb98"
-        nfcolor = "#3cb371"
+        ncolor = ncolor_host
+        nbcolor = nbcolor_host
+        nfcolor = nfcolor_host
         ntype = "Host"
         if (root == path[idx].properties.IP) {
-          nfcolor = "#404040"
+          nfcolor = nfcolor_root
         }
       }
       if (path[idx].labels[0] == "Domain") {
@@ -72,9 +116,9 @@ function buildGraph(graph, path, root) {
         nwidth = "25"
         nheight = "25"
         nfsize = "10"
-        ncolor = "#8b2e86"
-        nbcolor = "#fa98ef"
-        nfcolor = "#b23aa2"
+        ncolor = ncolor_domain
+        nbcolor = nbcolor_domain
+        nfcolor = nfcolor_domain
         ntype = "Domain"
       }
       if (path[idx].labels[0] == "ID") {
@@ -86,9 +130,9 @@ function buildGraph(graph, path, root) {
         nwidth = "25"
         nheight = "25"
         nfsize = "10"
-        ncolor = "#8b6f2e"
-        nbcolor = "#f9d897"
-        nfcolor = "#b28539"
+        ncolor = ncolor_id
+        nbcolor = nbcolor_id
+        nfcolor = nfcolor_id
         ntype = "Policy"
       }
       graph.nodes.push({
@@ -171,7 +215,9 @@ function buildGraph(graph, path, root) {
             "count": ecount,
             "logontype": String(path[idx].properties.logintype),
             "status": path[idx].properties.status,
-            "authname": path[idx].properties.authname
+            "authname": path[idx].properties.authname,
+            "edge_color": edge_color,
+            "ecolor": ecolor
           }
         });
       } else {
@@ -239,8 +285,9 @@ function drawGraph(graph, rootNode) {
         "curve-style": "bezier",
         "target-arrow-shape": "triangle",
         "width": 2,
-        "line-color": "#ddd",
-        "target-arrow-color": "#ddd"
+        "line-color": "data(edge_color)",
+        "target-arrow-color": "data(edge_color)",
+        "color": "data(ecolor)",
       })
       .selector('.highlighted').css({
         "background-color": "#61bffc",
@@ -581,22 +628,22 @@ function createQuery() {
   var dateStr = getDateRange();
 
   if (selectVal == "Username") {
-    whereStr = 'user.user =~ "' + setStr + '" ';
+    whereStr = 'user.user CONTAINS "' + setStr + '" ';
   } else if (selectVal == "IPAddress") {
-    whereStr = 'ip.hostname =~ "' + setStr + '" ';
+    whereStr = 'ip.hostname CONTAINS "' + setStr + '" ';
   } else {
-    whereStr = 'ip.IP =~ "' + setStr + '" ';
+    whereStr = 'ip.IP CONTAINS "' + setStr + '" ';
   }
 
   for (i = 1; i <= currentNumber; i++) {
     if (document.getElementById("query-input" + i).value) {
       ruleStr = document.getElementById("InputRule" + i).value;
       if (document.getElementById("InputSelect" + i).value == "Username") {
-        whereStr += ruleStr + ' user.user =~ "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' user.user CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
       } else if (document.getElementById("InputSelect" + i).value == "IPAddress") {
-        whereStr += ruleStr + ' ip.IP =~ "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' ip.IP CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
       } else {
-        whereStr += ruleStr + ' ip.hostname =~ "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' ip.hostname CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
       }
     }
   }
@@ -616,10 +663,10 @@ function searchPath() {
   var dateStr = getDateRange();
   dateStr = dateStr.slice(5);
 
-  queryStr = 'MATCH (from:Username) WHERE from.user = "' + setStr + '" \
-              MATCH (to:Username) WHERE to.rights = "system" \
-              MATCH (user:Username) WHERE user IN shortestPath((from)-[:Event*]-(to)) \
-              MATCH (ip:IPAddress) WHERE ip IN shortestPath((from)-[:Event*]-(to)) \
+  queryStr = 'MATCH (from:Username { user:"' + setStr + '" }), (to:Username { rights:"system"}), p = shortestPath((from)-[:Event*]-(to)) \
+              WITH p \
+              MATCH (user:Username) WHERE user IN nodes(p) \
+              MATCH (ip:IPAddress) WHERE ip IN nodes(p) \
               MATCH (user)-[event]-(ip) WHERE ' + dateStr + ' \
               RETURN user, ip, event'
 
@@ -641,6 +688,7 @@ function sendQuery(queryStr, root) {
   var loading = document.getElementById('loading');
   loading.classList.remove('loaded');
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -680,6 +728,7 @@ This function executes the neo4j query.
 function executeQuery(queryStr, root) {
   var countStr = queryStr.replace("user, event, ip", "COUNT(event)");
 
+  var session = driver.session();
   session.run(countStr)
     .subscribe({
       onNext: function(record) {
@@ -720,6 +769,7 @@ function diffQuery() {
 
   queryStr1st = 'MATCH (user)-[event:Event]-(ip)  WHERE event.date >= ' + date1st + ' AND event.date <= ' + (date1st + 86400) + ' RETURN user, event, ip';
 
+  var session = driver.session();
   session.run(queryStr1st)
     .subscribe({
       onNext: function(record) {
@@ -755,6 +805,7 @@ function diffNext(graph1) {
   var loading = document.getElementById('loading');
   loading.classList.remove('loaded');
 
+  var session = driver.session();
   session.run(queryStr2nd)
     .subscribe({
       onNext: function(record) {
@@ -842,11 +893,13 @@ function prhostNext() {
 
 function pagerankQuery(queryStr, dataType, currentPage) {
   var nodes = new Array();
-  var html = '<div><table class="table table-striped"><thead><tr class="col-sm-2 col-md-2">\
+  var html = '<div><table class="table table-hover"><thead class="thead-light"><tr class="col-sm-2 col-md-2">\
               <th class="col-sm-1 col-md-1">Rank</th><th class="col-sm-1 col-md-1">' + dataType +
     '</th></tr></thead><tbody class="col-sm-2 col-md-2">';
   var startRunk = currentPage * 10;
   queryStr = queryStr + " SKIP " + startRunk + " LIMIT " + 10;
+
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -885,6 +938,7 @@ function exportCSV() {
   var queryStr = 'MATCH (user:Username)-[event:Event]-(ip:IPAddress) RETURN user, ip, event';
   var events = new Array();
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -946,6 +1000,7 @@ function downloadCSV(csvType) {
   var queryStr = 'MATCH (date:Date) MATCH (user:Username) RETURN date, user';
   var users = new Array();
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1034,7 +1089,7 @@ function createTimeline(queryStr, tableType) {
   if (tableType == "search") {
     var span = 'rowspan = "4" colspan="2"';
   }
-  var html = '<div class="table-responsive"><table class="table table-bordered table-condensed table-striped table-wrapper" style="background-color:#EEE;"><thead><tr>\
+  var html = '<div class="table-responsive"><table class="table table-hover table-bordered table-sm table-striped table-wrapper" style="background-color:#EEE;"><thead class="thead-light"><tr>\
                     <th ' + span + '>Username</th>';
 
   for (i = 0; i < chartArray.length; i++) {
@@ -1043,6 +1098,7 @@ function createTimeline(queryStr, tableType) {
     }
   }
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1066,6 +1122,19 @@ function createTimeline(queryStr, tableType) {
         var nextyear = null;
         var nrangeHours = 0;
         var weekd = 0;
+
+        if (darkSwitch) {
+          normal_color = "#4d0715"
+          low_color = "#800b23"
+          mid_color = "#b31031"
+          high_color = "#dc143c"
+        } else {
+          normal_color = "#ffeaee"
+          low_color = "#ffbaee"
+          mid_color = "#ff8aee"
+          high_color = "#ff5aee"
+        }
+
         for (i = 1; i <= rangeHours; i++) {
           startDate.setHours(startDate.getHours() + 1);
           if (startDate.getFullYear() != thisyear) {
@@ -1125,13 +1194,13 @@ function createTimeline(queryStr, tableType) {
             alerts = users[i][2].split(",");
             for (j = 0; j < rowdata.length; j++) {
               if (alerts[j] > 17) {
-                html += '<td bgcolor="#ff5aee">' + rowdata[j].split(".")[0] + '</td>';
+                html += '<td bgcolor="' + high_color + '">' + rowdata[j].split(".")[0] + '</td>';
               } else if (alerts[j] > 16) {
-                html += '<td bgcolor="#ff8aee">' + rowdata[j].split(".")[0] + '</td>';
+                html += '<td bgcolor="' + mid_color + '">' + rowdata[j].split(".")[0] + '</td>';
               } else if (alerts[j] > 13) {
-                html += '<td bgcolor="#ffbaee">' + rowdata[j].split(".")[0] + '</td>';
+                html += '<td bgcolor="' + low_color + '">' + rowdata[j].split(".")[0] + '</td>';
               } else if (alerts[j] > 10) {
-                html += '<td bgcolor="#ffeaee">' + rowdata[j].split(".")[0] + '</td>';
+                html += '<td bgcolor="' + normal_color + '">' + rowdata[j].split(".")[0] + '</td>';
               } else {
                 html += '<td>' + rowdata[j].split(".")[0] + '</td>';
               }
@@ -1164,13 +1233,13 @@ function createTimeline(queryStr, tableType) {
               }
               for (k = 0; k < rowdata.length; k++) {
                 if (alerts[k] > 17) {
-                  html += '<td bgcolor="#ff5aee">' + rowdata[k].split(".")[0] + '</td>';
+                  html += '<td bgcolor="' + high_color + '">' + rowdata[k].split(".")[0] + '</td>';
                 } else if (alerts[k] > 16) {
-                  html += '<td bgcolor="#ff8aee">' + rowdata[k].split(".")[0] + '</td>';
+                  html += '<td bgcolor="' + mid_color + '">' + rowdata[k].split(".")[0] + '</td>';
                 } else if (alerts[k] > 13) {
-                  html += '<td bgcolor="#ffbaee">' + rowdata[k].split(".")[0] + '</td>';
+                  html += '<td bgcolor="' + low_color + '">' + rowdata[k].split(".")[0] + '</td>';
                 } else if (alerts[k] > 10) {
-                  html += '<td bgcolor="#ffeaee">' + rowdata[k].split(".")[0] + '</td>';
+                  html += '<td bgcolor="' + normal_color + '">' + rowdata[k].split(".")[0] + '</td>';
                 } else {
                   html += '<td>' + rowdata[k].split(".")[0] + '</td>';
                 }
@@ -1207,6 +1276,7 @@ function createTimelineGraph(queryStr) {
   var starttime = "";
   var endtime = "";
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1392,7 +1462,7 @@ function searchTimeline() {
   var setStr = document.getElementById("query-input").value;
 
   if (selectVal == "Username") {
-    whereStr = 'user.user =~ "' + setStr + '" ';
+    whereStr = 'user.user CONTAINS "' + setStr + '" ';
   } else {
     searchError();
   }
@@ -1400,7 +1470,7 @@ function searchTimeline() {
   for (i = 1; i <= currentNumber; i++) {
     if (document.getElementById("query-input" + i).value) {
       if (document.getElementById("InputSelect" + i).value == "Username") {
-        whereStr += 'or user.user =~ "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += 'or user.user CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
       } else {
         searchError();
       }
@@ -1416,7 +1486,7 @@ function searchTimeline() {
 }
 
 function clickTimeline(setStr) {
-  whereStr = 'user.user =~ "' + setStr + '" ';
+  whereStr = 'user.user CONTAINS "' + setStr + '" ';
 
   var queryStr = 'MATCH (date:Date) MATCH (user:Username) WHERE (' + whereStr + ') RETURN date, user';
   var gtype = document.getElementById("timelineTypes").checked;
@@ -1435,6 +1505,7 @@ function logdeleteCheck() {
   var queryStr = "MATCH (date:Deletetime) RETURN date";
   var ddata = "";
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1449,7 +1520,7 @@ function logdeleteCheck() {
 
           var elemMsg = document.getElementById("error");
           elemMsg.innerHTML =
-            '<div class="alert alert-danger alert-dismissible" id="alertfadeout" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="close">\
+            '<div class="alert alert-danger alert-dismissible mt-3" id="alertfadeout" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="close">\
             <span aria-hidden="true">×</span></button><strong>IMPORTANT</strong>: Delete Event Log has detected! If you have not deleted the event log, the attacker may have deleted it.\
             <br>DATE: ' + delDate + '  DOMAIN: ' + delDomain + '  USERNAME: ' + delUser + '</div>';
         }
@@ -1467,7 +1538,7 @@ push alert if search has failed.
 function searchError() {
   var elemMsg = document.getElementById("error");
   elemMsg.innerHTML =
-    '<div class="alert alert-warning alert-dismissible" id="alertfadeout" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="close">\
+    '<div class="alert alert-warning alert-dismissible mt-3" id="alertfadeout" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="close">\
     <span aria-hidden="true">×</span></button><strong>WARNING</strong>: Search failed!</div>';
   $(document).ready(function() {
     $('#alertfadeout').fadeIn(2000).delay(4000).fadeOut(2000);
@@ -1482,6 +1553,7 @@ function file_upload() {
   var upfile = document.getElementById("lefile");
   var timezone = document.getElementById("utcTime").value;
   var logtype = document.getElementById("logType").value;
+  var addlog = document.getElementById("add_log").checked;
 
   if (timezone == "Time Zone") {
     document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Please set the time zone of the event logs.</div>';
@@ -1496,6 +1568,7 @@ function file_upload() {
     }
     formData.append("timezone", timezone);
     formData.append("logtype", logtype);
+    formData.append("addlog", addlog);
     var xmlhttp = new XMLHttpRequest();
     xmlhttp.upload.addEventListener("progress", progressHandler, false);
     xmlhttp.addEventListener("load", completeHandler, false);
@@ -1550,7 +1623,12 @@ function parseEVTX() {
     if (xmlhttp2.readyState == 4) {
       if (xmlhttp2.status == 200) {
         var logdata = xmlhttp2.responseText.split(/\r\n|\r|\n/);
-        var allrecode = logdata[4].split(" ")[5].replace(".", "");
+        for (i = 0; i < logdata.length; i++) {
+          if (logdata[i].indexOf("Last record number") != -1) {
+            var allrecode = logdata[i].split(" ")[5].replace(".", "");
+            break;
+          }
+        }
         var nowdata = logdata[logdata.length - 2];
         if (nowdata.indexOf("Now loading") != -1) {
           var recordnum = nowdata.split(" ")[3];
@@ -1579,6 +1657,7 @@ load date info from neo4j
 function loaddate() {
   var queryStr = 'MATCH (date:Date) RETURN date';
 
+  var session = driver.session();
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {

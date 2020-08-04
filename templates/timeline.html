@@ -4,54 +4,66 @@
 <head>
   <meta charset="utf-8">
   <title>LogonTracer</title>
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://gitcdn.github.io/bootstrap-toggle/2.2.2/css/bootstrap-toggle.min.css" integrity="sha384-yBEPaZw444dClEfen526Q6x4nwuzGO6PreKpbRVSLFCci3oYGE5DnD1pNsubCxYW" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" integrity="sha384-yakM86Cz9KJ6CeFVbopALOEQGGvyBFdmA4oHMiYuHcd9L59pLkCEFSlr6M9m434E" crossorigin="anonymous">
   <link rel="stylesheet" href="static/css/style.css">
+  <link rel="stylesheet" href="static/css/dark-mode.css">
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.7.2/Chart.min.js" integrity="sha384-0saKbDOWtYAw5aP4czPUm6ByY5JojfQ9Co6wDgkuM7Zn+anp+4Rj92oGK8cbV91S" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/floatthead/2.1.2/jquery.floatThead.min.js" integrity="sha384-ASdxdxzGplF9B/P3mStsNmNS1x+OFhChbFeLziK29WOvaWkGDMspp2xw5+Vha6Ck" crossorigin="anonymous"></script>
-  <script src="https://gitcdn.github.io/bootstrap-toggle/2.2.2/js/bootstrap-toggle.min.js" integrity="sha384-cd07Jx5KAMCf7qM+DveFKIzHXeCSYUrai+VWCPIXbYL7JraHMFL/IXaCKbLtsxyB" crossorigin="anonymous"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>  <!-- Neo4j JavaScript Driver -->
-  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@1.7.3/lib/browser/neo4j-web.min.js" integrity="sha384-XVrDQNh79isRQKoUzX8pCHmnP2HmtLQJTDMfzI5/4gxbjqz7mHlGjTKyQxVGKR7k" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js" integrity="sha384-Q9RsZ4GMzjlu4FFkJw4No9Hvvm958HqHmXI9nqo5Np2dA/uOVBvKVxAvlBQrDhk4" crossorigin="anonymous"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.15.0/umd/popper.min.js" integrity="sha384-L2pyEeut/H3mtgCBaUNw7KWzp5n9+4pDQiExs933/5QfaTh8YStYFFkOzSoXjlTb" crossorigin="anonymous"></script>
+  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js" integrity="sha384-J1rV4940pYhBtFhx6SqDEMJP35rgSVSVx+44+TPf67jyXL8dsBtYMZeBCNLf/2zk" crossorigin="anonymous"></script>
+  <!-- Neo4j JavaScript Driver -->
+  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.1.1/lib/browser/neo4j-web.min.js" integrity="sha384-uIXLP9YQamN3hm39tZmG/ZJ9ZLhlOh8DJjYz1KSQ8pCXudznOjg2bwy9A33+et3k" crossorigin="anonymous"></script>
   <script src="static/js/script.js"></script>
 </head>
 
 <body>
-  <nav class="navbar navbar-default">
-    <div class="container-fluid">
-      <a class="navbar-brand" href="#"><img src="static/images/logo_timeline.svg" alt="top" width="144" style="margin-top: -5px"></a>
-      <div class="collapse navbar-collapse">
-        <form class="navbar-form navbar-left" role="search">
-          <div class="form-group">
+  <nav class="navbar navbar-expand-lg navbar-light bg-light p-1 shadow">
+    <a class="navbar-brand" href="#"><img class="my_svg" src="static/images/logo_timeline.svg" alt="top" width="144"></a>
+    <div class="collapse navbar-collapse">
+      <form class="navbar-nav mr-auto" role="search">
+        <div class="form-group mt-3" id="itemForm">
+          <div class="form-inline">
             <label class="sr-only" for="InputSelect">select</label>
-            <select class="form-control" id="InputSelect">
+            <select class="custom-select" id="InputSelect">
               <option>Username</option>
             </select>
-            <input class="form-control" type="text" value="administrator" id="query-input" size="10">
-            <div id="itemForm"></div>
+            <input class="form-control my-2 my-lg-0 ml-1" type="text" value="administrator" id="query-input">
           </div>
-          <input type="button" class="btn btn-default" value="+" onclick="ItemField.add();" />
-          <input type="button" class="btn btn-default" value="-" onclick="ItemField.del();" />
-          <input checked data-toggle="toggle" data-on="Table" data-off="Graph" data-onstyle="primary" data-offstyle="info" data-height="35" type="checkbox"  id="timelineTypes">
-          <button type="button" class="btn btn-default" onclick="searchTimeline()">search</button>
-          <button type="button" class="btn btn-default" onclick="createAlltimeline()">all</button>
-          <div class="btn-group">
-            <button class="btn btn-default dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">
-              Download <span class="caret"></span>
-            </button>
-            <ul class="dropdown-menu" role="menu">
-              <li role="presentation"><a onclick="downloadSummary()">Summary</a></li>
-              <li role="presentation"><a onclick="downloadDetail()">Details</a></li>
-            </ul>
+        </div>
+        <input type="button" class="btn btn-primary ml-1 mt-3 h-25" value="+" onclick="ItemField.add();" />
+        <input type="button" class="btn btn-primary ml-1 mt-3 h-25 mr-1" value="-" onclick="ItemField.del();" />
+        <span class="mt-3">
+          <input type="checkbox" data-toggle="toggle" data-on="Table" data-onstyle="outline-info" data-height="38" data-off="Graph" data-offstyle="outline-primary" id="timelineTypes">
+        </span>
+        <button type="button" class="btn btn-outline-primary ml-1 mt-3 h-25" onclick="searchTimeline()">search</button>
+        <button type="button" class="btn btn-outline-primary ml-1 mt-3 h-25" onclick="createAlltimeline()">all</button>
+        <div class="btn-group  ml-1 mt-3 h-25">
+          <button class="btn btn-outline-secondary" type="button">Download</button>
+          <button class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" type="button" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="sr-only"></span>
+          </button>
+          <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <a class="dropdown-item" onclick="downloadSummary()" href="#">Summary</a>
+            <a class="dropdown-item" onclick="downloadDetail()" href="#">Details</a>
           </div>
-        </form>
-      </div>
+        </div>
+        <div class="custom-control custom-switch ml-4 mt-4">
+          <input type="checkbox" class="custom-control-input" id="darkSwitch">
+          <label class="custom-control-label" for="darkSwitch">Dark Mode</label>
+        </div>
+
+        <script src="static/js/dark-mode-switch.min.js"></script>
+      </form>
     </div>
   </nav>
 
   <div class="container-fluid">
     <div class="row">
-      <div class="col-sm-12 col-md-12 main">
+      <div class="col-sm-12 col-md-12 main mt-3">
         <div id="error"></div>
         <div id="cy"></div>
         <div id="addcanvas"></div>
@@ -61,17 +73,17 @@
   <script type="text/javascript">
     var neo = neo4j.default;
     //Neo4j access settings
-    var driver = neo.driver("bolt://{{ server_ip }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
+    var driver = neo.driver("bolt://{{ server_ip }}:{{ ws_port }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
     var session = driver.session();
     //createAlltimeline();
 
     var currentNumber = 0;
     var ItemField = {
       currentNumber: 0,
-      itemTemplate: '<label class="sr-only" for="InputSelect">select</label>\
-                                <select class="form-control" id="InputSelect_count_">\
+      itemTemplate: '<div class="form-inline my-5 my-lg-0"><label class="sr-only" for="InputSelect">select</label>\
+                                <select class="custom-select" id="InputSelect_count_">\
                                 <option>Username</option></select>\
-                                <input class="form-control" type="text" id="query-input_count_" size="10">',
+                                <input class="form-control my-2 my-lg-0 ml-1"" type="text" id="query-input_count_"></div>',
       add: function() {
         currentNumber++;
         if (currentNumber <= 10) {
@@ -92,6 +104,10 @@
         currentNumber--;
       }
     }
+
+    $(function(){
+      deSVG('.my_svg', true);
+    });
   </script>
 </body>
 

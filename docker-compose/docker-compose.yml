@@ -1,0 +1,46 @@
+version: "3"
+services:
+  neo4j:
+    container_name: neo4j
+    image: neo4j:4.1.1
+    # Using volumes slows down the container.
+    #volumes:
+    #  - ./neo4j/data:/data
+    #  - ./neo4j/logs:/logs
+    #  - ./neo4j/conf:/conf
+    #  Set when sync container and local time
+    #  - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    environment:
+      - NEO4J_dbms_default__database=neo4j
+      - NEO4J_dbms_connector_bolt_listen__address=0.0.0.0:7687
+      - NEO4J_dbms_connector_http_listen__address=0.0.0.0:7474
+      # Performance tuning for JVM neo4j
+      # See more details: https://neo4j.com/developer/guide-performance-tuning/
+      - NEO4J_dbms_memory_heap_max__size=4G
+      - NEO4J_dbms_memory_heap_initial__size=2G
+      - NEO4j_dbms_memory_pagecache_size=20G
+      # set default neo4j password
+      - NEO4J_AUTH=neo4j/password
+    networks:
+      - neo4j-network
+
+  logontracer:
+    container_name: logontracer
+    build: ./LogonTracer/build
+    image: logontracer:latest
+    #volumes:
+    #  Set when sync container and local time
+    #  - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "8080:8080"
+    environment:
+      - LTHOSTNAME=localhost
+    networks:
+      - neo4j-network
+
+networks:
+  neo4j-network:
+    external: true
