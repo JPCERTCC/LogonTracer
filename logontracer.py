@@ -1277,7 +1277,11 @@ def parse_es():
 
         if eventid in EVENT_ID:
             logtime = hit["@timestamp"].replace("T", " ").split(".")[0]
-            etime = datetime.datetime.strptime(logtime, "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+            try:
+                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+            except:
+                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
+
             stime = datetime.datetime(*etime.timetuple()[:4])
 
             if starttime is None:
@@ -1475,13 +1479,13 @@ def parse_es():
         if eventid == 1102:
             logtime = hit["@timestamp"]
             try:
-                etime = datetime.datetime.strptime(logtime, "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
             except:
-                etime = datetime.datetime.strptime(logtime, "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
             deletelog.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
 
-            if hasattr(event.event_data, "SubjectUserName"):
-                username = event.event_data.SubjectUserName.split("@")[0]
+            if hasattr(event.user_data, "SubjectUserName"):
+                username = event.user_data.SubjectUserName.split("@")[0]
                 if username[-1:] not in "$":
                     deletelog.append(username.lower())
                 else:
@@ -1489,8 +1493,8 @@ def parse_es():
             else:
                 deletelog.append("-")
 
-            if hasattr(event.event_data, "SubjectDomainName"):
-                deletelog.append(event.event_data.SubjectDomainName)
+            if hasattr(event.user_data, "SubjectDomainName"):
+                deletelog.append(event.user_data.SubjectDomainName)
             else:
                 deletelog.append("-")
 
