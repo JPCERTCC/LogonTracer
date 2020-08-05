@@ -846,8 +846,8 @@ function getArrayDiff(arr1, arr2) {
 function nodeConcat(arr1, arr2) {
   let arr = arr1.nodes.concat(arr2.nodes);
   return arr.filter((v, i)=> {
-    console.log(arr2.edges)
-    console.log(arr)
+    //console.log(arr2.edges)
+    //console.log(arr)
     return (arr2.edges.findIndex(obj => obj.data.source === v.data.id) >= 0 ||
             arr2.edges.findIndex(obj => obj.data.target === v.data.id) >= 0);
   });
