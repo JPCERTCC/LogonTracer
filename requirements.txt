@@ -1,6 +1,6 @@
 numpy
 py2neo
-python-evtx
+evtx
 lxml
 scipy==1.2.1
 changefinder

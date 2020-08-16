@@ -21,8 +21,7 @@ except ImportError:
     has_lxml = False
 
 try:
-    from Evtx.Evtx import Evtx
-    from Evtx.Views import evtx_file_xml_view
+    from evtx import PyEvtxParser
     has_evtx = True
 except ImportError:
     has_evtx = False
@@ -340,7 +339,7 @@ def do_upload():
 
     if os.path.exists(UPLOAD_DIR) is False:
         os.mkdir(UPLOAD_DIR)
-        print("[+] make upload folder %s." % UPLOAD_DIR)
+        print("[+] make upload folder {0}.".format(UPLOAD_DIR))
 
     try:
         timezone = request.form["timezone"]
@@ -567,20 +566,20 @@ def learnhmm(frame, users, stime):
 
 def to_lxml(record_xml):
     rep_xml = record_xml.replace("xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"", "")
-    set_xml = "<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?>%s" % rep_xml
-    fin_xml = set_xml.encode("utf-8")
+    fin_xml = rep_xml.encode("utf-8")
     parser = etree.XMLParser(resolve_entities=False)
     return etree.fromstring(fin_xml, parser)
 
 
 def xml_records(filename):
     if args.evtx:
-        with Evtx(filename) as evtx:
-            for xml, record in evtx_file_xml_view(evtx.get_file_header()):
+        with open(filename, "rb") as evtx:
+            parser = PyEvtxParser(evtx)
+            for record in parser.records():
                 try:
-                    yield to_lxml(xml), None
+                    yield to_lxml(record["data"]), None
                 except etree.XMLSyntaxError as e:
-                    yield xml, e
+                    yield record["data"], e
 
     if args.xmls:
         xdata = ""
@@ -593,7 +592,7 @@ def xml_records(filename):
             for xml in xml_list:
                 if xml.startswith("<System>"):
                     try:
-                        yield to_lxml("<Event>" + xml), None
+                        yield to_lxml("<?xml version=\"1.0\" encoding=\"utf-8\" standalone=\"yes\" ?><Event>" + xml), None
                     except etree.XMLSyntaxError as e:
                         yield xml, e
 
@@ -669,29 +668,29 @@ def parse_evtx(evtx_list):
 
     if os.path.exists(cache_dir) is False:
         os.mkdir(cache_dir)
-        print("[+] make cache folder %s." % cache_dir)
+        print("[+] make cache folder {0}.".format(cache_dir))
 
     if args.timezone:
         try:
             datetime.timezone(datetime.timedelta(hours=args.timezone))
             tzone = args.timezone
-            print("[+] Time zone is %s." % args.timezone)
+            print("[+] Time zone is {0}.".format(args.timezone))
         except:
-            sys.exit("[!] Can't load time zone '%s'." % args.timezone)
+            sys.exit("[!] Can't load time zone {0}.".format(args.timezone))
     else:
         tzone = 0
 
     if args.fromdate:
         try:
             fdatetime = datetime.datetime.strptime(args.fromdate, "%Y%m%d%H%M%S")
-            print("[+] Parse the EVTX from %s." % fdatetime.strftime("%Y-%m-%d %H:%M:%S"))
+            print("[+] Parse the EVTX from {0}.".format(fdatetime.strftime("%Y-%m-%d %H:%M:%S")))
         except:
             sys.exit("[!] From date does not match format '%Y%m%d%H%M%S'.")
 
     if args.todate:
         try:
             tdatetime = datetime.datetime.strptime(args.todate, "%Y%m%d%H%M%S")
-            print("[+] Parse the EVTX from %s." % tdatetime.strftime("%Y-%m-%d %H:%M:%S"))
+            print("[+] Parse the EVTX from {0}.".format(tdatetime.strftime("%Y-%m-%d %H:%M:%S")))
         except:
             sys.exit("[!] To date does not match format '%Y%m%d%H%M%S'.")
 
@@ -702,19 +701,10 @@ def parse_evtx(evtx_list):
                 if fb_data != EVTX_HEADER:
                     sys.exit("[!] This file is not EVTX format {0}.".format(evtx_file))
 
-            chunk = -2
-            with Evtx(evtx_file) as evtx:
-                fh = evtx.get_file_header()
-                try:
-                    while True:
-                        last_chunk = list(evtx.chunks())[chunk]
-                        last_record = last_chunk.file_last_record_number()
-                        chunk -= 1
-                        if last_record > 0:
-                            record_sum = record_sum + last_record
-                            break
-                except:
-                    record_sum = record_sum + fh.next_record_number()
+            with open(evtx_file, "rb") as evtx:
+                parser = PyEvtxParser(evtx)
+                records = list(parser.records())
+                record_sum = len(records)
 
         if args.xmls:
             with open(evtx_file, "r") as fb:
@@ -724,13 +714,13 @@ def parse_evtx(evtx_list):
                 for line in fb:
                     record_sum += line.count("<System>")
 
-    print("[+] Last record number is %i." % record_sum)
+    print("[+] Last record number is {0}.".format(record_sum))
 
     # Parse Event log
     print("[+] Start parsing the EVTX file.")
 
     for evtx_file in evtx_list:
-        print("[+] Parse the EVTX file %s." % evtx_file)
+        print("[+] Parse the EVTX file {0}.".format(evtx_file))
 
         for node, err in xml_records(evtx_file):
             if err is not None:
@@ -739,7 +729,7 @@ def parse_evtx(evtx_list):
             eventid = int(node.xpath("/Event/System/EventID")[0].text)
 
             if not count % 100:
-                sys.stdout.write("\r[+] Now loading %i records." % count)
+                sys.stdout.write("\r[+] Now loading {0} records.".format(count))
                 sys.stdout.flush()
 
             if eventid in EVENT_ID:
@@ -990,12 +980,12 @@ def parse_evtx(evtx_list):
                     deletelog.append("-")
 
     print("\n[+] Load finished.")
-    print("[+] Total Event log is %i." % count)
+    print("[+] Total Event log is {0}.".format(count))
 
     if not username_set or not len(event_set):
         sys.exit("[!] This event log did not include logs to be visualized. Please check the details of the event log.")
     else:
-        print("[+] Fildered Event log is %i." % len(event_set))
+        print("[+] Fildered Event log is {0}.".format(len(event_set)))
 
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
@@ -1199,23 +1189,23 @@ def parse_es():
         try:
             datetime.timezone(datetime.timedelta(hours=args.timezone))
             tzone = args.timezone
-            print("[+] Time zone is %s." % args.timezone)
+            print("[+] Time zone is {0}.".format(args.timezone))
         except:
-            sys.exit("[!] Can't load time zone '%s'." % args.timezone)
+            sys.exit("[!] Can't load time zone {0}.".format(args.timezone))
     else:
         tzone = 0
 
     if args.fromdate:
         try:
             fdatetime = datetime.datetime.strptime(args.fromdate, "%Y%m%d%H%M%S")
-            print("[+] Search ES from %s." % fdatetime.strftime("%Y-%m-%d %H:%M:%S"))
+            print("[+] Search ES from {0}.".format(fdatetime.strftime("%Y-%m-%d %H:%M:%S")))
         except:
             sys.exit("[!] From date does not match format '%Y%m%d%H%M%S'.")
 
     if args.todate:
         try:
             tdatetime = datetime.datetime.strptime(args.todate, "%Y%m%d%H%M%S")
-            print("[+] Search ES to %s." % tdatetime.strftime("%Y-%m-%d %H:%M:%S"))
+            print("[+] Search ES to {0}.".format(tdatetime.strftime("%Y-%m-%d %H:%M:%S")))
         except:
             sys.exit("[!] To date does not match format '%Y%m%d%H%M%S'.")
     # Parse Event log
@@ -1272,7 +1262,7 @@ def parse_es():
         eventid = event.event_id
 
         if not count % 100:
-            sys.stdout.write("\r[+] Now loading %i records." % count)
+            sys.stdout.write("\r[+] Now loading {0} records.".format(count))
             sys.stdout.flush()
 
         if eventid in EVENT_ID:
@@ -1499,12 +1489,12 @@ def parse_es():
                 deletelog.append("-")
 
     print("\n[+] Load finished.")
-    print("[+] Total Event log is %i." % count)
+    print("[+] Total Event log is {0}.".format(count))
 
     if not username_set or not len(event_set):
         sys.exit("[!] This event log did not include logs to be visualized. Please check the details of the event log.")
     else:
-        print("[+] Fildered Event log is %i." % len(event_set))
+        print("[+] Fildered Event log is {0}.".format(len(event_set)))
 
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
@@ -1641,7 +1631,7 @@ def main():
         sys.exit("[!] py2neo must be installed for this script.")
 
     if not has_evtx:
-        sys.exit("[!] python-evtx must be installed for this script.")
+        sys.exit("[!] evtx must be installed for this script.")
 
     if not has_lxml:
         sys.exit("[!] lxml must be installed for this script.")
@@ -1671,7 +1661,7 @@ def main():
     except:
         sys.exit("[!] Can't connect Neo4j Database.")
 
-    print("[+] Script start. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+    print("[+] Script start. {0}".format(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
 
     try:
         print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, db.kernel_start_time))))
@@ -1692,7 +1682,7 @@ def main():
         cache_dir = os.path.join(FPATH, 'cache')
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
-            print("[+] Delete cache folder %s." % cache_dir)
+            print("[+] Delete cache folder {0}.".format(cache_dir))
 
     if args.evtx:
         for evtx_file in args.evtx:
@@ -1709,7 +1699,7 @@ def main():
     if args.es:
         parse_es()
 
-    print("[+] Script end. %s" % datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S"))
+    print("[+] Script end. {0}".format(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
 
 
 if __name__ == "__main__":
