@@ -222,9 +222,9 @@ parser.add_argument("-x", "--xml", dest="xmls", nargs="*", action="store", type=
 parser.add_argument("-z", "--timezone", dest="timezone", action="store", type=int, metavar="UTC",
                     help="Event log time zone. (for example: +9) (default: GMT)")
 parser.add_argument("-f", "--from", dest="fromdate", action="store", type=str, metavar="DATE",
-                    help="Parse Security Event log from this time. (for example: 20170101000000)")
+                    help="Parse Security Event log from this time. (for example: 2017-01-01T00:00:00)")
 parser.add_argument("-t", "--to", dest="todate", action="store", type=str, metavar="DATE",
-                    help="Parse Security Event log to this time. (for example: 20170228235959)")
+                    help="Parse Security Event log to this time. (for example: 2017-02-28T23:59:59)")
 parser.add_argument("--add", action="store_true", default=False,
                     help="Add additional data to Neo4j database. (default: False)")
 parser.add_argument("--delete", action="store_true", default=False,
@@ -704,17 +704,17 @@ def parse_evtx(evtx_list):
 
     if args.fromdate:
         try:
-            fdatetime = datetime.datetime.strptime(args.fromdate, "%Y%m%d%H%M%S")
+            fdatetime = datetime.datetime.strptime(args.fromdate, "%Y-%m-%dT%H:%M:%S")
             print("[+] Parse the EVTX from {0}.".format(fdatetime.strftime("%Y-%m-%d %H:%M:%S")))
         except:
-            sys.exit("[!] From date does not match format '%Y%m%d%H%M%S'.")
+            sys.exit("[!] From date does not match format '%Y-%m-%dT%H:%M:%S'.")
 
     if args.todate:
         try:
-            tdatetime = datetime.datetime.strptime(args.todate, "%Y%m%d%H%M%S")
+            tdatetime = datetime.datetime.strptime(args.todate, "%Y-%m-%dT%H:%M:%S")
             print("[+] Parse the EVTX from {0}.".format(tdatetime.strftime("%Y-%m-%d %H:%M:%S")))
         except:
-            sys.exit("[!] To date does not match format '%Y%m%d%H%M%S'.")
+            sys.exit("[!] To date does not match format '%Y-%m-%dT%H:%M:%S'.")
 
     for evtx_file in evtx_list:
         if args.evtx:
@@ -1245,17 +1245,17 @@ def parse_es():
 
     if args.fromdate:
         try:
-            fdatetime = datetime.datetime.strptime(args.fromdate, "%Y%m%d%H%M%S")
+            fdatetime = datetime.datetime.strptime(args.fromdate, "%Y-%m-%dT%H:%M:%S")
             print("[+] Search ES from {0}.".format(fdatetime.strftime("%Y-%m-%d %H:%M:%S")))
         except:
-            sys.exit("[!] From date does not match format '%Y%m%d%H%M%S'.")
+            sys.exit("[!] From date does not match format '%Y-%m-%dT%H:%M:%S'.")
 
     if args.todate:
         try:
-            tdatetime = datetime.datetime.strptime(args.todate, "%Y%m%d%H%M%S")
+            tdatetime = datetime.datetime.strptime(args.todate, "%Y-%m-%dT%H:%M:%S")
             print("[+] Search ES to {0}.".format(tdatetime.strftime("%Y-%m-%d %H:%M:%S")))
         except:
-            sys.exit("[!] To date does not match format '%Y%m%d%H%M%S'.")
+            sys.exit("[!] To date does not match format '%Y-%m-%dT%H:%M:%S'.")
     # Parse Event log
     print("[+] Start searching the ES.")
 
