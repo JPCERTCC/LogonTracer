@@ -1,0 +1,22 @@
+{
+  "settings": {
+    "number_of_shards": 1
+  },
+  "mappings": {
+    "properties": {
+      "@timestamp": {
+        "type": "date",
+        "format": "strict_date_optional_time_nanos"
+      },
+      "IP": {
+        "type": "text"
+      },
+      "hostname": {
+        "type": "text"
+      },
+      "rank": {
+        "type": "double"
+      }
+    }
+  }
+}

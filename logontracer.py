@@ -205,6 +205,8 @@ parser.add_argument("--es-prefix", dest="esprefix", action="store", type=str, me
                     help="Elastic Search event object prefix. (default: winlog)")
 parser.add_argument("--es", action="store_true", default=False,
                     help="Import data from Elastic Search. (default: False)")
+parser.add_argument("--postes", action="store_true", default=False,
+                    help="Post data to Elastic Search. (default: False)")
 parser.add_argument("-s", "--server", dest="server", action="store", type=str, metavar="SERVER",
                     help="Neo4j server. (default: localhost)")
 parser.add_argument("-u", "--user", dest="user", action="store", type=str, metavar="USERNAME",
@@ -281,6 +283,14 @@ statement_pr = """
   CREATE (user)-[group:Policy]->(id) set group.date='{date}'
 
   RETURN user, id
+  """
+
+es_doc_user = """
+  {{"@timestamp":"{datetime}", "user":"{user}", "rights":"{rights}", "sid":"{sid}", "status":"{status}", "rank":{rank}}}
+  """
+
+es_doc_ip = """
+  {{"@timestamp":"{datetime}", "IP":"{IP}", "hostname":"{hostname}", "rank":{rank}}}
   """
 
 if args.user:
@@ -562,6 +572,18 @@ def learnhmm(frame, users, stime):
     model.emissionprob_ = emission_probability
     model.fit(np.array([data_array], dtype="int").T, lengths)
     joblib.dump(model, FPATH + "/model/hmm.pkl")
+
+
+# Post to Elastic Search cluster
+def post_es(index, es, doc):
+    es.index(index=index, body=doc)
+
+
+# Create mattings to Elastic Search
+def create_map(es, index):
+    with open(FPATH + "/es-index/" + index + ".json", "r") as f:
+        body = f.read()
+    es.indices.create(index=index, body=body)
 
 
 def to_lxml(record_xml):
@@ -1069,6 +1091,22 @@ def parse_evtx(evtx_list):
     except:
         sys.exit("[!] Can't connect Neo4j Database.")
 
+    if args.postes:
+        # Parse Event log
+        print("[+] Start sending the ES.")
+
+        # Create a new ES client
+        client = Elasticsearch(ES_SERVER)
+
+        if client.indices.exists(index="logontracer-user-index") and client.indices.exists(index="logontracer-host-index") :
+            print("[+] Already created index mappings to ES.")
+        else:
+            create_map(client, "logontracer-host-index")
+            create_map(client, "logontracer-user-index")
+            print("[+] Creating index mappings to ES.")
+
+        es_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
     tx = GRAPH.begin()
     hosts_inv = {v: k for k, v in hosts.items()}
     for ipaddress in event_set["ipaddress"].drop_duplicates():
@@ -1078,6 +1116,11 @@ def parse_evtx(evtx_list):
             hostname = ipaddress
         # add the IPAddress node to neo4j
         tx.run(statement_ip.format(**{"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname}))
+
+        # add host data to Elasticsearch
+        if args.postes:
+            es_doc = es_doc_ip.format(**{"datetime": es_timestamp, "IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname})
+            post_es("logontracer-host-index", client, es_doc)
 
     i = 0
     for username in username_set:
@@ -1112,6 +1155,11 @@ def parse_evtx(evtx_list):
                                          "counts4769": ",".join(map(str, timelines[i*6+4])), "counts4776": ",".join(map(str, timelines[i*6+5])),
                                          "detect": ",".join(map(str, detects[i]))}))
         i += 1
+
+        # add user data to Elasticsearch
+        if args.postes:
+            es_doc = es_doc_user.format(**{"datetime": es_timestamp, "user": username[:-1], "rights": rights, "sid": sid, "status": ustatus, "rank": ranks[username]})
+            post_es("logontracer-user-index", client, es_doc)
 
     for domain in domains:
         # add the domain node to neo4j
@@ -1539,6 +1587,19 @@ def parse_es():
     except:
         sys.exit("[!] Can't connect Neo4j Database.")
 
+    if args.postes:
+        # Parse Event log
+        print("[+] Start sending the ES.")
+
+        if client.indices.exists(index="logontracer-user-index") and client.indices.exists(index="logontracer-host-index") :
+            print("[+] Already created index mappings to ES.")
+        else:
+            create_map(client, "logontracer-host-index")
+            create_map(client, "logontracer-user-index")
+            print("[+] Creating index mappings to ES.")
+
+        es_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
+
     tx = GRAPH.begin()
     hosts_inv = {v: k for k, v in hosts.items()}
     for ipaddress in event_set["ipaddress"].drop_duplicates():
@@ -1548,6 +1609,11 @@ def parse_es():
             hostname = ipaddress
         # add the IPAddress node to neo4j
         tx.run(statement_ip.format(**{"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname}))
+
+        # add host data to Elasticsearch
+        if args.postes:
+            es_doc = es_doc_ip.format(**{"datetime": es_timestamp, "IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname})
+            post_es("logontracer-host-index", client, es_doc)
 
     i = 0
     for username in username_set:
@@ -1582,6 +1648,11 @@ def parse_es():
                                          "counts4769": ",".join(map(str, timelines[i*6+4])), "counts4776": ",".join(map(str, timelines[i*6+5])),
                                          "detect": ",".join(map(str, detects[i]))}))
         i += 1
+
+        # add user data to Elasticsearch
+        if args.postes:
+            es_doc = es_doc_user.format(**{"datetime": es_timestamp, "user": username[:-1], "rights": rights, "sid": sid, "status": ustatus, "rank": ranks[username]})
+            post_es("logontracer-user-index", client, es_doc)
 
     for domain in domains:
         # add the domain node to neo4j

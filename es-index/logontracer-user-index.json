@@ -1,0 +1,28 @@
+{
+  "settings": {
+    "number_of_shards": 1
+  },
+  "mappings": {
+    "properties": {
+      "@timestamp": {
+        "type": "date",
+        "format": "strict_date_optional_time_nanos"
+      },
+      "user": {
+        "type": "keyword"
+      },
+      "rights": {
+        "type": "keyword"
+      },
+      "sid": {
+        "type": "keyword"
+      },
+      "status": {
+        "type": "text"
+      },
+      "rank": {
+        "type": "double"
+      }
+    }
+  }
+}
