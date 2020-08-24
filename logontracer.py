@@ -1268,9 +1268,9 @@ def parse_es():
     if fdatetime or tdatetime:
         filter = {"format": "epoch_millis"}
         if fdatetime:
-            filter["gte"] = fdatetime.timestamp() * 1000
+            filter["gte"] = int(fdatetime.timestamp() * 1000)
         if tdatetime:
-            filter["lt"] = tdatetime.timestamp() * 1000
+            filter["lt"] = int(tdatetime.timestamp() * 1000)
         s = s.filter("range", **{'@timestamp': filter})
 
     # Split the prefix
