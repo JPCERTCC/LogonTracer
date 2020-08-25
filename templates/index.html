@@ -118,6 +118,10 @@
         <hr>
         <a data-toggle="tooltip" data-placement="bottom" data-original-title="Import event logs in EVTX or XML format.">Upload</a><br>
         <button class="btn btn-secondary" data-toggle="modal" data-target="#UploadEVTX">Upload Event Log</button>
+        <hr>
+        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Import event logs from Elasticsearch.">Elasticsearch</a><br>
+        <button class="btn btn-secondary" data-toggle="modal" data-target="#Elasticsearch">Load from <img src="static/images/elastic-logo.png" width="24"></button>
+        <hr>
       </div>
       <div class="col-sm-8 col-md-8 main">
         <div id="error"></div>
@@ -175,6 +179,75 @@
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-primary" onclick="file_upload()">Upload</button>
+          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <a href="log" target="_blank"><button type="button" class="btn btn-secondary">Log</button></a>
+        </div>
+      </div>
+    </div>
+  </div>
+  <!-- Elasticsearch -->
+  <div class="modal fade" id="Elasticsearch" tabindex="-1">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h4 class="modal-title">Load Event Log from Elasticsearch</h4>
+          <button type="button" class="close" data-dismiss="modal"><i class="fas fa-times"></i></button>
+        </div>
+        <div class="modal-body">
+          <div class="container-fluid">
+            <div class="row">
+              <h4 class="col-md-3">Date<h4>
+                <div class="form-group">
+                  <div class="input-group fromdatetime" id="datetimepicker5" data-target-input="nearest">
+                    <input type="text" placeholder="From" id="from-date-time" class="form-control datetimepicker-input" data-target="#datetimepicker5"/>
+                    <div class="input-group-append" data-target="#datetimepicker5" data-toggle="datetimepicker">
+                      <div class="input-group-text"><i class="far fa-calendar-alt"></i></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="form-group">
+                  <div class="input-group todatetime" id="datetimepicker6" data-target-input="nearest">
+                    <input type="text" placeholder="To" id="to-date-time" class="form-control datetimepicker-input" data-target="#datetimepicker6"/>
+                    <div class="input-group-append" data-target="#datetimepicker6" data-toggle="datetimepicker">
+                      <div class="input-group-text"><i class="far fa-calendar-alt"></i></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="row">
+                <div class="custom-control custom-checkbox custom-control-inline">
+                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="If you want to add more logs, please enable the checkbox.">
+                    <input type="checkbox" id="add_logES" class="custom-control-input">
+                    <label class="custom-control-label" for="add_logES">Add additional event log from Elasticsearch</label>
+                  </label>
+                </div>
+              </div>
+              <div class="row">
+                <div class="custom-control custom-checkbox custom-control-inline">
+                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="If you want to add results analyzed by LononTracer, please enable the checkbox.">
+                    <input type="checkbox" id="add_es" class="custom-control-input">
+                    <label class="custom-control-label" for="add_es">Add results analyzed by LononTracer to Elasticsearch</label>
+                  </label>
+                </div>
+              </div>
+              <hr>
+              <div class="row">
+                <h4 class="col-md-3">Zone<h4>
+                <div id="zoneTimeES"></div>
+              </div>
+              <hr>
+              <div class="row">
+                <h4 class="col-md-3">Server<h4>
+                <div class="form-group">
+                  <input class="form-control" type="text"  value="localhost:9200" id="es-ip-input" data-toggle="tooltip" data-placement="bottom" data-original-title="Set the Elasticsearch server IP address.">
+                </div>
+              </div>
+            </div>
+          <div id="uploadBarES"></div>
+          <div id="statusES"></div>
+        </div>
+        <div class="modal-footer">
+          <button type="submit" class="btn btn-primary" onclick="load_eventlog()">Load</button>
           <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
           <a href="log" target="_blank"><button type="button" class="btn btn-secondary">Log</button></a>
         </div>
@@ -372,6 +445,13 @@
     }
     downMenu += '</select></div>';
     document.getElementById("zoneTime").innerHTML = downMenu;
+
+    var downMenuES = '<div class="col-xs-2"><select class="custom-select" id="utcTimeES"><option>Time Zone</option>';
+    for (i = +14; i >= -12; i--) {
+      downMenuES += '<option>' + i + '</option>';
+    }
+    downMenuES += '</select></div>';
+    document.getElementById("zoneTimeES").innerHTML = downMenuES;
 
     $('input[id=lefile]').change(function() {
       var inFile = "";

@@ -1579,6 +1579,51 @@ function file_upload() {
   }
 }
 
+/*
+load_eventlog
+Load event log from Elasticsearch server.
+*/
+function load_eventlog() {
+  if (!document.getElementById("from-date-time").value) {
+    var fromDateTime = "false";
+  } else {
+    var fromDateTime = formatDateTime(new Date(document.getElementById("from-date-time").value));
+  }
+
+  if (!document.getElementById("to-date-time").value) {
+    var toDateTime = "false";
+  } else {
+    var toDateTime = formatDateTime(new Date(document.getElementById("to-date-time").value));
+  }
+
+  var timezone = document.getElementById("utcTimeES").value;
+  var es_server = document.getElementById("es-ip-input").value;
+  var addlog = document.getElementById("add_logES").checked;
+  var addes = document.getElementById("add_es").checked;
+
+  if (timezone == "Time Zone") {
+    document.getElementById("statusES").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Please set the time zone of the event logs.</div>';
+  } else {
+    document.getElementById("uploadBarES").innerHTML = '';
+    document.getElementById("statusES").innerHTML = '';
+
+    var formData = new FormData();
+    formData.append("fromdatetime", fromDateTime);
+    formData.append("todatetime", toDateTime);
+    formData.append("timezone", timezone);
+    formData.append("es_server", es_server);
+    formData.append("addlog", addlog);
+    formData.append("addes", addes);
+    var xmlhttp = new XMLHttpRequest();
+    xmlhttp.upload.addEventListener("progress", progressHandlerES, false);
+    xmlhttp.addEventListener("load", completeHandlerES, false);
+    xmlhttp.addEventListener("error", errorHandlerES, false);
+    xmlhttp.addEventListener("abort", abortHandlerES, false);
+    xmlhttp.open("POST", "esload", true);
+    xmlhttp.send(formData);
+  }
+}
+
 function progressHandler(event) {
   var percent = (event.loaded / event.total) * 100;
   document.getElementById("uploadBar").innerHTML = '<h4>Upload ...</h4><div class="progress"><div class="progress-bar progress-bar-striped active" role="progressbar" style="width: ' + Math.round(percent) + '%;">' + Math.round(percent) + '%</div></div>';
@@ -1609,6 +1654,36 @@ function errorHandler(event) {
 
 function abortHandler(event) {
   document.getElementById("status").innerHTML = '<div class="alert alert-info">Upload Aborted</div>';
+}
+
+function progressHandlerES(event) {
+  var percent = (event.loaded / event.total) * 100;
+  document.getElementById("uploadBarES").innerHTML = '<h4>Wait ...</h4><div class="progress"><div class="progress-bar progress-bar-striped active" role="progressbar" style="width: ' + Math.round(percent) + '%;">' + Math.round(percent) + '%</div></div>';
+}
+
+function completeHandlerES(event) {
+  if (event.target.responseText == "FAIL") {
+    document.getElementById("statusES").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Failed!</div>';
+  }
+  if (event.target.responseText == "SUCCESS") {
+    parse_status = false
+    document.getElementById("uploadBarES").innerHTML = '<h4>Wait ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">Waiting ...</div></div>';
+    var loop = function() {
+      if (parse_status == false) {
+        setTimeout(loop, 2000);
+      }
+      parseES();
+    }
+    loop();
+  }
+}
+
+function errorHandlerES(event) {
+  document.getElementById("statusES").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Load error!</div>';
+}
+
+function abortHandlerES(event) {
+  document.getElementById("statusES").innerHTML = '<div class="alert alert-info">Load Aborted</div>';
 }
 
 /*
@@ -1644,6 +1719,34 @@ function parseEVTX() {
         }
       } else {
         document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: logontracer.log status =  ' + xmlhttp2.status + '</div>';
+        parse_status = true;
+      }
+    }
+  }
+}
+
+function parseES() {
+  var xmlhttp2 = new XMLHttpRequest();
+  xmlhttp2.open("GET", "/log");
+  xmlhttp2.send();
+  xmlhttp2.onreadystatechange = function() {
+    if (xmlhttp2.readyState == 4) {
+      if (xmlhttp2.status == 200) {
+        var logdata = xmlhttp2.responseText.split(/\r\n|\r|\n/);
+        var nowdata = logdata[logdata.length - 2];
+        if (nowdata.indexOf("Now loading") != -1) {
+          var recordnum = nowdata.split(" ")[3];
+          document.getElementById("uploadBarES").innerHTML = '<h4>Parsing process ...</h4><div class="progress"><div class="progress-bar progress-bar-striped active" role="progressbar" style="width: 100%;">' + recordnum + ' record</div></div>';
+        } else if (nowdata.indexOf("Script end") != -1) {
+          document.getElementById("uploadBarES").innerHTML = '<h4>End  ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">SUCCESS</div></div>';
+          document.getElementById("statusES").innerHTML = '<div class="alert alert-info"><strong>Import Success</strong>: You need to reload the web page.</div>';
+          parse_status = true;
+        } else if (nowdata.indexOf("[!]") != -1) {
+          document.getElementById("statusES").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Load error from Elasticsearch! Please check log.</div>';
+          parse_status = true;
+        }
+      } else {
+        document.getElementById("statusES").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: logontracer.log status =  ' + xmlhttp2.status + '</div>';
         parse_status = true;
       }
     }
@@ -1713,6 +1816,18 @@ function loaddate() {
           maxDate: maxDay,
           minDate: minDay
         });
+
+        $('.fromdatetime').datetimepicker({
+          locale: "en",
+          format: "YYYY-MM-DD HH:mm:ss",
+          useCurrent: false
+        });
+
+        $('.todatetime').datetimepicker({
+          locale: "en",
+          format: "YYYY-MM-DD HH:mm:ss",
+          useCurrent: false
+        });
       },
       onError: function(error) {
         console.log("Error: ", error);
@@ -1726,6 +1841,18 @@ var formatDate = function(date) {
   format = format.replace(/MM/g, ('0' + (date.getMonth() + 1)).slice(-2));
   format = format.replace(/DD/g, ('0' + date.getDate()).slice(-2));
   format = format.replace(/hh/g, ('0' + date.getHours()).slice(-2));
+
+  return format;
+};
+
+var formatDateTime = function(date) {
+  format = "YYYY-MM-DDThh:mm:ss";
+  format = format.replace(/YYYY/g, date.getFullYear());
+  format = format.replace(/MM/g, ('0' + (date.getMonth() + 1)).slice(-2));
+  format = format.replace(/DD/g, ('0' + date.getDate()).slice(-2));
+  format = format.replace(/hh/g, ('0' + date.getHours()).slice(-2));
+  format = format.replace(/mm/g, ('0' + date.getMinutes()).slice(-2));
+  format = format.replace(/ss/g, ('0' + date.getSeconds()).slice(-2));
 
   return format;
 };

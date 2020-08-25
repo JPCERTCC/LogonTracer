@@ -390,6 +390,63 @@ def do_upload():
         return "FAIL"
 
 
+# Load from Elasticsearch
+@app.route("/esload", methods=["POST"])
+def es_load():
+    try:
+        fromdatetime = request.form["fromdatetime"]
+        todatetime = request.form["todatetime"]
+        timezone = request.form["timezone"]
+        es_server = request.form["es_server"]
+        addlog = request.form["addlog"]
+        addes = request.form["addes"]
+
+        if fromdatetime not in "false":
+            try:
+                datetime.datetime.strptime(fromdatetime, "%Y-%m-%dT%H:%M:%S")
+                fromdatetime = " -f " + fromdatetime
+            except:
+                return "FAIL"
+        else:
+            fromdatetime = ""
+
+        if todatetime not in "false":
+            try:
+                datetime.datetime.strptime(todatetime, "%Y-%m-%dT%H:%M:%S")
+                todatetime = " -t " + todatetime
+            except:
+                return "FAIL"
+        else:
+            todatetime = ""
+
+        es_ip, es_port = es_server.split(":")
+        if (re.search(IPv4_PATTERN, es_ip) or es_ip in "localhost") and re.search(r"\A\d{2,5}\Z", es_port):
+            es_server = " --es-server " + es_server
+        else:
+            return "FAIL"
+
+        if not re.search(r"\A-{0,1}[0-9]{1,2}\Z", timezone):
+            return "FAIL"
+
+        if addlog in "true":
+            log_option = "--add"
+        else:
+            log_option = "--delete"
+
+        if addes in "true":
+            es_option = " --postes "
+        else:
+            es_option = ""
+
+        parse_command = "nohup python3 " + FPATH + "/logontracer.py --es " + log_option + es_option + " -z " + timezone + fromdatetime + todatetime + es_server  + " -s " + NEO4J_SERVER + " -u " + NEO4J_USER + " -p " + NEO4J_PASSWORD + " --es-index " + ES_INDEX + " --es-prefix " + ES_PREFIX + " >  " + FPATH + "/static/logontracer.log 2>&1 &"
+        subprocess.call("rm -f " + FPATH + "/static/logontracer.log > /dev/null", shell=True)
+        subprocess.call(parse_command, shell=True)
+        return "SUCCESS"
+
+    except:
+        return "FAIL"
+
+
 # Calculate ChangeFinder
 def adetection(counts, users, starttime, tohours):
     count_array = np.zeros((5, len(users), tohours + 1))
