@@ -27,7 +27,7 @@ except ImportError:
     has_evtx = False
 
 try:
-    from py2neo import Graph, Database
+    from py2neo import Graph, GraphService
     has_py2neo = True
 except ImportError:
     has_py2neo = False
@@ -1064,7 +1064,7 @@ def parse_evtx(evtx_list):
     if not username_set or not len(event_set):
         sys.exit("[!] This event log did not include logs to be visualized. Please check the details of the event log.")
     else:
-        print("[+] Fildered Event log is {0}.".format(len(event_set)))
+        print("[+] Filtered Event log is {0}.".format(len(event_set)))
 
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
@@ -1257,7 +1257,7 @@ def parse_evtx(evtx_list):
             tx.run(statement_pr.format(**{"user": username[:-1], "id": id, "date": policy[4]}))
             id += 1
 
-    tx.process()
+    #tx.process()
     tx.commit()
     print("[+] Creation of a graph data finished.")
 
@@ -1599,7 +1599,7 @@ def parse_es():
     if not username_set or not len(event_set):
         sys.exit("[!] This event log did not include logs to be visualized. Please check the details of the event log.")
     else:
-        print("[+] Fildered Event log is {0}.".format(len(event_set)))
+        print("[+] Filtered Event log is {0}.".format(len(event_set)))
 
     tohours = int((endtime - starttime).total_seconds() / 3600)
 
@@ -1750,7 +1750,7 @@ def parse_es():
             tx.run(statement_pr.format(**{"user": username[:-1], "id": id, "date": policy[4]}))
             id += 1
 
-    tx.process()
+    #tx.process()
     tx.commit()
     print("[+] Creation of a graph data finished.")
 
@@ -1785,14 +1785,14 @@ def main():
     try:
         graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD + "@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
         GRAPH = Graph(graph_http)
-        db = Database(host=NEO4J_SERVER, user=NEO4J_USER, password=NEO4J_PASSWORD, bolt=True)
+        db = GraphService(host=NEO4J_SERVER, user=NEO4J_USER, password=NEO4J_PASSWORD, bolt=True)
     except:
         sys.exit("[!] Can't connect Neo4j Database.")
 
     print("[+] Script start. {0}".format(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
 
     try:
-        print("[+] Neo4j Kernel version: {0}".format(".".join(map(str, db.kernel_start_time))))
+        print("[+] Neo4j Kernel version: {0}".format(db.kernel_version))
     except:
         print("[!] Can't get Neo4j kernel version.")
 

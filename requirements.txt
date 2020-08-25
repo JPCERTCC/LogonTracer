@@ -1,5 +1,5 @@
 numpy
-py2neo
+py2neo>=2020.0.0
 evtx
 lxml
 scipy==1.2.1
