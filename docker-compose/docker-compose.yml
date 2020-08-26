@@ -19,9 +19,9 @@ services:
       - NEO4J_dbms_connector_http_listen__address=0.0.0.0:7474
       # Performance tuning for JVM neo4j
       # See more details: https://neo4j.com/developer/guide-performance-tuning/
-      - NEO4J_dbms_memory_heap_max__size=4G
-      - NEO4J_dbms_memory_heap_initial__size=2G
-      - NEO4j_dbms_memory_pagecache_size=20G
+      # - NEO4J_dbms_memory_heap_max__size=4G
+      # - NEO4J_dbms_memory_heap_initial__size=2G
+      # - NEO4j_dbms_memory_pagecache_size=20G
       # set default neo4j password
       - NEO4J_AUTH=neo4j/password
     networks:
@@ -31,6 +31,8 @@ services:
     container_name: logontracer
     build: ./LogonTracer/build
     image: logontracer:latest
+    depends_on:
+      - neo4j
     #volumes:
     #  Set when sync container and local time
     #  - /etc/localtime:/etc/localtime:ro
