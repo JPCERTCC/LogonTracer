@@ -1,0 +1,8 @@
+node.name: node-1
+network.host: 0.0.0.0
+http.port: 9200
+cluster.initial_master_nodes: ["node-1"]
+xpack.ml.enabled: false
+xpack.security.enabled: false
+xpack.security.transport.ssl.enabled: true
+xpack.security.audit.enabled: true
