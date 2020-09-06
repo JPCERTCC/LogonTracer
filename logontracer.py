@@ -13,6 +13,7 @@ import shutil
 import argparse
 import datetime
 import subprocess
+from ssl import create_default_context
 
 try:
     from lxml import etree
@@ -95,6 +96,8 @@ ES_SERVER = "localhost:9200"
 ES_INDEX = "winlogbeat-*"
 # Elastic prefix
 ES_PREFIX = "winlog"
+# Elastic auth user
+ES_USER = "elastic"
 
 # Check Event Id
 EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719, 5137, 5141]
@@ -203,6 +206,12 @@ parser.add_argument("--es-index", dest="esindex", action="store", type=str, meta
                     help="Elastic Search index to search. (default: winlogbeat-*)")
 parser.add_argument("--es-prefix", dest="esprefix", action="store", type=str, metavar="ESPREFIX",
                     help="Elastic Search event object prefix. (default: winlog)")
+parser.add_argument("--es-user", dest="esuser", action="store", type=str, metavar="ESUSER",
+                    help="Elastic Search ssl authentication user. (default: elastic)")
+parser.add_argument("--es-pass", dest="espassword", action="store", type=str, metavar="ESPASSWORD",
+                    help="Elastic Search ssl authentication password.")
+parser.add_argument("--es-cafile", dest="escafile", action="store", type=str, metavar="ESCAFILE",
+                    help="Elastic Search ssl cert file.")
 parser.add_argument("--es", action="store_true", default=False,
                     help="Import data from Elastic Search. (default: False)")
 parser.add_argument("--postes", action="store_true", default=False,
@@ -320,6 +329,14 @@ if args.esindex:
 if args.esprefix:
     ES_PREFIX = args.esprefix
 
+if args.esuser:
+    ES_USER = args.esuser
+
+if args.espassword:
+    ES_PASSWORD = args.espassword
+
+if args.escafile:
+    ES_CAFILE = args.escafile
 
 # Web application index.html
 @app.route('/')
@@ -1153,7 +1170,13 @@ def parse_evtx(evtx_list):
         print("[+] Start sending the ES.")
 
         # Create a new ES client
-        client = Elasticsearch(ES_SERVER)
+        if args.espassword and args.escafile:
+            context = create_default_context(cafile=FPATH + ES_CAFILE)
+            client = Elasticsearch(ES_SERVER, http_auth=(ES_USER, ES_PASSWORD), scheme="https", ssl_context=context)
+        elif args.espassword:
+            client = Elasticsearch(ES_SERVER, http_auth=(ES_USER, ES_PASSWORD), scheme="https")
+        else:
+            client = Elasticsearch(ES_SERVER)
 
         if client.indices.exists(index="logontracer-user-index") and client.indices.exists(index="logontracer-host-index") :
             print("[+] Already created index mappings to ES.")
@@ -1317,7 +1340,13 @@ def parse_es():
     print("[+] Start searching the ES.")
 
     # Create a new ES client
-    client = Elasticsearch(ES_SERVER)
+    if args.espassword and args.escafile:
+        context = create_default_context(cafile=FPATH + ES_CAFILE)
+        client = Elasticsearch(ES_SERVER, http_auth=(ES_USER, ES_PASSWORD), scheme="https", ssl_context=context)
+    elif args.espassword:
+        client = Elasticsearch(ES_SERVER, http_auth=(ES_USER, ES_PASSWORD), scheme="https")
+    else:
+        client = Elasticsearch(ES_SERVER)
 
     # Create the search
     s = Search(using=client, index=ES_INDEX)
