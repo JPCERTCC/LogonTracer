@@ -1174,7 +1174,8 @@ def parse_evtx(evtx_list):
             context = create_default_context(cafile=FPATH + ES_CAFILE)
             client = Elasticsearch(ES_SERVER, http_auth=(ES_USER, ES_PASSWORD), scheme="https", ssl_context=context)
         elif args.espassword:
-            client = Elasticsearch(ES_SERVER, http_auth=(ES_USER, ES_PASSWORD), scheme="https")
+            es_hosts = ES_USER + ":" + ES_PASSWORD + "@" + ES_SERVER
+            client = Elasticsearch(hosts=[es_hosts])
         else:
             client = Elasticsearch(ES_SERVER)
 
@@ -1204,10 +1205,7 @@ def parse_evtx(evtx_list):
 
     i = 0
     for username in username_set:
-        if username in sids:
-            sid = sids[username]
-        else:
-            sid = "-"
+        sid = sids.get(username, "-")
         if username in admins:
             rights = "system"
         else:
@@ -1344,7 +1342,8 @@ def parse_es():
         context = create_default_context(cafile=FPATH + ES_CAFILE)
         client = Elasticsearch(ES_SERVER, http_auth=(ES_USER, ES_PASSWORD), scheme="https", ssl_context=context)
     elif args.espassword:
-        client = Elasticsearch(ES_SERVER, http_auth=(ES_USER, ES_PASSWORD), scheme="https")
+        es_hosts = ES_USER + ":" + ES_PASSWORD + "@" + ES_SERVER
+        client = Elasticsearch(hosts=[es_hosts])
     else:
         client = Elasticsearch(ES_SERVER)
 
@@ -1703,10 +1702,7 @@ def parse_es():
 
     i = 0
     for username in username_set:
-        if username in sids:
-            sid = sids[username]
-        else:
-            sid = "-"
+        sid = sids.get(username, "-")
         if username in admins:
             rights = "system"
         else:
