@@ -861,6 +861,7 @@ def parse_evtx(evtx_list):
                 status = "-"
                 sid = "-"
                 authname = "-"
+                guid = "-"
 
                 ###
                 # Detect admin users
@@ -898,7 +899,6 @@ def parse_evtx(evtx_list):
                 #  EventID 4719: System audit policy was changed
                 ###
                 elif eventid == 4719:
-                    guid = ''
                     for data in event_data:
                         if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
@@ -1426,6 +1426,7 @@ def parse_es():
             status = "-"
             sid = "-"
             authname = "-"
+            guid = "-"
 
             ###
             # Detect admin users
