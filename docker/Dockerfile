@@ -219,8 +219,6 @@ RUN echo "#!/bin/bash" > run.sh \
 ## Set env
 RUN sed -i -e "3i NEO4J_EDITION=community" /docker-entrypoint.sh
 
-USER neo4j
-
 WORKDIR /var/lib/neo4j
 
 EXPOSE 8080
