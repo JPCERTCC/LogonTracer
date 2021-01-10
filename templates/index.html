@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <title>LogonTracer</title>
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/css/bootstrap.min.css" integrity="sha384-ggOyR0iXCbMQv3Xipma34MD+dH/1fQ784/j6cY/iJTQUOhcWr7x9JvoRxT2MZw1T" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
   <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.css" integrity="sha384-EG4MkHYaMXjB6f2q1t0Jfs+W6DpGsGZls4D6PYHr9yhXwZf27Z10ReappeV2ZXcU" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" integrity="sha384-yakM86Cz9KJ6CeFVbopALOEQGGvyBFdmA4oHMiYuHcd9L59pLkCEFSlr6M9m434E" crossorigin="anonymous">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" integrity="sha384-CmLV3WR+cw/TcN50vJSYAs2EAzhDD77tQvGcmoZ1KEzxtpl2K5xkrpFz9N2H9ClN" crossorigin="anonymous">
@@ -16,14 +16,14 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.js" integrity="sha384-6pAYkjo39N26cI9QEzy7zTD9xr9XzSnaWywG02LeFyoJnBEyYvWvqomLU+uGAlaw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js" integrity="sha384-Q9RsZ4GMzjlu4FFkJw4No9Hvvm958HqHmXI9nqo5Np2dA/uOVBvKVxAvlBQrDhk4" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.15.0/umd/popper.min.js" integrity="sha384-L2pyEeut/H3mtgCBaUNw7KWzp5n9+4pDQiExs933/5QfaTh8YStYFFkOzSoXjlTb" crossorigin="anonymous"></script>
-  <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.3.1/js/bootstrap.min.js" integrity="sha384-JjSmVgyd0p3pXB1rRibZUAYoIIy6OrQ6VrjIEaFf/nJGzIxFDsf4x0xIM+B07jRM" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.4.2/dist/cytoscape.min.js" integrity="sha384-vTbGUxFr0qyAqYeS+nIqQ6Row8uIp1PgvAWiA4GuEtdkD8scsArkL9QgZHWaHuv5" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/cytoscape-qtip@2.7.1/cytoscape-qtip.min.js" integrity="sha384-0S5MX36ySZW8tkZEooDZdxYdGvtwdVxA/1bl0U0zoqsrHBJbv4LxKxc8Hp8LpxlE" crossorigin="anonymous"></script>
+  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.17.1/dist/cytoscape.min.js" integrity="sha384-Yb1Z72xvvDj90lZyt11T289pCDIO1IkHKVtYsiqJ+UHg0RBcYrjEwyuN6CANr+P+" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape-qtip@2.8.0/cytoscape-qtip.min.js" integrity="sha384-jJ6MCpnkaa5gDX4/qEUeKZ6SOfPAa+hfjLifoOrfDehIF0VTqdPA6sqrkWRYJIGi" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js" integrity="sha384-sIzeKWIAHvT0Vm8QbfLCqZwBG0WMCkWVAOYd/330YSNeeQ1Y57N3T9lQz5Ry/EHH" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.0.1/js/tempusdominus-bootstrap-4.min.js" integrity="sha384-hzexvprs0k2Q/IHSJOfegsjdg6kTcTTVxQdgHiB4+I/915hcvse9v42LLVVM5K4e" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js" integrity="sha384-J1rV4940pYhBtFhx6SqDEMJP35rgSVSVx+44+TPf67jyXL8dsBtYMZeBCNLf/2zk" crossorigin="anonymous"></script>
   <!-- Neo4j JavaScript Driver -->
-  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.1.1/lib/browser/neo4j-web.min.js" integrity="sha384-uIXLP9YQamN3hm39tZmG/ZJ9ZLhlOh8DJjYz1KSQ8pCXudznOjg2bwy9A33+et3k" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.2.1/lib/browser/neo4j-web.min.js" integrity="sha384-r0SOtzrxnyTN0w02zPv1PxxkQYtJzqmeE936zA0aiNJ6DVAiFFip1dpAYSFqfO5s" crossorigin="anonymous"></script>
   <script src="static/js/script.js"></script>
 </head>
 
