@@ -693,6 +693,14 @@ def xml_records(filename):
                         yield xml, e
 
 
+def convert_logtime(logtime, tzone):
+    tzless = re.sub('[^0-9-:\s]', '', logtime.split(".")[0]).strip()
+    try:
+        return datetime.datetime.strptime(tzless, "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
+    except:
+        return datetime.datetime.strptime(tzless, "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
+
+
 # Parse the EVTX file
 def parse_evtx(evtx_list):
     cache_dir = os.path.join(FPATH, 'cache')
@@ -830,10 +838,7 @@ def parse_evtx(evtx_list):
 
             if eventid in EVENT_ID:
                 logtime = node.xpath("/Event/System/TimeCreated")[0].get("SystemTime")
-                try:
-                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
-                except:
-                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
+                etime = convert_logtime(logtime, tzone)
                 stime = datetime.datetime(*etime.timetuple()[:4])
                 if args.fromdate or args.todate:
                     if args.fromdate and fdatetime > etime:
@@ -1052,10 +1057,7 @@ def parse_evtx(evtx_list):
             ###
             if eventid == 1102:
                 logtime = node.xpath("/Event/System/TimeCreated")[0].get("SystemTime")
-                try:
-                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
-                except:
-                    etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
+                etime = convert_logtime(logtime, tzone)
                 deletelog.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
 
                 namespace = "http://manifests.microsoft.com/win/2004/08/windows/eventlog"
@@ -1401,10 +1403,7 @@ def parse_es():
 
         if eventid in EVENT_ID:
             logtime = hit["@timestamp"].replace("T", " ").split(".")[0]
-            try:
-                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
-            except:
-                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
+            etime = convert_logtime(logtime, tzone)
 
             stime = datetime.datetime(*etime.timetuple()[:4])
 
@@ -1603,10 +1602,7 @@ def parse_es():
         ###
         if eventid == 1102:
             logtime = hit["@timestamp"]
-            try:
-                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
-            except:
-                etime = datetime.datetime.strptime(logtime.split(".")[0], "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
+            etime = convert_logtime(logtime, tzone)
             deletelog.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
 
             if hasattr(event.user_data, "SubjectUserName"):
