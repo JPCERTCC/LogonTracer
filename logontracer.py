@@ -64,7 +64,7 @@ except ImportError:
     has_hmmlearn = False
 
 try:
-    from sklearn.externals import joblib
+    import joblib
     has_sklearn = True
 except ImportError:
     has_sklearn = False

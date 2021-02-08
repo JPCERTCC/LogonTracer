@@ -2,9 +2,9 @@ numpy
 py2neo>=2020.0.0
 evtx
 lxml
-scipy==1.2.1
+scipy
 changefinder
 flask
 hmmlearn
-scikit-learn==0.19.2
+scikit-learn
 elasticsearch-dsl>=7.0.0,<8.0.0

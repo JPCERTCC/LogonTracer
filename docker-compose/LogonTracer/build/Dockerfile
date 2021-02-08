@@ -19,8 +19,8 @@ RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && cd LogonTracer \
     && pip install cython \
     && pip install numpy \
-    && pip install scipy==1.2.1 \
-    && pip install statsmodels==0.10.2 \
+    && pip install scipy \
+    && pip install statsmodels \
     && pip install -r requirements.txt \
     && sed -i 's/\" -s \" + NEO4J_SERVER/\" -s neo4j\"/g' logontracer.py \
     && sed -i 's/+ NEO4J_SERVER +/+ \"neo4j\" +/g' logontracer.py \

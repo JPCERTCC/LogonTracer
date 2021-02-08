@@ -194,8 +194,8 @@ RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && cd LogonTracer \
     && pip install cython \
     && pip install numpy \
-    && pip install scipy==1.2.1 \
-    && pip install statsmodels==0.10.2 \
+    && pip install scipy \
+    && pip install statsmodels \
     && pip install -r requirements.txt \
     && unlink /var/lib/neo4j/data \
     && mkdir -p /var/lib/neo4j/data/databases \
