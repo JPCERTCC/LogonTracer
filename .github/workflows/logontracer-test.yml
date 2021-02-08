@@ -29,8 +29,8 @@ jobs:
         python -m pip install --upgrade pip
         pip install cython
         pip install numpy
-        pip install scipy==1.2.1
-        pip install statsmodels==0.10.2
+        pip install scipy
+        pip install statsmodels
         pip install -r requirements.txt
     - name: Test for LogonTracer web gui
       run: curl --verbose --show-error http://localhost:8080
