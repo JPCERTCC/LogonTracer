@@ -694,7 +694,7 @@ def xml_records(filename):
 
 
 def convert_logtime(logtime, tzone):
-    tzless = re.sub('[^0-9-:\s]', '', logtime.split(".")[0]).strip()
+    tzless = re.sub('[^0-9-:\s]', ' ', logtime.split(".")[0]).strip()
     try:
         return datetime.datetime.strptime(tzless, "%Y-%m-%d %H:%M:%S") + datetime.timedelta(hours=tzone)
     except:
