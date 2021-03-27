@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 #
 # LICENSE
-# Please refer to the LICENSE.txt in the https://github.com/JPCERTCC/aa-tools/
+# Please refer to the LICENSE.txt in the https://github.com/JPCERTCC/LogonTracer/
 #
 
 import os
