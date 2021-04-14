@@ -915,7 +915,7 @@ def parse_evtx(evtx_list):
                             category = data.text
                         if data.get("Name") in "SubcategoryGuid" and data.text is not None and re.search(r"\A{[\w\-]*}\Z", data.text):
                             guid = data.text
-                    policylist.append([etime.strftime("%Y-%m-%d %H:%M:%S"), username, category, guid.lower(), int(stime.strftime("%s"))])
+                    policylist.append([etime.strftime("%Y-%m-%d %H:%M:%S"), username, category, guid.lower(), int(stime.timestamp())])
                 ###
                 # Detect added users from specific group
                 #  EventID 4728: A member was added to a security-enabled global group
@@ -1021,10 +1021,10 @@ def parse_evtx(evtx_list):
                     if username != "-" and username != "anonymous logon" and ipaddress != "::1" and ipaddress != "127.0.0.1" and (ipaddress != "-" or hostname != "-"):
                         # generate pandas series
                         if ipaddress != "-":
-                            event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname, int(stime.strftime("%s"))], index=event_set.columns)
+                            event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
                             ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, ipaddress, eventid],  index=ml_frame.columns)
                         else:
-                            event_series = pd.Series([eventid, hostname, username, logintype, status, authname, int(stime.strftime("%s"))], index=event_set.columns)
+                            event_series = pd.Series([eventid, hostname, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
                             ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, hostname, eventid],  index=ml_frame.columns)
                         # append pandas series to dataframe
                         event_set = event_set.append(event_series, ignore_index=True)
@@ -1466,7 +1466,7 @@ def parse_es():
                     username = "-"
                 category = event.event_data.CategoryId
                 guid = event.event_data.SubcategoryGuid
-                policylist.append([etime.strftime("%Y-%m-%d %H:%M:%S"), username, category, guid.lower(), int(stime.strftime("%s"))])
+                policylist.append([etime.strftime("%Y-%m-%d %H:%M:%S"), username, category, guid.lower(), int(stime.timestamp())])
             ###
             # Detect added users from specific group
             #  EventID 4728: A member was added to a security-enabled global group
@@ -1566,10 +1566,10 @@ def parse_es():
                 if username != "-" and username != "anonymous logon" and ipaddress != "::1" and ipaddress != "127.0.0.1" and (ipaddress != "-" or hostname != "-"):
                     # generate pandas series
                     if ipaddress != "-":
-                        event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname, int(stime.strftime("%s"))], index=event_set.columns)
+                        event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
                         ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, ipaddress, eventid],  index=ml_frame.columns)
                     else:
-                        event_series = pd.Series([eventid, hostname, username, logintype, status, authname, int(stime.strftime("%s"))], index=event_set.columns)
+                        event_series = pd.Series([eventid, hostname, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
                         ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, hostname, eventid],  index=ml_frame.columns)
                     # append pandas series to dataframe
                     event_set = event_set.append(event_series, ignore_index=True)
