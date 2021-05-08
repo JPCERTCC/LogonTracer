@@ -1808,7 +1808,7 @@ def main():
     try:
         graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD + "@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
         GRAPH = Graph(graph_http)
-        db = GraphService(host=NEO4J_SERVER, user=NEO4J_USER, password=NEO4J_PASSWORD, bolt=True)
+        db = GraphService(host=NEO4J_SERVER, user=NEO4J_USER, password=NEO4J_PASSWORD)
     except:
         sys.exit("[!] Can't connect Neo4j Database.")
 
