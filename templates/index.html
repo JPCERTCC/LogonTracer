@@ -4,7 +4,7 @@
 <head>
   <meta charset="utf-8">
   <title>LogonTracer</title>
-  <link rel="stylesheet" href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/css/bootstrap.min.css" integrity="sha384-9aIt2nRpC12Uk9gS9baDl411NQApFmC26EwAOH8WgZl5MYYxFfc+NcPb1dKGj7Sk" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
   <link rel="stylesheet" href="http://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.css" integrity="sha384-EG4MkHYaMXjB6f2q1t0Jfs+W6DpGsGZls4D6PYHr9yhXwZf27Z10ReappeV2ZXcU" crossorigin="anonymous">
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" integrity="sha384-yakM86Cz9KJ6CeFVbopALOEQGGvyBFdmA4oHMiYuHcd9L59pLkCEFSlr6M9m434E" crossorigin="anonymous">
   <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" integrity="sha384-CmLV3WR+cw/TcN50vJSYAs2EAzhDD77tQvGcmoZ1KEzxtpl2K5xkrpFz9N2H9ClN" crossorigin="anonymous">
@@ -15,112 +15,116 @@
   <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js" integrity="sha256-hwg4gsxgFZhOsEEamdOYGBf13FyQuiTwlAQgxVSNgt4=" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/qtip2/2.2.1/jquery.qtip.js" integrity="sha384-6pAYkjo39N26cI9QEzy7zTD9xr9XzSnaWywG02LeFyoJnBEyYvWvqomLU+uGAlaw" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js" integrity="sha384-Q9RsZ4GMzjlu4FFkJw4No9Hvvm958HqHmXI9nqo5Np2dA/uOVBvKVxAvlBQrDhk4" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.15.0/umd/popper.min.js" integrity="sha384-L2pyEeut/H3mtgCBaUNw7KWzp5n9+4pDQiExs933/5QfaTh8YStYFFkOzSoXjlTb" crossorigin="anonymous"></script>
-  <script src="https://stackpath.bootstrapcdn.com/bootstrap/4.5.0/js/bootstrap.min.js" integrity="sha384-OgVRvuATP1z7JjHLkuOU7Xw704+h835Lr+6QL9UvYjZE3Ipu6Tp75j7Bh/kR0JKI" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.17.1/dist/cytoscape.min.js" integrity="sha384-Yb1Z72xvvDj90lZyt11T289pCDIO1IkHKVtYsiqJ+UHg0RBcYrjEwyuN6CANr+P+" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.2/dist/umd/popper.min.js" integrity="sha384-IQsoLXl5PILFhosVNubq5LC7Qb9DXgDA9i+tQ8Zj3iwWAwPtgFTxbJ8NT4GN1R8p" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.min.js" integrity="sha384-Atwg2Pkwv9vp0ygtn1JAojH0nYbwNJLPhwyoVbhoPwBhjQPR5VtM2+xf0Uwh9KtT" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.19.0/dist/cytoscape.min.js" integrity="sha384-PrL5I4ZOM0AxHqZI8Mnw6Bf6d5DkQXlneKuzQ99QeR58lFMAZBmCI7C4Wn3rjEe7" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/cytoscape-qtip@2.8.0/cytoscape-qtip.min.js" integrity="sha384-jJ6MCpnkaa5gDX4/qEUeKZ6SOfPAa+hfjLifoOrfDehIF0VTqdPA6sqrkWRYJIGi" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.22.2/moment.min.js" integrity="sha384-sIzeKWIAHvT0Vm8QbfLCqZwBG0WMCkWVAOYd/330YSNeeQ1Y57N3T9lQz5Ry/EHH" crossorigin="anonymous"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.0.1/js/tempusdominus-bootstrap-4.min.js" integrity="sha384-hzexvprs0k2Q/IHSJOfegsjdg6kTcTTVxQdgHiB4+I/915hcvse9v42LLVVM5K4e" crossorigin="anonymous"></script>
   <script src="https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js" integrity="sha384-J1rV4940pYhBtFhx6SqDEMJP35rgSVSVx+44+TPf67jyXL8dsBtYMZeBCNLf/2zk" crossorigin="anonymous"></script>
   <!-- Neo4j JavaScript Driver -->
-  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.2.1/lib/browser/neo4j-web.min.js" integrity="sha384-r0SOtzrxnyTN0w02zPv1PxxkQYtJzqmeE936zA0aiNJ6DVAiFFip1dpAYSFqfO5s" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.2.3/lib/browser/neo4j-web.min.js" integrity="sha384-1D5NgvaN05AW2uC9b49MURqg8/grsmT+Rmq97UTE8+hnwhArsP2FPrtkz71Ga3Gu" crossorigin="anonymous"></script>
   <script src="static/js/script.js"></script>
 </head>
 
 <body>
   <nav class="navbar navbar-expand-lg navbar-light bg-light p-1 shadow">
-      <a class="navbar-brand" href="#"><img class="my_svg" src="static/images/logo_top.svg" alt="top" width="190"></a>
-      <div class="collapse navbar-collapse">
-        <form class="navbar-nav" role="search">
-          <div class="form-group mt-3" id="itemForm">
-            <div class="form-inline">
-              <label class="sr-only" for="InputSelect">select</label>
-              <select class="custom-select" id="InputSelect">
-                <option>Username</option>
-                <option>Hostname</option>
-                <option>IPAddress</option>
+    <a class="navbar-brand" href="#"><img class="my_svg" src="static/images/logo_top.svg" alt="top" width="190"></a>
+    <div class="collapse navbar-collapse">
+      <form class="navbar-nav" role="search">
+        <div id="itemForm">
+          <div class="row mt-2" style="--bs-gutter-x: 0.5rem;">
+            <div class="col-auto">
+              <select class="form-select" id="InputSelect">
+                <option value="Username">Username</option>
+                <option value="Hostname">Hostname</option>
+                <option value="IPAddress">IPAddress</option>
               </select>
-              <input class="form-control my-2 my-lg-0 ml-1" type="text" value="administrator" id="query-input">
+            </div>
+            <div class="col-auto">
+              <input class="form-control" type="text" value="administrator" id="query-input">
             </div>
           </div>
-          <input type="button" class="btn btn-primary ml-1 mt-3 h-25" value="+" onclick="ItemField.add();" />
-          <input type="button" class="btn btn-primary ml-1 mt-3 h-25" value="-" onclick="ItemField.del();" />
-          <input type="button" class="btn btn-secondary ml-1 mt-3 h-25" data-toggle="modal" value="Filter" data-target="#Filters">
-          <button type="button" class="btn btn-outline-primary ml-1 mt-3 h-25" data-toggle="tooltip" data-placement="bottom" data-original-title="Username/IPAddress/Hostname search" onclick="createQuery()">search</button>
-          <button type="button" class="btn btn-outline-primary ml-1 mt-3 h-25" data-toggle="tooltip" data-placement="bottom" data-original-title="Search for how exploit the administrator account from the account. (only one Username)" onclick="searchPath()">search path</button>
-          <div class="btn-group ml-1 mt-3 h-25">
-            <button class="btn btn-outline-secondary" type="button">Export</button>
-            <button class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" type="button" id="navbarDropdown" role="button" data-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
-              <span class="sr-only"></span>
-            </button>
-            <div class="dropdown-menu" aria-labelledby="navbarDropdown">
-              <a class="dropdown-item" onclick="exportCSV()" href="#">CSV</a>
-              <a class="dropdown-item" download="image.json" id="export-json" onclick="exportJSON()" href="#">JSON</a>
-              <a class="dropdown-item" download="image.png" id="export-png" onclick="exportPNG()" href="#">PNG</a>
-              <a class="dropdown-item" download="image.jpeg" id="export-jpeg" onclick="exportJPEG()" href="#">JPEG</a>
-            </div>
+        </div>
+        <input type="button" class="btn btn-primary ms-1 mt-2 h-25" value="+" onclick="ItemField.add();" />
+        <input type="button" class="btn btn-primary ms-1 mt-2 h-25" value="-" onclick="ItemField.del();" />
+        <input type="button" class="btn btn-secondary ms-1 mt-2 h-25" data-bs-toggle="modal" value="Filter" data-bs-target="#Filters">
+        <button type="button" class="btn btn-outline-primary ms-1 mt-2 h-25" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Username/IPAddress/Hostname search" onclick="createQuery()">search</button>
+        <button type="button" class="btn btn-outline-primary ms-1 mt-2 h-25" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Search for how exploit the administrator account from the account. (only one Username)" onclick="searchPath()">search
+          path</button>
+        <div class="btn-group ms-1 mt-2 h-25">
+          <button class="btn btn-outline-secondary" type="button">Export</button>
+          <button class="btn btn-outline-secondary dropdown-toggle dropdown-toggle-split" type="button" id="navbarDropdown" role="button" data-bs-toggle="dropdown" aria-haspopup="true" aria-expanded="false">
+            <span class="sr-only"></span>
+          </button>
+          <div class="dropdown-menu" aria-labelledby="navbarDropdown">
+            <a class="dropdown-item" onclick="exportCSV()" href="#">CSV</a>
+            <a class="dropdown-item" download="image.json" id="export-json" onclick="exportJSON()" href="#">JSON</a>
+            <a class="dropdown-item" download="image.png" id="export-png" onclick="exportPNG()" href="#">PNG</a>
+            <a class="dropdown-item" download="image.jpeg" id="export-jpeg" onclick="exportJPEG()" href="#">JPEG</a>
           </div>
-          <div class="custom-control custom-switch ml-4 mt-4">
-            <input type="checkbox" class="custom-control-input" id="darkSwitch">
-            <label class="custom-control-label" for="darkSwitch">Dark Mode</label>
-          </div>
+        </div>
+        <div class="form-check form-switch ms-4 mt-3">
+          <input class="form-check-input" type="checkbox" id="darkSwitch">
+          <label class="form-check-label" for="darkSwitch">Dark Mode</label>
+        </div>
 
-          <script src="static/js/dark-mode-switch.min.js"></script>
-        </form>
-      </div>
+        <script src="static/js/dark-mode-switch.min.js"></script>
+      </form>
+    </div>
   </nav>
 
   <div class="container-fluid">
     <div class="row">
       <div class="col-sm-2 col-md-2 sidebar">
         <div class="list-group mt-3">
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing all users and hosts." onclick="createAllQuery()">All Users</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing users with system privileges." onclick="createSystemQuery()">SYSTEM Privileges</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing remote logon users and hosts using NTLM authentication. If not using NTLM authentication, it may be pass-the-hash." onclick="createNTLMQuery()">NTLM Remote Logon</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing RDP logon users and hosts (Logon type: 10)." onclick="createRDPQuery()">RDP Logon</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing logon users and hosts from remote network (Logon type: 3)." onclick="createNetQuery()">Network Logon</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing batch server logon (Logon type: 4)." onclick="createBatchQuery()">Batch Logon</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing Services Control Manager logon (Logon type: 5)." onclick="createServiceQuery()">Service Logon</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing the error log that the ms14-068 exploit failed." onclick="create14068Query()">MS14-068 Exploit Failure</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing failed logon." onclick="createFailQuery()">Logon Failure</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing DCSync and DCShadow log." onclick="dcsQuery()">Detect DCSync/DCShadow</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing deleted or added users." onclick="adddelUsersQuery()">Add/Delete Users</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing all domain names. If an attacker is intrude into a network, there may be a malicious domain name." onclick="createDomainQuery()">Domain Check</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Visualizing changed audit policy." onclick="policyQuery()">Audit Policy Change</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="modal" data-target="#Diff">Diff Graph</button>
-          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-toggle="tooltip" data-placement="bottom" data-original-title="Displays hourly event log counts in time series." onclick="window.open('timeline')">Create Timeline</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing all users and hosts." onclick="createAllQuery()">All Users</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing users with system privileges." onclick="createSystemQuery()">SYSTEM Privileges</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing remote logon users and hosts using NTLM authentication. If not using NTLM authentication, it may be pass-the-hash." onclick="createNTLMQuery()">NTLM Remote Logon</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing RDP logon users and hosts (Logon type: 10)." onclick="createRDPQuery()">RDP Logon</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing logon users and hosts from remote network (Logon type: 3)." onclick="createNetQuery()">Network Logon</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing batch server logon (Logon type: 4)." onclick="createBatchQuery()">Batch Logon</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing Services Control Manager logon (Logon type: 5)." onclick="createServiceQuery()">Service Logon</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing the error log that the ms14-068 exploit failed." onclick="create14068Query()">MS14-068 Exploit Failure</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing failed logon." onclick="createFailQuery()">Logon Failure</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing DCSync and DCShadow log." onclick="dcsQuery()">Detect DCSync/DCShadow</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing deleted or added users." onclick="adddelUsersQuery()">Add/Delete Users</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing all domain names. If an attacker is intrude into a network, there may be a malicious domain name." onclick="createDomainQuery()">Domain Check</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing changed audit policy." onclick="policyQuery()">Audit Policy Change</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="modal" data-bs-target="#Diff">Diff Graph</button>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Displays hourly event log counts in time series." onclick="window.open('timeline')">Create Timeline</button>
         </div>
         <hr>
-        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Add value to edges of visualization graph.">Add event value</a><br>
-        <div class="btn-group btn-group-toggle" data-toggle="buttons">
-          <label class="btn btn-outline-secondary">
-            <input type="checkbox" name="options" id="label-count" autocomplete="off">Count</label>
-          <label class="btn btn-outline-secondary">
-            <input type="checkbox" name="options" id="label-type" autocomplete="off">Type</label>
-          <label class="btn btn-outline-secondary">
-            <input type="checkbox" name="options" id="label-authname" autocomplete="off">Auth</label>
+        <a data-bs-toggle="tooltip" data-bs-placement="bottom" title="Add value to edges of visualization graph.">Add event value</a><br>
+        <div class="btn-group" role="group">
+          <input type="checkbox" class="btn-check" id="label-count" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="label-count">Count</label>
+          <input type="checkbox" class="btn-check" id="label-type" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="label-type">Type</label>
+          <input type="checkbox" class="btn-check" id="label-authname" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="label-authname">Auth</label>
         </div>
         <hr>
-        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Select visualization graph mode.">Graph mode</a><br>
-        <div class="btn-group btn-group-toggle" data-toggle="buttons">
-          <label class="btn btn-outline-secondary active">
-		        <input type="radio" id="modeGrid" name="graphmode" checked="checked">grid</label>
-          <label class="btn btn-outline-secondary">
-		        <input type="radio" id="modeCose" name="graphmode">cose</label>
-          <label class="btn btn-outline-secondary">
-		        <input type="radio" id="modeCircle" name="graphmode">circle</label>
-          <label class="btn btn-outline-secondary">
-  		      <input type="radio" id="modeTree" name="graphmode">tree</label>
+        <a data-bs-toggle="tooltip" data-bs-placement="bottom" title="Select visualization graph mode.">Graph mode</a><br>
+        <div class="btn-group" role="group">
+          <input type="radio" class="btn-check" id="modeGrid" name="btnradio" autocomplete="off" checked="checked">
+          <label class="btn btn-outline-secondary" for="modeGrid">grid</label>
+          <input type="radio" class="btn-check" id="modeCose" name="btnradio" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="modeCose">cose</label>
+          <input type="radio" class="btn-check" id="modeCircle" name="btnradio" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="modeCircle">circle</label>
+          <input type="radio" class="btn-check" id="modeTree" name="btnradio" autocomplete="off">
+          <label class="btn btn-outline-secondary" for="modeTree">tree</label>
         </div>
         <hr>
-        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Enable visualization of malicious account ranking.">Rank visualize mode</a><br>
+        <a data-bs-toggle="tooltip" data-bs-placement="bottom" title="Enable visualization of malicious account ranking.">Rank visualize mode</a><br>
         <input type="checkbox" data-toggle="toggle" data-on="Enabled" data-onstyle="secondary" data-height="35" data-off="Disabled" data-offstyle="outline-secondary" id="rankMode">
         <hr>
-        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Import event logs in EVTX or XML format.">Upload</a><br>
-        <button class="btn btn-secondary" data-toggle="modal" data-target="#UploadEVTX">Upload Event Log</button>
+        <a data-bs-toggle="tooltip" data-bs-placement="bottom" title="Import event logs in EVTX or XML format.">Upload</a><br>
+        <button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#UploadEVTX">Upload Event Log</button>
         <hr>
-        <a data-toggle="tooltip" data-placement="bottom" data-original-title="Import event logs from Elasticsearch.">Elasticsearch</a><br>
-        <button class="btn btn-secondary" data-toggle="modal" data-target="#Elasticsearch">Load from <img src="static/images/elastic-logo.png" width="24"></button>
+        <a data-bs-toggle="tooltip" data-bs-placement="bottom" title="Import event logs from Elasticsearch.">Elasticsearch</a><br>
+        <button class="btn btn-secondary" data-bs-toggle="modal" data-bs-target="#Elasticsearch">Load from <img src="static/images/elastic-logo.png" width="24"></button>
         <hr>
       </div>
       <div class="col-sm-8 col-md-8 main">
@@ -134,12 +138,12 @@
         <div class="container" id="rankUser"></div>
         <ul class="pagination justify-content-center">
           <li><a class="btn page-link rounded-pill" onclick="pruserBack()">Back</a></li>
-          <li><a class="btn page-link rounded-pill ml-2" onclick="pruserNext()">Next</a></li>
+          <li><a class="btn page-link rounded-pill ms-2" onclick="pruserNext()">Next</a></li>
         </ul>
         <div class="container" id="rankHost"></div>
         <ul class="pagination justify-content-center">
           <li><a class="btn page-link rounded-pill" onclick="prhostBack()">Back</a></li>
-          <li><a class="btn page-link rounded-pill ml-2" onclick="prhostNext()">Next</a></li>
+          <li><a class="btn page-link rounded-pill ms-2" onclick="prhostNext()">Next</a></li>
         </ul>
       </div>
     </div>
@@ -150,28 +154,30 @@
       <div class="modal-content">
         <div class="modal-header">
           <h4 class="modal-title">Upload Event Log File</h4>
-          <button type="button" class="close" data-dismiss="modal"><i class="fas fa-times"></i></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <p>Import the event log. Supported file format is EVTX or XML (exported Event Viewer or PowerShell).</p>
-          <div class="form-inline">
-          <div class="w-auto" id="zoneTime"></div>
-          <div class="w-auto ml-2">
-            <select class="custom-select" id="logType">
-              <option>EVTX</option>
-              <option>XML</option>
-            </select>
+          <div class="row">
+            <div class="col-2" id="zoneTime"></div>
+            <div class="col-2">
+              <select class="form-select" id="logType">
+                <option>EVTX</option>
+                <option>XML</option>
+              </select>
+            </div>
+            <div class="col-8">
+              <div class="input-group">
+                <input multiple id="lefile" type="file" style="display:none">
+                <input type="text" id="evtx_name" class="form-control" placeholder="select file (multi files) ...">
+                <span class="input-group-btn"><button type="button" class="btn btn-info" onclick="$('input[id=lefile]').click();">Browse</button></span>
+              </div>
+            </div>
           </div>
-          <div class="input-group w-75 ml-2">
-            <input multiple id="lefile" type="file" style="display:none">
-            <input type="text" id="evtx_name" class="form-control" placeholder="select file (multi files) ...">
-            <span class="input-group-btn"><button type="button" class="btn btn-info" onclick="$('input[id=lefile]').click();">Browse</button></span>
-          </div>
-          </div>
-          <div class="custom-control custom-checkbox mt-3">
-            <label data-toggle="tooltip" data-placement="bottom" data-original-title="If you want to add more logs, please enable the checkbox.">
-              <input type="checkbox" class="custom-control-input" id="add_log">
-              <label class="custom-control-label" for="add_log">Add additional EVTX or XML files</label>
+          <div class="form-check mt-3">
+            <input class="form-check-input" type="checkbox" value="" id="add_log">
+            <label class="form-check-label" for="add_log" data-bs-toggle="tooltip" data-bs-placement="bottom" title="If you want to add more logs, please enable the checkbox.">
+              Add additional EVTX or XML files
             </label>
           </div>
           <div id="uploadBar"></div>
@@ -179,7 +185,7 @@
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-primary" onclick="file_upload()">Upload</button>
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
           <a href="log" target="_blank"><button type="button" class="btn btn-secondary">Log</button></a>
         </div>
       </div>
@@ -187,68 +193,63 @@
   </div>
   <!-- Elasticsearch -->
   <div class="modal fade" id="Elasticsearch" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h4 class="modal-title">Load Event Log from Elasticsearch</h4>
-          <button type="button" class="close" data-dismiss="modal"><i class="fas fa-times"></i></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <div class="container-fluid">
+            <h4 class="col-md-3">Date</h4>
             <div class="row">
-              <h4 class="col-md-3">Date<h4>
-                <div class="form-group">
-                  <div class="input-group fromdatetime" id="datetimepicker5" data-target-input="nearest">
-                    <input type="text" placeholder="From" id="from-date-time" class="form-control datetimepicker-input" data-target="#datetimepicker5"/>
-                    <div class="input-group-append" data-target="#datetimepicker5" data-toggle="datetimepicker">
-                      <div class="input-group-text"><i class="far fa-calendar-alt"></i></div>
-                    </div>
-                  </div>
-                </div>
-                <div class="form-group">
-                  <div class="input-group todatetime" id="datetimepicker6" data-target-input="nearest">
-                    <input type="text" placeholder="To" id="to-date-time" class="form-control datetimepicker-input" data-target="#datetimepicker6"/>
-                    <div class="input-group-append" data-target="#datetimepicker6" data-toggle="datetimepicker">
-                      <div class="input-group-text"><i class="far fa-calendar-alt"></i></div>
-                    </div>
-                  </div>
+              <div class="form-group col-auto">
+                <div class="input-group fromdatetime" id="datetimepicker5" data-target-input="nearest">
+                  <input type="text" placeholder="From" id="from-date-time" class="form-control datetimepicker-input" data-target="#datetimepicker5" />
+                  <div class="input-group-text" data-target="#datetimepicker5" data-toggle="datetimepicker"><i class="far fa-calendar-alt"></i></div>
                 </div>
               </div>
-              <div class="row">
-                <div class="custom-control custom-checkbox custom-control-inline">
-                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="If you want to add more logs, please enable the checkbox.">
-                    <input type="checkbox" id="add_logES" class="custom-control-input">
-                    <label class="custom-control-label" for="add_logES">Add additional event log from Elasticsearch</label>
-                  </label>
-                </div>
+              <div class="col-auto mt-2">
+                <h5>to</h5>
               </div>
-              <div class="row">
-                <div class="custom-control custom-checkbox custom-control-inline">
-                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="If you want to add results analyzed by LononTracer, please enable the checkbox.">
-                    <input type="checkbox" id="add_es" class="custom-control-input">
-                    <label class="custom-control-label" for="add_es">Add results analyzed by LononTracer to Elasticsearch</label>
-                  </label>
-                </div>
-              </div>
-              <hr>
-              <div class="row">
-                <h4 class="col-md-3">Zone<h4>
-                <div id="zoneTimeES"></div>
-              </div>
-              <hr>
-              <div class="row">
-                <h4 class="col-md-3">Server<h4>
-                <div class="form-group">
-                  <input class="form-control" type="text"  value="localhost:9200" id="es-ip-input" data-toggle="tooltip" data-placement="bottom" data-original-title="Set the Elasticsearch server IP address.">
+              <div class="form-group col-auto">
+                <div class="input-group todatetime" id="datetimepicker6" data-target-input="nearest">
+                  <input type="text" placeholder="To" id="to-date-time" class="form-control datetimepicker-input" data-target="#datetimepicker6" />
+                  <div class="input-group-text" data-target="#datetimepicker6" data-toggle="datetimepicker"><i class="far fa-calendar-alt"></i></div>
                 </div>
               </div>
             </div>
+            <div class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" value="" id="add_logES">
+              <label class="form-check-label" for="add_logES" data-bs-toggle="tooltip" data-bs-placement="bottom" title="If you want to add more logs, please enable the checkbox.">
+                Add additional event log from Elasticsearch
+              </label>
+            </div>
+            <div class="form-check mt-3">
+              <input class="form-check-input" type="checkbox" value="" id="add_es">
+              <label class="form-check-label" for="add_es" data-bs-toggle="tooltip" data-bs-placement="bottom" title="If you want to add results analyzed by LononTracer, please enable the checkbox.">
+                Add results analyzed by LononTracer to Elasticsearch
+              </label>
+            </div>
+            <hr>
+            <h4>Zone</h4>
+            <div class="row">
+              <div id="zoneTimeES"></div>
+            </div>
+            <hr>
+            <h4>Server</h4>
+            <div class="row">
+              <div class="col-auto">
+                <input class="form-control" type="text" value="localhost:9200" id="es-ip-input" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Set the Elasticsearch server IP address.">
+              </div>
+            </div>
+          </div>
           <div id="uploadBarES"></div>
           <div id="statusES"></div>
         </div>
         <div class="modal-footer">
           <button type="submit" class="btn btn-primary" onclick="load_eventlog()">Load</button>
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
           <a href="log" target="_blank"><button type="button" class="btn btn-secondary">Log</button></a>
         </div>
       </div>
@@ -260,114 +261,112 @@
       <div class="modal-content">
         <div class="modal-header">
           <h4 class="modal-title">Event Log Filter</h4>
-          <button type="button" class="close" data-dismiss="modal"><i class="fas fa-times"></i></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <p>Filter event log by date, count and event id.</p>
           <div class="container-fluid">
-            <div class="row">
-              <h4 class="col-md-3">Date<h4>
-                <div class="form-group">
-                  <div class="input-group fromdate" id="datetimepicker1" data-target-input="nearest">
-                    <input type="text" placeholder="From" id="from-date" class="form-control datetimepicker-input" data-target="#datetimepicker1"/>
-                    <div class="input-group-append" data-target="#datetimepicker1" data-toggle="datetimepicker">
-                      <div class="input-group-text"><i class="far fa-calendar-alt"></i></div>
+            <h4>Date<h4>
+                <div class="row">
+                  <div class="form-group col-auto">
+                    <div class="input-group fromdate" id="datetimepicker1" data-target-input="nearest">
+                      <input type="text" placeholder="From" id="from-date" class="form-control datetimepicker-input" data-target="#datetimepicker1" />
+                      <div class="input-group-text" data-target="#datetimepicker1" data-toggle="datetimepicker"><i class="far fa-calendar-alt"></i></div>
+                    </div>
+                  </div>
+                  <div class="col-auto mt-2">
+                    <h5>to</h5>
+                  </div>
+                  <div class="form-group col-auto">
+                    <div class="input-group todate" id="datetimepicker2" data-target-input="nearest">
+                      <input type="text" placeholder="To" id="to-date" class="form-control datetimepicker-input" data-target="#datetimepicker2" />
+                      <div class="input-group-text" data-target="#datetimepicker2" data-toggle="datetimepicker"><i class="far fa-calendar-alt"></i></div>
                     </div>
                   </div>
                 </div>
-                <div class="form-group">
-                  <div class="input-group todate" id="datetimepicker2" data-target-input="nearest">
-                    <input type="text" placeholder="To" id="to-date" class="form-control datetimepicker-input" data-target="#datetimepicker2"/>
-                    <div class="input-group-append" data-target="#datetimepicker2" data-toggle="datetimepicker">
-                      <div class="input-group-text"><i class="far fa-calendar-alt"></i></div>
-                    </div>
+                <hr>
+                <h4>Event ID</h4>
+                <div class="form-check form-check-inline">
+                  <label data-bs-toggle="tooltip" data-bs-placement="bottom" title="Successful logon">
+                    <input type="checkbox" id="id4624" class="form-check-input" checked="checked">
+                    <label class="form-check-label" for="id4624">4624</label>
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <label data-bs-toggle="tooltip" data-bs-placement="bottom" title="Logon failure">
+                    <input type="checkbox" id="id4625" class="form-check-input" checked="checked">
+                    <label class="form-check-label" for="id4625">4625</label>
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <label data-bs-toggle="tooltip" data-bs-placement="bottom" title="Kerberos Authentication (TGT Request)">
+                    <input type="checkbox" id="id4768" class="form-check-input" checked="checked">
+                    <label class="form-check-label" for="id4768">4768</label>
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <label data-bs-toggle="tooltip" data-bs-placement="bottom" title="Kerberos Service Ticket (ST Request)">
+                    <input type="checkbox" id="id4769" class="form-check-input" checked="checked">
+                    <label class="form-check-label" for="id4769">4769</label>
+                  </label>
+                </div>
+                <div class="form-check form-check-inline">
+                  <label data-bs-toggle="tooltip" data-bs-placement="bottom" title="NTLM Authentication">
+                    <input type="checkbox" id="id4776" class="form-check-input" checked="checked">
+                    <label class="form-check-label" for="id4776">4776</label>
+                  </label>
+                </div>
+                <hr>
+                <div class="row g-3 align-items-center">
+                  <div class="col-auto">
+                    <h4>Count<h4>
+                  </div>
+                  <div class="col-auto">
+                    <input class="form-control" type="text" value=0 id="count-input" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Set the lower limit of Event ID to visualize.">
                   </div>
                 </div>
-              </div>
-              <hr>
-              <div class="row">
-                <h4 class="col-md-3">Event ID</h4>
-                <div class="custom-control custom-checkbox custom-control-inline">
-                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="Successful logon">
-                    <input type="checkbox" id="id4624" class="custom-control-input" checked="checked">
-                    <label class="custom-control-label" for="id4624">4624</label>
-                  </label>
-                </div>
-                <div class="custom-control custom-checkbox custom-control-inline">
-                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="Logon failure">
-                    <input type="checkbox" id="id4625" class="custom-control-input" checked="checked">
-                    <label class="custom-control-label" for="id4625">4625</label>
-                  </label>
-                </div>
-                <div class="custom-control custom-checkbox custom-control-inline">
-                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="Kerberos Authentication (TGT Request)">
-                    <input type="checkbox" id="id4768" class="custom-control-input" checked="checked">
-                    <label class="custom-control-label" for="id4768">4768</label>
-                  </label>
-                </div>
-                <div class="custom-control custom-checkbox custom-control-inline">
-                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="Kerberos Service Ticket (ST Request)">
-                    <input type="checkbox" id="id4769" class="custom-control-input" checked="checked">
-                    <label class="custom-control-label" for="id4769">4769</label>
-                  </label>
-                </div>
-                <div class="custom-control custom-checkbox custom-control-inline">
-                  <label data-toggle="tooltip" data-placement="bottom" data-original-title="NTLM Authentication">
-                    <input type="checkbox" id="id4776" class="custom-control-input" checked="checked">
-                    <label class="custom-control-label" for="id4776">4776</label>
-                  </label>
-                </div>
-              </div>
-              <hr>
-              <div class="row">
-                <h4 class="col-md-3">Count<h4>
-                <div class="form-group">
-                  <input class="form-control" type="text" value=0 id="count-input" data-toggle="tooltip" data-placement="bottom" data-original-title="Set the lower limit of Event ID to visualize.">
-                </div>
-              </div>
-            </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
-          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
     </div>
   </div>
+  </div>
   <!-- Diff Graph -->
   <div class="modal fade" id="Diff" tabindex="-1">
-    <div class="modal-dialog">
+    <div class="modal-dialog modal-lg">
       <div class="modal-content">
         <div class="modal-header">
           <h4 class="modal-title">Diff Graph</h4>
-          <button type="button" class="close" data-dismiss="modal"><i class="fas fa-times"></i></button>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
         </div>
         <div class="modal-body">
           <p>Compare two days and view unique events.</p>
           <div class="container-fluid">
             <div class="row">
-              <div class="form-group">
+              <div class="form-group col-auto">
                 <div class="input-group fromday" id="datetimepicker3" data-target-input="nearest">
-                  <input type="text" placeholder="From" id="from-day" class="form-control datetimepicker-input" data-target="#datetimepicker3"/>
-                  <div class="input-group-append" data-target="#datetimepicker3" data-toggle="datetimepicker">
-                    <div class="input-group-text"><i class="far fa-calendar-alt"></i></div>
-                  </div>
+                  <input type="text" placeholder="From" id="from-day" class="form-control datetimepicker-input" data-target="#datetimepicker3" />
+                  <div class="input-group-text" data-target="#datetimepicker3" data-toggle="datetimepicker"><i class="far fa-calendar-alt"></i></div>
                 </div>
               </div>
-              <div class="form-group">
+              <div class="col-auto mt-2">
+                <h5>and</h5>
+              </div>
+              <div class="form-group col-auto">
                 <div class="input-group today" id="datetimepicker4" data-target-input="nearest">
-                  <input type="text" placeholder="To" id="to-day" class="form-control datetimepicker-input" data-target="#datetimepicker4"/>
-                  <div class="input-group-append" data-target="#datetimepicker4" data-toggle="datetimepicker">
-                    <div class="input-group-text"><i class="far fa-calendar-alt"></i></div>
-                  </div>
+                  <input type="text" placeholder="To" id="to-day" class="form-control datetimepicker-input" data-target="#datetimepicker4" />
+                  <div class="input-group-text" data-target="#datetimepicker4" data-toggle="datetimepicker"><i class="far fa-calendar-alt"></i></div>
                 </div>
               </div>
             </div>
           </div>
         </div>
         <div class="modal-footer">
-          <button type="submit" class="btn btn-primary" data-dismiss="modal" onclick="diffQuery()">Compare</button>
-          <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+          <button type="submit" class="btn btn-primary" data-bs-dismiss="modal" onclick="diffQuery()">Compare</button>
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
         </div>
       </div>
     </div>
@@ -383,8 +382,8 @@
           <p>Web page loading slow due to large graph. Do you want to continue searching?</p>
         </div>
         <div class="modal-footer">
-          <button type="button" class="btn btn-secondary" onclick="contQuery()" data-dismiss="modal">Yes</button>
-          <button type="button" class="btn btn-primary" data-dismiss="modal">No</button>
+          <button type="button" class="btn btn-secondary" onclick="contQuery()" data-bs-dismiss="modal">Yes</button>
+          <button type="button" class="btn btn-primary" data-bs-dismiss="modal">No</button>
         </div>
       </div>
     </div>
@@ -411,13 +410,23 @@
     var currentNumber = 0;
     var ItemField = {
       currentNumber: 0,
-      itemTemplate: '<div class="form-inline my-5 my-lg-0"><label class="sr-only" for="InputSelect">select</label>\
-                                <select class="custom-select" id="InputSelect_count_">\
-                                <option>Username</option><option>Hostname</option><option>IPAddress</option></select>\
-                                <input class="form-control my-2 my-lg-0 ml-1" type="text" id="query-input_count_">\
-                                <label class="sr-only" for="InputSelect">select</label>\
-                                <select class="custom-select ml-1" id="InputRule_count_">\
-                                <option>OR</option><option>AND</option></select></div>',
+      itemTemplate: '<div class="row mt-1" style="--bs-gutter-x: 0.5rem;">\
+                      <div class="col-auto">\
+                        <select class="form-select" id="InputSelect_count_">\
+                          <option value="Username">Username</option>\
+                          <option value="Hostname">Hostname</option>\
+                          <option value="IPAddress">IPAddress</option>\
+                        </select>\
+                      </div>\
+                      <div class="col-auto">\
+                        <input class="form-control" type="text" id="query-input_count_">\
+                      </div>\
+                      <div class="col-auto">\
+                        <select class="form-select" id="InputRule_count_">\
+                          <option>OR</option>\
+                          <option>AND</option>\
+                        </select>\
+                      </div>',
       add: function() {
         currentNumber++;
         if (currentNumber <= 10) {
@@ -439,14 +448,14 @@
       }
     }
 
-    var downMenu = '<div class="col-xs-2"><select class="custom-select" id="utcTime"><option>Time Zone</option>';
+    var downMenu = '<select class="form-select" id="utcTime"><option value="Username">Time Zone</option>';
     for (i = +14; i >= -12; i--) {
       downMenu += '<option>' + i + '</option>';
     }
-    downMenu += '</select></div>';
+    downMenu += '</select>';
     document.getElementById("zoneTime").innerHTML = downMenu;
 
-    var downMenuES = '<div class="col-xs-2"><select class="custom-select" id="utcTimeES"><option>Time Zone</option>';
+    var downMenuES = '<div class="col-3"><select class="form-select" id="utcTimeES"><option value="Username">Time Zone</option>';
     for (i = +14; i >= -12; i--) {
       downMenuES += '<option>' + i + '</option>';
     }
@@ -464,11 +473,11 @@
       $('#evtx_name').val(inFile.replace("C:\\fakepath\\", ""));
     });
 
-    $(function () {
-      $('[data-toggle="tooltip"]').tooltip();
+    $(function() {
+      $('[data-bs-toggle="tooltip"]').tooltip();
     })
 
-    $(function(){
+    $(function() {
       deSVG('.my_svg', true);
     });
   </script>

@@ -35,7 +35,7 @@
   fill: WHITE;
   stroke: WHITE;
   height: 50px;
-  width: 190px;
+  width: 200px;
 }
 
 [data-theme="dark"] .table {
@@ -49,7 +49,7 @@
   border-color: WHITE;
 }
 
-[data-theme="dark"] .table .thead-light th {
+[data-theme="dark"] .table .table-light th {
   color: WHITE;
   background-color: #202020;
   border-color: WHITE;
@@ -172,4 +172,32 @@
 
 [data-theme="dark"] .dropdown-item:active {
   color: Black;
+}
+
+[data-theme="dark"] .bgcolorSun {
+  background-color: #ff5050;
+}
+
+[data-theme="dark"] .bgcolorSat {
+  background-color: #5891db;
+}
+
+[data-theme="dark"] .bgcolorDay {
+  background-color: #202020;
+}
+
+[data-theme="dark"] .bgcolornormal {
+  background-color: #4d0715;
+}
+
+[data-theme="dark"] .bgcolorlow {
+  background-color: #800b23;
+}
+
+[data-theme="dark"] .bgcolormid {
+  background-color: #b31031;
+}
+
+[data-theme="dark"] .bgcolorhigh {
+  background-color: #dc143c;
 }

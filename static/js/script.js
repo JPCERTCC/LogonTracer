@@ -738,10 +738,10 @@ function executeQuery(queryStr, root) {
         session.close();
         if (recordCount > 3000) {
           setqueryStr = queryStr;
-          $('#warningMessage').modal({
-            show: true,
-            backdrop: 'false'
-          });
+          var warningMessage = new bootstrap.Modal(document.getElementById('warningMessage'), {
+            keyboard: false
+          })
+          warningMessage.show();
         } else {
           sendQuery(queryStr, root);
         }
@@ -893,7 +893,7 @@ function prhostNext() {
 
 function pagerankQuery(queryStr, dataType, currentPage) {
   var nodes = new Array();
-  var html = '<div><table class="table table-hover"><thead class="thead-light"><tr class="col-sm-2 col-md-2">\
+  var html = '<div><table class="table table-hover"><thead class="table-light"><tr class="col-sm-2 col-md-2">\
               <th class="col-sm-1 col-md-1">Rank</th><th class="col-sm-1 col-md-1">' + dataType +
     '</th></tr></thead><tbody class="col-sm-2 col-md-2">';
   var startRunk = currentPage * 10;
@@ -1080,8 +1080,10 @@ function createTimeline(queryStr, tableType) {
   var users = new Array();
   var starttime = "";
   var endtime = "";
+  var darkSwitch = document.getElementById("darkSwitch").checked;
   var weekTbl = new Array("Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat");
-  var bgcolorTbl = new Array("#ff7f50", "#efefef", "#efefef", "#efefef", "#efefef", "#efefef", "#b0c4de");
+  //var bgcolorTbl = new Array("#ff7f50", "#efefef", "#efefef", "#efefef", "#efefef", "#efefef", "#b0c4de");
+  var bgcolorTbl = new Array("bgcolorSun", "bgcolorDay", "bgcolorDay", "bgcolorDay", "bgcolorDay", "bgcolorDay", "bgcolorSat");
 
   if (tableType == "all") {
     var span = 'rowspan = "4"';
@@ -1089,7 +1091,7 @@ function createTimeline(queryStr, tableType) {
   if (tableType == "search") {
     var span = 'rowspan = "4" colspan="2"';
   }
-  var html = '<div class="table-responsive"><table class="table table-hover table-bordered table-sm table-striped table-wrapper" style="background-color:#EEE;"><thead class="thead-light"><tr>\
+  var html = '<div class="table-responsive"><table class="table table-hover table-bordered table-sm table-wrapper" style="background-color:#EEE;"><thead class="thread-light"><tr>\
                     <th ' + span + '>Username</th>';
 
   for (i = 0; i < chartArray.length; i++) {
@@ -1123,17 +1125,10 @@ function createTimeline(queryStr, tableType) {
         var nrangeHours = 0;
         var weekd = 0;
 
-        if (darkSwitch) {
-          normal_color = "#4d0715"
-          low_color = "#800b23"
-          mid_color = "#b31031"
-          high_color = "#dc143c"
-        } else {
-          normal_color = "#ffeaee"
-          low_color = "#ffbaee"
-          mid_color = "#ff8aee"
-          high_color = "#ff5aee"
-        }
+        var normal_color = "bgcolornormal"
+        var low_color = "bgcolorlow"
+        var mid_color = "bgcolormid"
+        var high_color = "bgcolorhigh"
 
         for (i = 1; i <= rangeHours; i++) {
           startDate.setHours(startDate.getHours() + 1);
@@ -1162,7 +1157,7 @@ function createTimeline(queryStr, tableType) {
         for (i = 1; i < rangeHours; i++) {
           startDate.setHours(startDate.getHours() + 1);
           if (startDate.getDate() != thisday) {
-            html += '<th bgcolor="' + bgcolorTbl[thisdow + weekd] + '" colspan="' + (i - nrangeHours) + '">' + thisday + '(' + weekTbl[thisdow + weekd] + ')</th>';
+            html += '<th class="' + bgcolorTbl[thisdow + weekd] + '" colspan="' + (i - nrangeHours) + '">' + thisday + '(' + weekTbl[thisdow + weekd] + ')</th>';
             if (thisdow + weekd >= 6) {
               thisdow = 0 - (weekd + 1);
             }
@@ -1171,7 +1166,7 @@ function createTimeline(queryStr, tableType) {
             weekd += 1;
           }
         }
-        html += '<th bgcolor="' + bgcolorTbl[thisdow + weekd] + '" colspan="' + (rangeHours - nrangeHours) + '">' + thisday + '(' + weekTbl[thisdow + weekd] + ')</th></tr><tr>';
+        html += '<th class="' + bgcolorTbl[thisdow + weekd] + '" colspan="' + (rangeHours - nrangeHours) + '">' + thisday + '(' + weekTbl[thisdow + weekd] + ')</th></tr><tr>';
 
         for (i = 0; i < rangeHours; i++) {
           html += '<th>' + thishour + '</th>';
@@ -1194,13 +1189,13 @@ function createTimeline(queryStr, tableType) {
             alerts = users[i][2].split(",");
             for (j = 0; j < rowdata.length; j++) {
               if (alerts[j] > 17) {
-                html += '<td bgcolor="' + high_color + '">' + rowdata[j].split(".")[0] + '</td>';
+                html += '<td class="' + high_color + '">' + rowdata[j].split(".")[0] + '</td>';
               } else if (alerts[j] > 16) {
-                html += '<td bgcolor="' + mid_color + '">' + rowdata[j].split(".")[0] + '</td>';
+                html += '<td class="' + mid_color + '">' + rowdata[j].split(".")[0] + '</td>';
               } else if (alerts[j] > 13) {
-                html += '<td bgcolor="' + low_color + '">' + rowdata[j].split(".")[0] + '</td>';
+                html += '<td class="' + low_color + '">' + rowdata[j].split(".")[0] + '</td>';
               } else if (alerts[j] > 10) {
-                html += '<td bgcolor="' + normal_color + '">' + rowdata[j].split(".")[0] + '</td>';
+                html += '<td class="' + normal_color + '">' + rowdata[j].split(".")[0] + '</td>';
               } else {
                 html += '<td>' + rowdata[j].split(".")[0] + '</td>';
               }
@@ -1233,13 +1228,13 @@ function createTimeline(queryStr, tableType) {
               }
               for (k = 0; k < rowdata.length; k++) {
                 if (alerts[k] > 17) {
-                  html += '<td bgcolor="' + high_color + '">' + rowdata[k].split(".")[0] + '</td>';
+                  html += '<td class="' + high_color + '">' + rowdata[k].split(".")[0] + '</td>';
                 } else if (alerts[k] > 16) {
-                  html += '<td bgcolor="' + mid_color + '">' + rowdata[k].split(".")[0] + '</td>';
+                  html += '<td class="' + mid_color + '">' + rowdata[k].split(".")[0] + '</td>';
                 } else if (alerts[k] > 13) {
-                  html += '<td bgcolor="' + low_color + '">' + rowdata[k].split(".")[0] + '</td>';
+                  html += '<td class="' + low_color + '">' + rowdata[k].split(".")[0] + '</td>';
                 } else if (alerts[k] > 10) {
-                  html += '<td bgcolor="' + normal_color + '">' + rowdata[k].split(".")[0] + '</td>';
+                  html += '<td class="' + normal_color + '">' + rowdata[k].split(".")[0] + '</td>';
                 } else {
                   html += '<td>' + rowdata[k].split(".")[0] + '</td>';
                 }
@@ -1520,8 +1515,8 @@ function logdeleteCheck() {
 
           var elemMsg = document.getElementById("error");
           elemMsg.innerHTML =
-            '<div class="alert alert-danger alert-dismissible mt-3" id="alertfadeout" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="close">\
-            <span aria-hidden="true">×</span></button><strong>IMPORTANT</strong>: Delete Event Log has detected! If you have not deleted the event log, the attacker may have deleted it.\
+            '<div class="alert alert-danger alert-dismissible mt-3" id="alertfadeout" role="alert"><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">\
+            </button><strong>IMPORTANT</strong>: Delete Event Log has detected! If you have not deleted the event log, the attacker may have deleted it.\
             <br>DATE: ' + delDate + '  DOMAIN: ' + delDomain + '  USERNAME: ' + delUser + '</div>';
         }
       },
@@ -1538,8 +1533,8 @@ push alert if search has failed.
 function searchError() {
   var elemMsg = document.getElementById("error");
   elemMsg.innerHTML =
-    '<div class="alert alert-warning alert-dismissible mt-3" id="alertfadeout" role="alert"><button type="button" class="close" data-dismiss="alert" aria-label="close">\
-    <span aria-hidden="true">×</span></button><strong>WARNING</strong>: Search failed!</div>';
+    '<div class="alert alert-warning alert-dismissible mt-3" id="alertfadeout" role="alert"><button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close">\
+    </button><strong>WARNING</strong>: Search failed!</div>';
   $(document).ready(function() {
     $('#alertfadeout').fadeIn(2000).delay(4000).fadeOut(2000);
   });

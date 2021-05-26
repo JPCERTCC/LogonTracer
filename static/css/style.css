@@ -29,5 +29,37 @@ table.floatThead-table {
 
 .my_svg {
   height: 50px;
-  width: 190px;
+  width: 200px;
+}
+
+.navbar {
+  z-index: 10000;
+}
+
+.bgcolorSun {
+  background-color: #ff7f50;
+}
+
+.bgcolorSat {
+  background-color: #b0c4de;
+}
+
+.bgcolorDay {
+  background-color: #efefef;
+}
+
+.bgcolornormal {
+  background-color: #ffeaee;
+}
+
+.bgcolorlow {
+  background-color: #ffbaee;
+}
+
+.bgcolormid {
+  background-color: #ff8aee;
+}
+
+.bgcolorhigh {
+  background-color: #ff5aee;
 }
