@@ -808,7 +808,7 @@ def parse_evtx(evtx_list):
             with open(evtx_file, "rb") as evtx:
                 parser = PyEvtxParser(evtx)
                 records = list(parser.records())
-                record_sum = len(records)
+                record_sum += len(records)
 
         if args.xmls:
             with open(evtx_file, "r") as fb:
