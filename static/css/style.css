@@ -36,6 +36,10 @@ table.floatThead-table {
   z-index: 10000;
 }
 
+.modal {
+  z-index: 100000;
+}
+
 .bgcolorSun {
   background-color: #ff7f50;
 }
