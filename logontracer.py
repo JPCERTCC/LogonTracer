@@ -1282,7 +1282,13 @@ def parse_evtx(evtx_list):
             id += 1
 
     #tx.process()
-    tx.commit()
+    try:
+        # for py2neo 2021.1 or later
+        GRAPH.commit(tx)
+    except:
+        # for py2neo 2021.0 or earlier
+        tx.commit()
+
     print("[+] Creation of a graph data finished.")
 
 # Parse from Elastic Search cluster
@@ -1774,7 +1780,13 @@ def parse_es():
             id += 1
 
     #tx.process()
-    tx.commit()
+    try:
+        # for py2neo 2021.1 or later
+        GRAPH.commit(tx)
+    except:
+        # for py2neo 2021.0 or earlier
+        tx.commit()
+
     print("[+] Creation of a graph data finished.")
 
 def main():
