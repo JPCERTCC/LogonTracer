@@ -40,6 +40,10 @@ table.floatThead-table {
   z-index: 100000;
 }
 
+.tooltip {
+  z-index: 110000;
+}
+
 .bgcolorSun {
   background-color: #ff7f50;
 }
