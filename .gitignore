@@ -1,3 +1,6 @@
 *.pyc
 *~
 *.bak
+cache
+upload
+*.log
