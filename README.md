@@ -13,8 +13,8 @@
   * **4672**: Assign special privileges  
 
   More details are described in the following documents:     
-  * [Visualise Event Logs to Identify Compromised Accounts - LogonTracer -](http://blog.jpcert.or.jp/2017/11/visualise-event-logs-to-identify-compromised-accounts---logontracer-.html)  
-  * [イベントログを可視化して不正使用されたアカウントを調査](https://www.jpcert.or.jp/magazine/acreport-logontracer.html) (Japanese)  
+  * [Visualise Event Logs to Identify Compromised Accounts - LogonTracer -](https://blogs.jpcert.or.jp/en/2017/11/visualise-event-logs-to-identify-compromised-accounts---logontracer-.html)  
+  * [イベントログを可視化して不正使用されたアカウントを調査](https://blogs.jpcert.or.jp/ja/2017/11/logontracer.html) (Japanese)  
 
   ![LogonTracer sample](images/sample.png)  
 
