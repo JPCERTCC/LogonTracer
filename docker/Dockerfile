@@ -13,8 +13,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 		netbase \
 	&& rm -rf /var/lib/apt/lists/*
 
-ENV GPG_KEY 0D96DF4D4110E5C43FBFB17F2D347EA6AA65421D
-ENV PYTHON_VERSION 3.7.8
+ENV GPG_KEY E3FF2839C048B25C084DEBE9B26995E310250568
+ENV PYTHON_VERSION 3.9.7
 
 RUN set -ex \
 	\
@@ -192,6 +192,7 @@ RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && chmod 777 LogonTracer \
 		&& chmod 777 LogonTracer/static \
     && cd LogonTracer \
+		&& python -m pip install --upgrade pip \
     && pip install cython \
     && pip install numpy \
     && pip install scipy \
