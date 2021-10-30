@@ -811,7 +811,7 @@ def parse_evtx(evtx_list):
                 record_sum += len(records)
 
         if args.xmls:
-            with open(evtx_file, "r") as fb:
+            with open(evtx_file, "r", encoding="utf8", errors="ignore") as fb:
                 fb_header = fb.read(6)
                 if "<?xml" not in fb_header:
                     sys.exit("[!] This file is not XML format {0}.".format(evtx_file))
