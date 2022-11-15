@@ -5,6 +5,6 @@ lxml
 scipy
 changefinder
 flask
-hmmlearn
+hmmlearn>=0.2.8
 scikit-learn
 elasticsearch-dsl>=7.0.0,<8.0.0

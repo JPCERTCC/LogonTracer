@@ -641,7 +641,7 @@ def learnhmm(frame, users, stime):
     data_array[data_array == 4624] = 3
     data_array[data_array == 4625] = 4
     # model = hmm.GaussianHMM(n_components=3, covariance_type="full", n_iter=10000)
-    model = hmm.MultinomialHMM(n_components=3, n_iter=10000)
+    model = hmm.CategoricalHMM(n_components=3, n_iter=10000)
     # model.startprob_ = start_probability
     model.emissionprob_ = emission_probability
     model.fit(np.array([data_array], dtype="int").T, lengths)
