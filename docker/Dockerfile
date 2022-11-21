@@ -1,4 +1,4 @@
-FROM neo4j:4.2.19
+FROM neo4j:4.4.14
 
 # ensure local python is preferred over distribution python
 ENV PATH /usr/local/bin:$PATH
