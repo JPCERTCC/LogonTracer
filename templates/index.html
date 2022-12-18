@@ -448,14 +448,14 @@
       }
     }
 
-    var downMenu = '<select class="form-select" id="utcTime"><option value="Username">Time Zone</option>';
+    var downMenu = '<select class="form-select" id="utcTime"><option value="Time Zone">Time Zone</option>';
     for (i = +14; i >= -12; i--) {
       downMenu += '<option>' + i + '</option>';
     }
     downMenu += '</select>';
     document.getElementById("zoneTime").innerHTML = downMenu;
 
-    var downMenuES = '<div class="col-3"><select class="form-select" id="utcTimeES"><option value="Username">Time Zone</option>';
+    var downMenuES = '<div class="col-3"><select class="form-select" id="utcTimeES"><option value="Time Zone">Time Zone</option>';
     for (i = +14; i >= -12; i--) {
       downMenuES += '<option>' + i + '</option>';
     }
