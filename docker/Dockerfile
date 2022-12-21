@@ -189,10 +189,13 @@ RUN set -ex \
 WORKDIR /usr/local/src
 
 RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
+    && chmod 777 /usr/local \
+    && chmod 777 /usr/local/src \
     && chmod 777 LogonTracer \
-		&& chmod 777 LogonTracer/static \
+	&& chmod 777 LogonTracer/static \
+	&& chmod 777 LogonTracer/logs \
     && cd LogonTracer \
-		&& python -m pip install --upgrade pip \
+	&& python -m pip install --upgrade pip \
     && pip install cython \
     && pip install numpy \
     && pip install scipy \
