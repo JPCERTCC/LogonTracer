@@ -45,29 +45,53 @@ table.floatThead-table {
 }
 
 .bgcolorSun {
-  background-color: #ff7f50;
+  background-color: #ff7f50 !important;
 }
 
 .bgcolorSat {
-  background-color: #b0c4de;
+  background-color: #b0c4de !important;
 }
 
 .bgcolorDay {
-  background-color: #efefef;
+  background-color: #efefef !important;
 }
 
 .bgcolornormal {
-  background-color: #ffeaee;
+  background-color: #ffeaee !important;
 }
 
 .bgcolorlow {
-  background-color: #ffbaee;
+  background-color: #ffbaee !important;
 }
 
 .bgcolormid {
-  background-color: #ff8aee;
+  background-color: #ff8aee !important;
 }
 
 .bgcolorhigh {
-  background-color: #ff5aee;
+  background-color: #ff5aee !important;
+}
+
+.login-form {
+  max-width: none !important;
+  width: 415px;
+}
+
+.login-form input#username, input#password, input#password1, input#password2, input#case {
+  max-width: none !important;
+  width: 370px;
+  height: 2.4em;
+  padding: 0 16px;
+  border-radius: 4px;
+  border: none;
+  box-shadow: 0 0 0 1px #ccc inset;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+}
+
+.drop-hover:hover > .dropdown-menu {
+  display: block !important;
+  margin-left: 100%;
+  margin-top: -22%;
 }

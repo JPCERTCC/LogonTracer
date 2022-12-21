@@ -1,0 +1,35 @@
+version: 1
+formatters:
+  file:
+    format: "[%(asctime)s] [%(levelname)s] : %(message)s"
+
+handlers:
+  file:
+    class: logging.handlers.TimedRotatingFileHandler
+    formatter: file
+    filename: logs/application.log
+    backupCount: 8
+    when: D
+    interval: 1
+    encoding: 'utf-8'
+  logontracer_handler:
+    class: logging.handlers.TimedRotatingFileHandler
+    formatter: file
+    filename: static/logontracer.log
+    backupCount: 8
+    when: D
+    interval: 1
+    encoding: 'utf-8'
+  console:
+    class: logging.StreamHandler
+    stream: ext://sys.stdout
+
+loggers:
+  agent_logger:
+    level: INFO
+    handlers: [console]
+    propagate: no
+
+root:
+  level: WARN
+  handlers: [file]

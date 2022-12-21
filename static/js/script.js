@@ -688,7 +688,7 @@ function sendQuery(queryStr, root) {
   var loading = document.getElementById('loading');
   loading.classList.remove('loaded');
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -728,7 +728,7 @@ This function executes the neo4j query.
 function executeQuery(queryStr, root) {
   var countStr = queryStr.replace("user, event, ip", "COUNT(event)");
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(countStr)
     .subscribe({
       onNext: function(record) {
@@ -769,7 +769,7 @@ function diffQuery() {
 
   queryStr1st = 'MATCH (user)-[event:Event]-(ip)  WHERE event.date >= ' + date1st + ' AND event.date <= ' + (date1st + 86400) + ' RETURN user, event, ip';
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr1st)
     .subscribe({
       onNext: function(record) {
@@ -805,7 +805,7 @@ function diffNext(graph1) {
   var loading = document.getElementById('loading');
   loading.classList.remove('loaded');
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr2nd)
     .subscribe({
       onNext: function(record) {
@@ -899,7 +899,7 @@ function pagerankQuery(queryStr, dataType, currentPage) {
   var startRunk = currentPage * 10;
   queryStr = queryStr + " SKIP " + startRunk + " LIMIT " + 10;
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -938,7 +938,7 @@ function exportCSV() {
   var queryStr = 'MATCH (user:Username)-[event:Event]-(ip:IPAddress) RETURN user, ip, event';
   var events = new Array();
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1000,7 +1000,7 @@ function downloadCSV(csvType) {
   var queryStr = 'MATCH (date:Date) MATCH (user:Username) RETURN date, user';
   var users = new Array();
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1100,7 +1100,7 @@ function createTimeline(queryStr, tableType) {
     }
   }
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1271,7 +1271,7 @@ function createTimelineGraph(queryStr) {
   var starttime = "";
   var endtime = "";
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1500,7 +1500,7 @@ function logdeleteCheck() {
   var queryStr = "MATCH (date:Deletetime) RETURN date";
   var ddata = "";
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {
@@ -1549,6 +1549,7 @@ function file_upload() {
   var timezone = document.getElementById("utcTime").value;
   var logtype = document.getElementById("logType").value;
   var addlog = document.getElementById("add_log").checked;
+  var sigmascan = document.getElementById("sigma_scan").checked;
 
   if (timezone == "Time Zone") {
     document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Please set the time zone of the event logs.</div>';
@@ -1564,6 +1565,8 @@ function file_upload() {
     formData.append("timezone", timezone);
     formData.append("logtype", logtype);
     formData.append("addlog", addlog);
+    formData.append("sigmascan", sigmascan);
+    formData.append("casename", caseName);
     var xmlhttp = new XMLHttpRequest();
     xmlhttp.upload.addEventListener("progress", progressHandler, false);
     xmlhttp.addEventListener("load", completeHandler, false);
@@ -1608,6 +1611,7 @@ function load_eventlog() {
     formData.append("timezone", timezone);
     formData.append("es_server", es_server);
     formData.append("addlog", addlog);
+    formData.append("casename", caseName);
     formData.append("addes", addes);
     var xmlhttp = new XMLHttpRequest();
     xmlhttp.upload.addEventListener("progress", progressHandlerES, false);
@@ -1755,7 +1759,7 @@ load date info from neo4j
 function loaddate() {
   var queryStr = 'MATCH (date:Date) RETURN date';
 
-  var session = driver.session();
+  var session = driver.session({database: caseName});
   session.run(queryStr)
     .subscribe({
       onNext: function(record) {

@@ -166,6 +166,10 @@
   color: WHITE;
 }
 
+[data-theme="dark"] .navbar-light .navbar-nav .nav-link {
+    color: rgba(255, 255, 255, 0.55);
+}
+
 [data-theme="dark"] .dropdown-item:hover {
   color: Black;
 }
@@ -175,29 +179,29 @@
 }
 
 [data-theme="dark"] .bgcolorSun {
-  background-color: #ff5050;
+  background-color: #ff5050 !important;
 }
 
 [data-theme="dark"] .bgcolorSat {
-  background-color: #5891db;
+  background-color: #5891db !important;
 }
 
 [data-theme="dark"] .bgcolorDay {
-  background-color: #202020;
+  background-color: #202020 !important;
 }
 
 [data-theme="dark"] .bgcolornormal {
-  background-color: #4d0715;
+  background-color: #4d0715 !important;
 }
 
 [data-theme="dark"] .bgcolorlow {
-  background-color: #800b23;
+  background-color: #800b23 !important;
 }
 
 [data-theme="dark"] .bgcolormid {
-  background-color: #b31031;
+  background-color: #b31031 !important;
 }
 
 [data-theme="dark"] .bgcolorhigh {
-  background-color: #dc143c;
+  background-color: #dc143c !important;
 }

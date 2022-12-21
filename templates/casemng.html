@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LogonTracer</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
+  <link rel="stylesheet" href="static/css/style.css">
+  <link rel="stylesheet" href="static/css/dark-mode.css">
+  <!-- Neo4j JavaScript Driver -->
+  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.4.10/lib/browser/neo4j-web.min.js" integrity="sha384-g97Tx/JpmmKp7i9H8mPaOaMLiH742OFCLAa+tT0ZavZS/3spwuHUirCDwiA3wFgE" crossorigin="anonymous"></script>
+</head>
+
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light p-1 shadow">
+    <a class="navbar-brand" href="/"><img class="my_svg" src="static/images/logo_top.svg" alt="top" width="190"></a>
+    <div class="collapse navbar-collapse">
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-md-4 offset-md-4">
+        <div class="login-form bg-light mt-4 p-4">
+          <form action="" method="POST" class="row g-3">
+            <h4>Add Access to Case</h4>
+            <div id="currentCase"></div>
+            {{ messages | safe }}
+            <div class="col-12">
+              <label>Case</label>
+              <div id="caseSelect"></div>
+            </div>
+            <div class="col-12">
+              <label>Access User</label>
+              <div id="userSelect"></div>
+            </div>
+            <div class="col-12">
+              <div class="float-end">
+                <button type="submit" class="btn btn-secondary" name="action" value="add">Add User</button>
+                <a href="/" name="cancel" class="btn btn-dark">Cancel</a>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="text/javascript">
+    var caseName = '{{ case_name }}';
+
+    if (caseName.indexOf("neo4j") != -1) {
+      document.getElementById("currentCase").innerHTML = '<div class="alert alert-info" role="alert">Current case: default</div>';
+    } else {
+      document.getElementById("currentCase").innerHTML = '<div class="alert alert-info" role="alert">Current case: ' + caseName + '</div>';
+    }
+
+    var users = new Array();
+    var neo = neo4j.default;
+    //Neo4j access settings
+    if (location.protocol == 'http:') {
+      var driver = neo.driver("bolt://{{ server_ip }}:{{ ws_port }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
+    } else if (location.protocol == 'https:') {
+      var driver = neo.driver("bolt+ssc://{{ server_ip }}:{{ ws_port }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
+    }
+    var session1 = driver.session({database: 'system'});
+    session1.run('SHOW USERS')
+      .subscribe({
+        onNext: record => {
+          var userdata = new Array();
+          users.push(record.get('user'));
+        },
+        onCompleted: () => {
+          session1.close()
+          var tableMenu = '<select class="form-select" name="userSelect">';
+          for (i = 0; i < users.length; i++) {
+            tableMenu +=  '<option value="' + users[i] + '">' + users[i] + '</option>';
+          }
+          tableMenu +=  '</select>';
+          document.getElementById("userSelect").innerHTML = tableMenu;
+        },
+        onError: error => {
+          console.log(error)
+        }
+      })
+
+    var cases = new Array();
+    var session2 = driver.session({database: 'system'});
+    session2.run('SHOW DATABASES')
+      .subscribe({
+        onNext: record => {
+          if (record.get('name').indexOf("system") == -1) {
+            cases.push(record.get('name'))
+            // console.log(record.get('name'))
+          }
+        },
+        onCompleted: () => {
+          session2.close()
+          var downMenu = '<select class="form-select" name="caseName"><option value="case_name">Case</option>';
+          for (i = 0; i < cases.length; i++) {
+            if (cases[i].indexOf("neo4j") != -1) {
+              downMenu += '<option value="' + cases[i] + '">default</option>';
+            } else {
+              downMenu += '<option value="' + cases[i] + '">' + cases[i] + '</option>';
+            }
+          }
+          downMenu += '</select>';
+          document.getElementById("caseSelect").innerHTML = downMenu;
+        },
+        onError: error => {
+          console.log(error)
+        }
+      })
+
+  </script>
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.min.js" integrity="sha384-Atwg2Pkwv9vp0ygtn1JAojH0nYbwNJLPhwyoVbhoPwBhjQPR5VtM2+xf0Uwh9KtT" crossorigin="anonymous"></script>
+</body>
+
+</html>

@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>LogonTracer</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/css/bootstrap.min.css" integrity="sha384-+0n0xVW2eSR5OomGNYDnhzAbDsOXxcvSN1TPprVMTNDbiYZCxYbOOl7+AMvyTG2x" crossorigin="anonymous">
+  <link rel="stylesheet" href="static/css/style.css">
+  <link rel="stylesheet" href="static/css/dark-mode.css">
+  <!-- Neo4j JavaScript Driver -->
+  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.4.10/lib/browser/neo4j-web.min.js" integrity="sha384-g97Tx/JpmmKp7i9H8mPaOaMLiH742OFCLAa+tT0ZavZS/3spwuHUirCDwiA3wFgE" crossorigin="anonymous"></script>
+</head>
+
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light p-1 shadow">
+    <a class="navbar-brand" href="/"><img class="my_svg" src="static/images/logo_top.svg" alt="top" width="190"></a>
+    <div class="collapse navbar-collapse">
+    </div>
+  </nav>
+
+  <div class="container">
+    <div class="row">
+      <div class="col-md-6 offset-md-3">
+        <div class="mt-8 p-8">
+          <form action="" method="POST">
+            <h4 class="text-center mt-3">Delete Access to Case</h4>
+            {{ messages | safe }}
+            <div id="table_body"></div>
+            <div class="float-end">
+              <button type="submit" class="btn btn-secondary" name="action" value="delete">Delete</button>
+              <a href="/" name="cancel" class="btn btn-dark">Cancel</a>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script type="text/javascript">
+    var users = new Array();
+    var neo = neo4j.default;
+    //Neo4j access settings
+    if (location.protocol == 'http:') {
+      var driver = neo.driver("bolt://{{ server_ip }}:{{ ws_port }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
+    } else if (location.protocol == 'https:') {
+      var driver = neo.driver("bolt+ssc://{{ server_ip }}:{{ ws_port }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
+    }
+    var session = driver.session({database: 'system'});
+    session.run('SHOW USERS')
+      .subscribe({
+        onNext: record => {
+          var userdata = new Array();
+          users.push(record.get('user'));
+        },
+        onCompleted: () => {
+          session.close()
+
+          for (i = 0; i < users.length; i++) {
+            accessTable(users[i])
+          }
+        },
+        onError: error => {
+          console.log(error)
+        }
+      })
+
+    var caseAccess = new Array();
+    function accessTable(user) {
+      var session = driver.session({database: 'system'});
+      session.run('SHOW USER ' + user + ' PRIVILEGES')
+        .subscribe({
+          onNext: record => {
+            var cdata = new Array();
+            if (record.get('graph').indexOf("*") == -1 && record.get('graph').indexOf("DEFAULT") == -1 ) {
+              cdata.push(record.get('user'))
+              cdata.push(record.get('graph'))
+              caseAccess.push(cdata)
+            }
+          },
+          onCompleted: () => {
+            session.close()
+            var tableMenu = '<table class="table table-hover"><thead><tr><th scope="col"></th><th scope="col">User</th><th scope="col">Access Case</th></tr></thead><tbody>';
+            for (i = 0; i < caseAccess.length; i++) {
+              tableMenu +=  '<th><div class="form-check"><input class="form-check-input" type="checkbox" name="userlist" value="' + caseAccess[i][0] + '_' + caseAccess[i][1] + '"></div></th>';
+              tableMenu +=  '<td>' + caseAccess[i][0] + '</td>';
+              if (caseAccess[i][1].indexOf("neo4j") == -1) {
+                tableMenu +=  '<td>' + caseAccess[i][1] + '</td></tr>';
+              } else {
+                tableMenu +=  '<td>default</td></tr>';
+              }
+            }
+            tableMenu +=  '</tbody></table>';
+            document.getElementById("table_body").innerHTML = tableMenu;
+            //console.log(caseAccess)
+          },
+          onError: error => {
+            console.log(error)
+          }
+        })
+    }
+
+  </script>
+  <!-- Bootstrap JS -->
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.1/dist/js/bootstrap.min.js" integrity="sha384-Atwg2Pkwv9vp0ygtn1JAojH0nYbwNJLPhwyoVbhoPwBhjQPR5VtM2+xf0Uwh9KtT" crossorigin="anonymous"></script>
+</body>
+
+</html>

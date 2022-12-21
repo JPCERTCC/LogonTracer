@@ -1,0 +1,26 @@
+settings:
+  logontracer:
+    WEB_PORT: "8080" # Web application port
+    WEB_HOST: "0.0.0.0" # Web application address
+    database_name: "data.db" # LogonTracer user info database
+    default_user: "neo4j" # LogonTracer default login name
+    default_password: "password" # LogonTracer default login password
+    default_case: "neo4j" # Default neo4j database name
+    SESSION_COOKIE_SECURE: False # When using HTTPS, it is necessary to relay a web server such as nginx.
+
+  neo4j:
+    NEO4J_USER: "neo4j" # neo4j user name
+    NEO4J_PASSWORD: "password" # neo4j password
+    NEO4J_SERVER: "localhost" # neo4j server
+    NEO4J_PORT: "7474" # neo4j listen port
+    WS_PORT: "7687" # Websocket port
+
+  elastic:
+    ES_SERVER: "localhost:9200" # Elastic Search server
+    ES_INDEX: "winlogbeat-*" # Elastic index
+    ES_PREFIX: "winlog" # Elastic prefix
+    ES_USER: "elastic" # Elastic auth user
+
+  sigma:
+    git_url: "https://github.com/SigmaHQ/sigma.git" # Sigma rules url
+    results: "sigma_results.csv" # Sigma scan result file
