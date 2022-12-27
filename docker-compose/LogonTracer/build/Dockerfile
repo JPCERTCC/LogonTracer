@@ -8,10 +8,15 @@ RUN set -ex \
 		dpkg-dev \
 		gcc \
 		libssl-dev \
-		make
+		make \
+		curl \
+        build-essential
 
 ## LogonTracer install
 WORKDIR /usr/local/src
+
+RUN curl https://sh.rustup.rs -sSf | bash -s -- -y
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && chmod 777 LogonTracer \
