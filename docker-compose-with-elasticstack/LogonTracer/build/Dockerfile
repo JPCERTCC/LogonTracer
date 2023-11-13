@@ -1,4 +1,4 @@
-FROM python:3.7.8-slim-buster
+FROM python:3.12.0-slim
 
 RUN set -ex \
   	\
@@ -7,6 +7,7 @@ RUN set -ex \
     && apt-get install -y --no-install-recommends git \
 		dpkg-dev \
 		gcc \
+    g++ \
 		libssl-dev \
 		make
 
