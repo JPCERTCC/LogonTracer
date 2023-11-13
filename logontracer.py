@@ -1959,11 +1959,11 @@ def parse_evtx(evtx_list, case):
                             event_series = pd.Series([eventid, hostname, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
                             ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, hostname, eventid],  index=ml_frame.columns)
                         # append pandas series to dataframe
-                        event_set = event_set.append(event_series, ignore_index=True)
-                        ml_frame = ml_frame.append(ml_series, ignore_index=True)
+                        event_set = pd.concat([event_set, event_series], ignore_index=True)
+                        ml_frame = pd.concat([ml_frame, ml_series], ignore_index=True)
                         # print("%s,%i,%s,%s,%s,%s" % (eventid, ipaddress, username, comment, logintype))
                         count_series = pd.Series([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username], index=count_set.columns)
-                        count_set = count_set.append(count_series, ignore_index=True)
+                        count_set = pd.concat([count_set, count_series], ignore_index=True)
                         # print("%s,%s" % (stime.strftime("%Y-%m-%d %H:%M:%S"), username))
 
                         if domain != "-":
@@ -2551,11 +2551,11 @@ def parse_es(case):
                         event_series = pd.Series([eventid, hostname, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
                         ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, hostname, eventid],  index=ml_frame.columns)
                     # append pandas series to dataframe
-                    event_set = event_set.append(event_series, ignore_index=True)
-                    ml_frame = ml_frame.append(ml_series, ignore_index=True)
+                    event_set = pd.concat([event_set, event_series], ignore_index=True)
+                    ml_frame = pd.concat([ml_frame, ml_series], ignore_index=True)
                     # print("%s,%i,%s,%s,%s,%s" % (eventid, ipaddress, username, comment, logintype))
                     count_series = pd.Series([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username], index=count_set.columns)
-                    count_set = count_set.append(count_series, ignore_index=True)
+                    count_set = pd.concat([count_set, count_series], ignore_index=True)
                     # print("%s,%s" % (stime.strftime("%Y-%m-%d %H:%M:%S"), username))
 
                     if domain != "-":
