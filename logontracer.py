@@ -1,9 +1,6 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
-# LICENSE
-# https://github.com/JPCERTCC/LogonTracer/blob/master/LICENSE.txt
-#
 
 import os
 import re
