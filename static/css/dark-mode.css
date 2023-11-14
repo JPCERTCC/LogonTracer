@@ -41,6 +41,8 @@
 [data-theme="dark"] .table {
   color: WHITE;
   background-color: #202020;
+  --bs-table-bg: initial;
+  --bs-table-color: initial;
 }
 
 [data-theme="dark"] .tbody {
