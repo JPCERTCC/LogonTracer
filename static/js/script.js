@@ -1449,7 +1449,12 @@ function addCanvas(users) {
 
 function createAlltimeline() {
   var queryStr = 'MATCH (date:Date) MATCH (user:Username) RETURN date, user';
-  createTimeline(queryStr, "all");
+  var gtype = document.getElementById("timelineTypes").checked;
+  if (gtype) {
+    createTimeline(queryStr, "all");
+  } else {
+    createTimelineGraph(queryStr);
+  }
 }
 
 function searchTimeline() {
