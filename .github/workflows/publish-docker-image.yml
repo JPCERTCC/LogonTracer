@@ -11,17 +11,17 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: [3.7, 3.8, 3.9]
+        python-version: ['3.9', '3.10', '3.11', '3.12']
 
     steps:
     - name: Checkout code
       uses: actions/checkout@v3
     - name: Build the LogonTracer Docker Image and start
       run: |
-        docker build ./docker -t jpcertcc/docker-logontracer:latest
-        docker run --detach --publish=7474:7474 --publish=7687:7687  --publish=8080:8080 -e LTHOSTNAME=localhost jpcertcc/docker-logontracer
+        docker image build ./docker -t jpcertcc/docker-logontracer:latest
+        docker container run --detach --publish=7474:7474 --publish=7687:7687  --publish=8080:8080 -e LTHOSTNAME=localhost jpcertcc/docker-logontracer
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v2
+      uses: actions/setup-python@v4
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -44,9 +44,9 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v2
+      uses: actions/checkout@v3
     - name: Register docker image
-      uses: docker/build-push-action@v1
+      uses: docker/build-push-action@v5
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
