@@ -1,6 +1,6 @@
   <div align="center"><img src="images/logo_top.svg" width="500"></div>  
 
-  [![Arsenal](https://rawgit.com/toolswatch/badges/master/arsenal/usa/2018.svg)](https://www.toolswatch.org/2018/05/black-hat-arsenal-usa-2018-the-w0w-lineup/) [![Version](https://img.shields.io/github/v/release/JPCERTCC/LogonTracer)](https://github.com/JPCERTCC/LogonTracer/releases) [![Docker pull](https://img.shields.io/docker/pulls/jpcertcc/docker-logontracer)](https://hub.docker.com/r/jpcertcc/docker-logontracer/) ![test](https://github.com/JPCERTCC/LogonTracer/workflows/test/badge.svg?branch=master)  
+  [![Arsenal](https://rawgit.com/toolswatch/badges/master/arsenal/usa/2018.svg)](https://www.toolswatch.org/2018/05/black-hat-arsenal-usa-2018-the-w0w-lineup/) [![Version](https://img.shields.io/github/v/release/JPCERTCC/LogonTracer)](https://github.com/JPCERTCC/LogonTracer/releases) [![Docker pull](https://img.shields.io/docker/pulls/jpcertcc/docker-logontracer)](https://hub.docker.com/r/jpcertcc/docker-logontracer/) [![test](https://github.com/JPCERTCC/LogonTracer/actions/workflows/logontracer-test.yml/badge.svg)](https://github.com/JPCERTCC/LogonTracer/actions/workflows/logontracer-test.yml)  
 
 ## Concept
   **LogonTracer** is a tool to investigate malicious logon by visualizing and analyzing Windows Active Directory event logs. This tool associates a host name (or an IP address) and account name found in logon-related events and displays it as a graph. This way, it is possible to see in which account login attempt occurs and which host is used.  
