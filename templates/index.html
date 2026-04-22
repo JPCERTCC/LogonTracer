@@ -24,6 +24,7 @@
   <script src="https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js"></script>
   <!-- Neo4j JavaScript Driver -->
   <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.4.11/lib/browser/neo4j-web.min.js" integrity="sha384-M7IgiSpzRjF1qJu8pYaYwoDwXif/XBFUlabbZLNDtqXE7kPugcTx7QRyZqveSoBZ" crossorigin="anonymous"></script>
+  <script src="static/js/ai-security-assistant.js"></script>
   <script src="static/js/script.js"></script>
 </head>
 
@@ -65,29 +66,51 @@
             <a class="dropdown-item" download="image.jpeg" id="export-jpeg" onclick="exportJPEG()" href="#">JPEG</a>
           </div>
         </div>
-        <div class="form-check form-switch ms-5 mt-3">
-          <input class="form-check-input" type="checkbox" id="darkSwitch">
-          <label class="form-check-label" for="darkSwitch">Dark Mode</label>
-        </div>
-
-        <li class="nav-item dropdown ms-5 mt-2 h-25" style="margin-left:auto">
+        <button type="button" class="btn btn-outline-info ms-1 mt-2 h-25" 
+                data-bs-toggle="tooltip" data-bs-placement="bottom" 
+                title="Show last AI analysis result" 
+                onclick="showAIHistory()" 
+                id="ai-history-btn">
+          <i class="fas fa-brain"></i> AI History
+        </button>
+        <button type="button" class="btn btn-outline-success ms-1 mt-2 h-25" 
+                data-bs-toggle="tooltip" data-bs-placement="bottom" 
+                title="Run autonomous AI agent threat detection" 
+                onclick="aiAssistant.runAgentDetection()" 
+                id="ai-agent-btn">
+          <i class="fas fa-robot"></i> AI Analysis
+        </button>
+      </form>
+      
+      <!-- Right side navbar items -->
+      <ul class="navbar-nav ms-auto align-items-center">
+        <!-- Dark Mode Toggle -->
+        <li class="nav-item d-flex align-items-center me-2" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Toggle dark mode display">
+          <label class="me-2" for="darkSwitch"><i class="fas fa-moon"></i></label>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="darkSwitch">
+          </div>
+        </li>
+        
+        <!-- Settings Dropdown -->
+        <li class="nav-item dropdown">
           <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
-            Settings
+            <i class="fas fa-user-cog"></i> Settings
           </a>
-          <ul class="dropdown-menu" aria-labelledby="navbarDropdownMenuLink">
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
             <li><h6 class="dropdown-header">User Menu</h6></li>
             <li><a class="dropdown-item" href="setting">Change Password</a></li>
             <li><a class="dropdown-item" href="changecase">Change Case</a></li>
             <div class="dropdown-divider"></div>
             <li><h6 class="dropdown-header">Admin Menu</h6></li>
-            <li class="dropend drop-hover">
+            <li class="dropstart drop-hover">
               <a class="dropdown-item dropdown-toggle" href="#">User Management</a>
               <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="signup">Add User</a></li>
                 <li><a class="dropdown-item" href="usermng">Delete User</a></li>
               </ul>
             </li>
-            <li class="dropend drop-hover">
+            <li class="dropstart drop-hover">
               <a class="dropdown-item dropdown-toggle" href="#">Case Management</a>
               <ul class="dropdown-menu">
                 <li><a class="dropdown-item" href="addcase">Add New Case</a></li>
@@ -97,13 +120,15 @@
               </ul>
             </li>
             <div class="dropdown-divider"></div>
-            <li><h6 class="dropdown-header">User: {{ neo4j_user }}</h6></li>
+            <li><h6 class="dropdown-header">AI Settings</h6></li>
+            <li><a class="dropdown-item" href="ai-settings">Settings</a></li>
+            <div class="dropdown-divider"></div>
+            <li><h6 class="dropdown-header">User: {{ current_user.username }}</h6></li>
             <li><a class="dropdown-item" href="logout">Logout</a></li>
           </ul>
         </li>
-
-        <script src="static/js/dark-mode-switch.min.js"></script>
-      </form>
+      </ul>
+      <script src="static/js/dark-mode-switch.min.js"></script>
     </div>
   </nav>
 
@@ -126,7 +151,7 @@
           <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Visualizing changed audit policy." onclick="policyQuery()">Audit Policy Change</button>
           <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="modal" data-bs-target="#Diff">Diff Graph</button>
           <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Displays hourly event log counts in time series." onclick="window.open('timeline')">Create Timeline</button>
-          <a type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Sigma rule scan results." href="/sigma" download="sigma.csv">Sigma Scan</a>
+          <button type="button" class="list-group-item list-group-item-action list-group-item-light" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Displays Sigma rule scan results." onclick="window.open('sigma_view')">Sigma Scan Results</button>
         </div>
         <hr>
         <a data-bs-toggle="tooltip" data-bs-placement="bottom" title="Add value to edges of visualization graph.">Add event value</a><br>
@@ -429,25 +454,34 @@
     </div>
   </div>
   <script type="text/javascript">
-    var neo = neo4j.default;
-    //Neo4j access settings
-    if (location.protocol == 'http:') {
-      var driver = neo.driver("bolt://{{ server_ip }}:{{ ws_port }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
-    } else if (location.protocol == 'https:') {
-      var driver = neo.driver("bolt+ssc://{{ server_ip }}:{{ ws_port }}", neo.auth.basic("{{ neo4j_user }}", "{{ neo4j_password }}"));
-    }
+    var driver;
     var caseName = '{{ case_name }}';
-    var session = driver.session({database: caseName});
+    var session;
     var cy = cytoscape();
     var rankpageUser = 0
     var rankpageHost = 0
 
-    var userqueryStr = 'MATCH (node:Username) RETURN node ORDER BY node.rank DESC';
-    var ipqueryStr = 'MATCH (node:IPAddress) RETURN node ORDER BY node.rank DESC';
-    pagerankQuery(userqueryStr, "User", rankpageUser);
-    pagerankQuery(ipqueryStr, "Host", rankpageHost);
-    logdeleteCheck();
-    loaddate();
+    fetch('/api/neo4j/credentials')
+      .then(r => r.json())
+      .then(creds => {
+        if (creds.error) { console.error(creds.error); return; }
+        caseName = creds.case_name || caseName;
+        var neo = neo4j.default;
+        if (location.protocol == 'http:') {
+          driver = neo.driver("bolt://" + creds.server + ":" + creds.port, neo.auth.basic(creds.username, creds.password));
+        } else {
+          driver = neo.driver("bolt+ssc://" + creds.server + ":" + creds.port, neo.auth.basic(creds.username, creds.password));
+        }
+        session = driver.session({database: caseName});
+
+        var userqueryStr = 'MATCH (node:Username) RETURN node ORDER BY node.rank DESC';
+        var ipqueryStr = 'MATCH (node:IPAddress) RETURN node ORDER BY node.rank DESC';
+        pagerankQuery(userqueryStr, "User", rankpageUser);
+        pagerankQuery(ipqueryStr, "Host", rankpageHost);
+        logdeleteCheck();
+        loaddate();
+      })
+      .catch(err => console.error(err));
 
     var loading = document.getElementById('loading');
     loading.classList.add('loaded');
@@ -510,7 +544,14 @@
     if (caseName.indexOf("neo4j") != -1) {
       document.getElementById("caseStatus").innerHTML = '<button type="button" class="btn btn-secondary" disabled>case: default</button>';
     } else {
-      document.getElementById("caseStatus").innerHTML = '<button type="button" class="btn btn-secondary" disabled>case: ' + caseName + '</button>';
+      var caseBtn = document.createElement('button');
+      caseBtn.type = 'button';
+      caseBtn.className = 'btn btn-secondary';
+      caseBtn.disabled = true;
+      caseBtn.textContent = 'case: ' + caseName;
+      var caseElem = document.getElementById("caseStatus");
+      caseElem.textContent = '';
+      caseElem.appendChild(caseBtn);
     }
 
     $('input[id=lefile]').change(function() {
@@ -526,6 +567,77 @@
 
     $(function() {
       $('[data-bs-toggle="tooltip"]').tooltip();
+      
+      // Initialize AI Assistant when page loads
+      if (typeof aiAssistant !== 'undefined') {
+        // Check AI status and show buttons if enabled
+        aiAssistant.checkAIStatus();
+      }
+
+      // Check for search parameters from Sigma view (searchType, searchValue)
+      const urlParams = new URLSearchParams(window.location.search);
+      const searchType = urlParams.get('searchType');
+      let searchValue = urlParams.get('searchValue');
+      
+      if (searchType && searchValue) {
+        const allowedSearchTypes = ['Username', 'Hostname', 'IPAddress'];
+        if (!allowedSearchTypes.includes(searchType)) {
+          console.warn('Invalid searchType parameter');
+          return;
+        }
+        
+        const maxLength = 256;
+        const allowedPattern = /^[a-zA-Z0-9\-_\.@]+$/;
+        
+        if (searchValue.length > maxLength) {
+          console.warn('searchValue exceeds maximum length');
+          return;
+        }
+        
+        if (!allowedPattern.test(searchValue)) {
+          console.warn('searchValue contains invalid characters');
+          return;
+        }
+        
+        if (searchType === 'Username') {
+          searchValue = searchValue.toLowerCase();
+          const atIndex = searchValue.indexOf('@');
+          if (atIndex !== -1) {
+            searchValue = searchValue.substring(0, atIndex);
+          }
+        }
+        
+        if (searchType === 'Hostname') {
+          searchValue = searchValue.toLowerCase();
+          const dotIndex = searchValue.indexOf('.');
+          if (dotIndex !== -1) {
+            searchValue = searchValue.substring(0, dotIndex);
+          }
+        }
+        
+        // Additional validation after normalization
+        if (!searchValue || searchValue.length === 0) {
+          console.warn('searchValue is empty after normalization');
+          return;
+        }
+        
+        // Set the search type dropdown
+        const inputSelect = document.getElementById('InputSelect');
+        if (inputSelect) {
+          inputSelect.value = searchType;
+        }
+        
+        // Set the search value
+        const queryInput = document.getElementById('query-input');
+        if (queryInput) {
+          queryInput.value = searchValue;
+        }
+        
+        // Execute search after a short delay to ensure page is fully loaded
+        setTimeout(function() {
+          createQuery();
+        }, 500);
+      }
     })
 
     $(function() {

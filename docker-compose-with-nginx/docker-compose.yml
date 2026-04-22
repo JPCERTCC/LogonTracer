@@ -1,8 +1,8 @@
 services:
   neo4j:
     container_name: neo4j
-    # image: neo4j:4.4.45-enterprise
-    image: neo4j:4.4.45
+    # image: neo4j:5.26.19-enterprise
+    image: neo4j:5.26.19
     volumes:
       - ./neo4j/certificates:/var/lib/neo4j/certificates
     # Using volumes slows down the container.
@@ -30,7 +30,7 @@ services:
       # - NEO4j_dbms_memory_pagecache_size=20G
       # set default neo4j password
       - NEO4J_AUTH=neo4j/password
-      # Accept the Neo4j license agreement for Enterprise Edition
+      # if you use neo4j enterprise
       # - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
     networks:
       - neo4j-network

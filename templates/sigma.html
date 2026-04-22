@@ -1,0 +1,1517 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="utf-8">
+  <title>LogonTracer - Sigma Detection Results</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/css/bootstrap5-toggle.min.css" integrity="sha384-0lIa81VMKhT4lTphDk5USICv1KjOG1vgvk17vDiZGAw4RjRa47eHhKL/Xk+TJ2N+" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.11.2/css/all.css" integrity="sha384-KA6wR/X5RY4zFAHpv/CnoG2UW1uogYfdnP67Uv7eULvTveboZJg0qUpmJZb5VqzN" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.min.css">
+  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/3.0.2/css/buttons.bootstrap5.min.css">
+  <link rel="stylesheet" href="static/css/style.css">
+  <link rel="stylesheet" href="static/css/dark-mode.css">
+  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/js/bootstrap5-toggle.jquery.min.js" integrity="sha384-1B+pGsGQhuc6J3yvEqAHys/XCGuY3SN/trNbr1zMw6UFqp+aa5/r1TSBMmvA+QGa" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js" integrity="sha384-7qAoOXltbVP82dhxHAUje59V5r2YsVfBafyUDxEdApLPmcdhBPg1DKg1ERo0BZlK" crossorigin="anonymous"></script>
+  <script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
+  <script src="https://cdn.datatables.net/2.0.8/js/dataTables.bootstrap5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/3.0.2/js/dataTables.buttons.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/3.0.2/js/buttons.bootstrap5.min.js"></script>
+  <script src="https://cdn.datatables.net/buttons/3.0.2/js/buttons.html5.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js"></script>
+  <style>
+    .level-critical { background-color: #dc3545 !important; color: white; }
+    .level-high { background-color: #fd7e14 !important; color: white; }
+    .level-medium { background-color: #ffc107 !important; color: black; }
+    .level-low { background-color: #0dcaf0 !important; color: black; }
+    .level-informational { background-color: #6c757d !important; color: white; }
+    
+    .badge-level {
+      font-size: 0.75rem;
+      padding: 0.35em 0.65em;
+      border-radius: 0.25rem;
+      font-weight: 600;
+    }
+    
+    .table-hover tbody tr:hover {
+      background-color: rgba(0, 123, 255, 0.1);
+    }
+    
+    .stats-card {
+      border-radius: 10px;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+      transition: transform 0.2s;
+    }
+    
+    .stats-card:hover {
+      transform: translateY(-2px);
+    }
+    
+    .stats-number {
+      font-size: 2rem;
+      font-weight: bold;
+    }
+    
+    .event-details {
+      font-family: 'Consolas', 'Monaco', monospace;
+      font-size: 0.85rem;
+      max-height: 400px;
+      overflow-y: auto;
+    }
+    
+    .filter-btn.active {
+      box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+    }
+    
+    #loadingOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 9999;
+    }
+    
+    .dark-mode .stats-card {
+      background-color: #2d2d2d;
+      border-color: #444;
+    }
+    
+    .dark-mode .table {
+      color: #e0e0e0;
+    }
+    
+    .dark-mode .modal-content {
+      background-color: #2d2d2d;
+      color: #e0e0e0;
+    }
+
+    /* Graph link styles */
+    .graph-link {
+      color: #0d6efd;
+      text-decoration: none;
+      cursor: pointer;
+    }
+    
+    .graph-link:hover {
+      color: #0a58ca;
+      text-decoration: underline;
+    }
+    
+    .dark-mode .graph-link {
+      color: #6ea8fe;
+    }
+    
+    .dark-mode .graph-link:hover {
+      color: #9ec5fe;
+    }
+
+    /* Dark mode for data-theme attribute (used by dark-mode-switch.min.js) */
+    [data-theme="dark"] .stats-card {
+      background-color: #2d2d2d;
+      border-color: #444;
+    }
+    
+    [data-theme="dark"] .card {
+      background-color: #2d2d2d;
+      border-color: #444;
+    }
+    
+    [data-theme="dark"] .card-body {
+      background-color: #2d2d2d;
+    }
+    
+    [data-theme="dark"] .card-header {
+      background-color: #3a3a3a !important;
+      border-color: #555;
+    }
+    
+    [data-theme="dark"] .table {
+      color: #e0e0e0;
+      background-color: #2d2d2d;
+    }
+    
+    [data-theme="dark"] .table-striped > tbody > tr:nth-of-type(odd) > * {
+      background-color: #353535;
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .table-striped > tbody > tr:nth-of-type(even) > * {
+      background-color: #2d2d2d;
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .table-hover > tbody > tr:hover > * {
+      background-color: #444 !important;
+      color: #fff;
+    }
+    
+    [data-theme="dark"] .table-dark {
+      background-color: #1a1a1a;
+    }
+    
+    [data-theme="dark"] thead.table-dark th {
+      background-color: #1a1a1a;
+      border-color: #555;
+    }
+    
+    [data-theme="dark"] .table td,
+    [data-theme="dark"] .table th {
+      border-color: #444;
+    }
+    
+    [data-theme="dark"] .modal-content {
+      background-color: #2d2d2d;
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .event-details {
+      background-color: #1a1a1a !important;
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .event-details .table-light th {
+      background-color: #353535;
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .graph-link {
+      color: #6ea8fe;
+    }
+    
+    [data-theme="dark"] .graph-link:hover {
+      color: #9ec5fe;
+    }
+    
+    /* DataTables dark mode */
+    [data-theme="dark"] .dataTables_wrapper {
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .dataTables_wrapper .dataTables_length,
+    [data-theme="dark"] .dataTables_wrapper .dataTables_filter,
+    [data-theme="dark"] .dataTables_wrapper .dataTables_info,
+    [data-theme="dark"] .dataTables_wrapper .dataTables_paginate {
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .dataTables_wrapper .dataTables_length select,
+    [data-theme="dark"] .dataTables_wrapper .dataTables_filter input {
+      background-color: #3a3a3a;
+      color: #e0e0e0;
+      border-color: #555;
+    }
+    
+    [data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button {
+      color: #e0e0e0 !important;
+      background-color: #3a3a3a;
+      border-color: #555;
+    }
+    
+    [data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button:hover {
+      background-color: #4a4a4a !important;
+      color: #fff !important;
+      border-color: #666;
+    }
+    
+    [data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.current {
+      background-color: #0d6efd !important;
+      color: #fff !important;
+      border-color: #0d6efd;
+    }
+    
+    [data-theme="dark"] .dataTables_wrapper .dataTables_paginate .paginate_button.disabled {
+      color: #666 !important;
+    }
+    
+    [data-theme="dark"] .page-link {
+      background-color: #3a3a3a;
+      color: #e0e0e0;
+      border-color: #555;
+    }
+    
+    [data-theme="dark"] .page-link:hover {
+      background-color: #4a4a4a;
+      color: #fff;
+    }
+    
+    [data-theme="dark"] .page-item.active .page-link {
+      background-color: #0d6efd;
+      border-color: #0d6efd;
+    }
+    
+    [data-theme="dark"] .page-item.disabled .page-link {
+      background-color: #2d2d2d;
+      color: #666;
+    }
+    
+    /* Modal dark mode improvements */
+    [data-theme="dark"] .modal-body {
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .modal-body .text-muted {
+      color: #aaa !important;
+    }
+    
+    [data-theme="dark"] .modal-body .form-label {
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .modal-body .form-text {
+      color: #aaa;
+    }
+    
+    [data-theme="dark"] .modal-body .form-select,
+    [data-theme="dark"] .modal-body .form-control {
+      background-color: #3a3a3a;
+      color: #e0e0e0;
+      border-color: #555;
+    }
+    
+    [data-theme="dark"] .modal-body .form-check-label {
+      color: #e0e0e0;
+    }
+    
+    [data-theme="dark"] .modal-body .border {
+      border-color: #555 !important;
+    }
+    
+    [data-theme="dark"] .modal-body .alert-warning {
+      background-color: #664d03;
+      border-color: #997404;
+      color: #ffda6a;
+    }
+    
+    [data-theme="dark"] .modal-body .alert-success {
+      background-color: #1e4620;
+      border-color: #2d6a2f;
+      color: #a3d9a5;
+    }
+    
+    [data-theme="dark"] .modal-body .alert-danger {
+      background-color: #5a1a1a;
+      border-color: #842029;
+      color: #f5c2c7;
+    }
+    
+    [data-theme="dark"] .modal-footer {
+      border-color: #444;
+    }
+    
+    [data-theme="dark"] .modal-header {
+      border-color: #444;
+    }
+    
+    /* Filter tag styles */
+    .filter-tag {
+      transition: opacity 0.2s;
+    }
+    
+    .filter-tag:hover {
+      opacity: 0.8;
+    }
+    
+    /* Navbar improvements */
+    .navbar .dropdown-menu {
+      min-width: 220px;
+    }
+    
+    .navbar .form-check-label .badge {
+      font-size: 0.85rem;
+      min-width: 80px;
+    }
+    
+    /* Active filters container */
+    #activeFiltersContainer {
+      gap: 0.25rem;
+    }
+  </style>
+</head>
+
+<body>
+  <nav class="navbar navbar-expand-lg navbar-light bg-light p-1 shadow">
+    <a class="navbar-brand" href="/"><img class="my_svg" src="static/images/logo_top.svg" alt="top" width="190"></a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sigmaNavbar" aria-controls="sigmaNavbar" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="sigmaNavbar">
+      <ul class="navbar-nav me-auto">
+        <!-- Case Status -->
+        <li class="nav-item">
+          <span id="caseStatus" class="nav-link"></span>
+        </li>
+        
+        <!-- Filter Dropdown -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="filterDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-filter"></i> Filter by Level
+          </a>
+          <ul class="dropdown-menu" aria-labelledby="filterDropdown">
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check">
+                  <input class="form-check-input filter-checkbox" type="checkbox" value="critical" id="filterCritical">
+                  <label class="form-check-label" for="filterCritical">
+                    <span class="badge level-critical">Critical</span>
+                  </label>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check">
+                  <input class="form-check-input filter-checkbox" type="checkbox" value="high" id="filterHigh">
+                  <label class="form-check-label" for="filterHigh">
+                    <span class="badge level-high">High</span>
+                  </label>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check">
+                  <input class="form-check-input filter-checkbox" type="checkbox" value="medium" id="filterMedium">
+                  <label class="form-check-label" for="filterMedium">
+                    <span class="badge level-medium">Medium</span>
+                  </label>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check">
+                  <input class="form-check-input filter-checkbox" type="checkbox" value="low" id="filterLow">
+                  <label class="form-check-label" for="filterLow">
+                    <span class="badge level-low">Low</span>
+                  </label>
+                </div>
+              </div>
+            </li>
+            <li>
+              <div class="dropdown-item">
+                <div class="form-check">
+                  <input class="form-check-input filter-checkbox" type="checkbox" value="informational" id="filterInfo">
+                  <label class="form-check-label" for="filterInfo">
+                    <span class="badge level-informational">Info</span>
+                  </label>
+                </div>
+              </div>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item text-primary" href="#" onclick="clearFilters(); return false;">
+                <i class="fas fa-times-circle me-1"></i> Clear All Filters
+              </a>
+            </li>
+          </ul>
+        </li>
+        
+        <!-- Active Filters Display -->
+        <li class="nav-item d-flex align-items-center ms-2" id="activeFiltersContainer" style="display: none !important;">
+          <span id="activeFilters" class="d-flex gap-1"></span>
+        </li>
+      </ul>
+      
+      <!-- Right side buttons -->
+      <ul class="navbar-nav">
+        <!-- Actions Dropdown -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="actionsDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-cog"></i> Actions
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="actionsDropdown">
+            <li>
+              <a class="dropdown-item" href="#" onclick="refreshData(); return false;">
+                <i class="fas fa-sync-alt me-2 text-success"></i> Refresh Data
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#rescanModal">
+                <i class="fas fa-search me-2 text-danger"></i> Rescan with Rules
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header">Export All Data</h6></li>
+            <li>
+              <a class="dropdown-item" href="#" onclick="exportToCSV(); return false;">
+                <i class="fas fa-file-csv me-2"></i> CSV (All)
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" onclick="exportToJSON(); return false;">
+                <i class="fas fa-file-code me-2"></i> JSON (All)
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li><h6 class="dropdown-header">Export Filtered Data</h6></li>
+            <li>
+              <a class="dropdown-item" href="#" onclick="exportFilteredToCSV(); return false;">
+                <i class="fas fa-filter me-2"></i> CSV (Filtered)
+              </a>
+            </li>
+            <li>
+              <a class="dropdown-item" href="#" onclick="exportFilteredToJSON(); return false;">
+                <i class="fas fa-filter me-2"></i> JSON (Filtered)
+              </a>
+            </li>
+            <li><hr class="dropdown-divider"></li>
+            <li>
+              <a class="dropdown-item" href="/sigma" download="sigma_results.json">
+                <i class="fas fa-download me-2"></i> Download Raw JSON
+              </a>
+            </li>
+          </ul>
+        </li>
+        
+        <!-- Dark Mode Toggle -->
+        <li class="nav-item d-flex align-items-center ms-2" data-bs-toggle="tooltip" data-bs-placement="bottom" title="Toggle dark mode display">
+          <label class="me-2" for="darkSwitch"><i class="fas fa-moon"></i></label>
+          <div class="form-check form-switch mb-0">
+            <input class="form-check-input" type="checkbox" id="darkSwitch">
+          </div>
+        </li>
+        
+        <!-- Settings Dropdown -->
+        <li class="nav-item dropdown">
+          <a class="nav-link dropdown-toggle" href="#" id="navbarDropdownMenuLink" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <i class="fas fa-user-cog"></i> Settings
+          </a>
+          <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdownMenuLink">
+            <li><h6 class="dropdown-header">User Menu</h6></li>
+            <li><a class="dropdown-item" href="setting">Change Password</a></li>
+            <li><a class="dropdown-item" href="changecase">Change Case</a></li>
+            <div class="dropdown-divider"></div>
+            <li><h6 class="dropdown-header">Admin Menu</h6></li>
+            <li class="dropstart drop-hover">
+              <a class="dropdown-item dropdown-toggle" href="#">User Management</a>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="signup">Add User</a></li>
+                <li><a class="dropdown-item" href="usermng">Delete User</a></li>
+              </ul>
+            </li>
+            <li class="dropstart drop-hover">
+              <a class="dropdown-item dropdown-toggle" href="#">Case Management</a>
+              <ul class="dropdown-menu">
+                <li><a class="dropdown-item" href="addcase">Add New Case</a></li>
+                <li><a class="dropdown-item" href="delcase">Delete Case</a></li>
+                <li><a class="dropdown-item" href="casemng">Add Access to Case</a></li>
+                <li><a class="dropdown-item" href="delcasemng">Delete Access to Case</a></li>
+              </ul>
+            </li>
+            <div class="dropdown-divider"></div>
+            <li><h6 class="dropdown-header">User: {{ neo4j_user }}</h6></li>
+            <li><a class="dropdown-item" href="logout">Logout</a></li>
+          </ul>
+        </li>
+      </ul>
+      <script src="static/js/dark-mode-switch.min.js"></script>
+    </div>
+  </nav>
+
+  <!-- Loading Overlay -->
+  <div id="loadingOverlay" style="display: none;">
+    <div class="spinner-border text-light" role="status" style="width: 3rem; height: 3rem;">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+
+  <div class="container-fluid mt-4">
+    <!-- Statistics Cards -->
+    <div class="row mb-4" id="statsRow">
+      <div class="col-md-2">
+        <div class="card stats-card text-center">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Total Detections</h6>
+            <p class="stats-number text-primary" id="statTotal">-</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card stats-card text-center">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Critical</h6>
+            <p class="stats-number text-danger" id="statCritical">-</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card stats-card text-center">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">High</h6>
+            <p class="stats-number" style="color: #fd7e14;" id="statHigh">-</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card stats-card text-center">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Medium</h6>
+            <p class="stats-number text-warning" id="statMedium">-</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card stats-card text-center">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Low</h6>
+            <p class="stats-number text-info" id="statLow">-</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-md-2">
+        <div class="card stats-card text-center">
+          <div class="card-body">
+            <h6 class="card-subtitle mb-2 text-muted">Informational</h6>
+            <p class="stats-number text-secondary" id="statInfo">-</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Detection Results Table -->
+    <div class="row">
+      <div class="col-12">
+        <div class="card shadow">
+          <div class="card-header bg-primary text-white">
+            <h5 class="mb-0"><i class="fas fa-shield-alt me-2"></i>Sigma Detection Results</h5>
+          </div>
+          <div class="card-body">
+            <table id="sigmaTable" class="table table-striped table-hover" style="width:100%">
+              <thead class="table-dark">
+                <tr>
+                  <th>Timestamp</th>
+                  <th>Level</th>
+                  <th>Rule Title</th>
+                  <th>EventID</th>
+                  <th>Computer</th>
+                  <th>User</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Event Details Modal -->
+  <div class="modal fade" id="eventDetailsModal" tabindex="-1" aria-labelledby="eventDetailsModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-xl">
+      <div class="modal-content">
+        <div class="modal-header bg-primary text-white">
+          <h5 class="modal-title" id="eventDetailsModalLabel">
+            <i class="fas fa-info-circle me-2"></i>Event Details
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <div class="row">
+            <div class="col-md-6">
+              <h6 class="border-bottom pb-2"><i class="fas fa-exclamation-triangle me-2"></i>Sigma Rule Information</h6>
+              <table class="table table-sm">
+                <tr><th width="30%">Title</th><td id="modalRuleTitle"></td></tr>
+                <tr><th>Level</th><td id="modalRuleLevel"></td></tr>
+                <tr><th>Description</th><td id="modalRuleDescription"></td></tr>
+              </table>
+            </div>
+            <div class="col-md-6">
+              <h6 class="border-bottom pb-2"><i class="fas fa-desktop me-2"></i>System Information</h6>
+              <table class="table table-sm">
+                <tr><th width="30%">EventID</th><td id="modalEventID"></td></tr>
+                <tr><th>Timestamp</th><td id="modalTimestamp"></td></tr>
+                <tr><th>Computer</th><td id="modalComputer"></td></tr>
+                <tr><th>Channel</th><td id="modalChannel"></td></tr>
+              </table>
+            </div>
+          </div>
+          <div class="row mt-3">
+            <div class="col-12">
+              <h6 class="border-bottom pb-2"><i class="fas fa-database me-2"></i>Event Data</h6>
+              <div class="event-details bg-light p-3 rounded" id="modalEventData">
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+          <button type="button" class="btn btn-primary" onclick="copyEventToClipboard()">
+            <i class="fas fa-copy me-1"></i>Copy to Clipboard
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Sigma Rescan Modal -->
+  <div class="modal fade" id="rescanModal" tabindex="-1" aria-labelledby="rescanModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+      <div class="modal-content">
+        <div class="modal-header bg-danger text-white">
+          <h5 class="modal-title" id="rescanModalLabel">
+            <i class="fas fa-search me-2"></i>Sigma Rescan
+          </h5>
+          <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+        <div class="modal-body">
+          <p class="text-muted mb-3">
+            Scan EVTX files with Sigma rules. Select the files to scan and the rules folder.
+          </p>
+          
+          <!-- EVTX File Selection -->
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="fas fa-file me-1"></i>EVTX Files to Scan
+            </label>
+            <div class="border rounded p-2" style="max-height: 200px; overflow-y: auto;">
+              <div id="evtxFileList">
+                <div class="text-muted">Loading files...</div>
+              </div>
+            </div>
+            <div class="form-text">
+              Select EVTX files from the upload folder. If none selected, all files will be scanned.
+            </div>
+          </div>
+          
+          <!-- Sigma Rules Selection -->
+          <div class="mb-3">
+            <label for="rulesPathSelect" class="form-label">
+              <i class="fas fa-folder me-1"></i>Sigma Rules Folder (Server)
+            </label>
+            <select class="form-select" id="rulesPathSelect">
+              <option value="sigma">Loading...</option>
+            </select>
+            <div class="form-text">
+              Select a folder from the server's sigma directory
+            </div>
+          </div>
+          
+          <div class="mb-3">
+            <label class="form-label">
+              <i class="fas fa-upload me-1"></i>Or upload your Sigma rules
+            </label>
+            <div class="input-group">
+              <input type="file" class="form-control" id="sigmaFileUpload" multiple accept=".yml,.yaml">
+              <button class="btn btn-outline-danger" type="button" onclick="clearUploadedFiles()">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="form-text">
+              Select Sigma rule files (.yml or .yaml) to upload and scan
+            </div>
+            <div id="uploadedFilesInfo" class="mt-2" style="display: none;">
+              <small class="text-success"><i class="fas fa-check-circle me-1"></i><span id="uploadedFileCount">0</span> Sigma rule file(s) selected</small>
+            </div>
+          </div>
+          
+          <div class="alert alert-warning mb-0">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            <strong>Note:</strong> This will replace the current scan results. Large files may take several minutes.
+          </div>
+          
+          <div id="rescanProgress" class="mt-3" style="display: none;">
+            <div class="progress">
+              <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 100%"></div>
+            </div>
+            <p class="text-center mt-2 mb-0" id="rescanStatus">Scanning...</p>
+          </div>
+          
+          <div id="rescanResult" class="mt-3" style="display: none;">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+          <button type="button" class="btn btn-danger" id="rescanBtn" onclick="performRescan()">
+            <i class="fas fa-search me-1"></i>Start Rescan
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // CSRF token helper
+    function getCsrfToken() {
+      return document.cookie.split(';')
+        .map(c => c.trim())
+        .find(c => c.startsWith('csrf_token='))
+        ?.split('=')[1] || '';
+    }
+
+    // Attach CSRF token to all jQuery AJAX POST/PUT/PATCH/DELETE requests
+    $.ajaxSetup({
+      beforeSend: function(xhr, settings) {
+        if (!/^(GET|HEAD|OPTIONS|TRACE)$/i.test(settings.type)) {
+          xhr.setRequestHeader('X-CSRFToken', getCsrfToken());
+        }
+      }
+    });
+
+    // Global variables
+    let sigmaData = [];
+    let dataTable = null;
+    let currentEventData = null;
+    var caseName = '{{ case_name }}';
+
+    // Initialize on page load
+    $(document).ready(function() {
+      // Set case status
+      if (caseName.indexOf("neo4j") != -1) {
+        document.getElementById("caseStatus").innerHTML = '<button type="button" class="btn btn-secondary" disabled>case: default</button>';
+      } else {
+        var caseBtn = document.createElement('button');
+        caseBtn.type = 'button';
+        caseBtn.className = 'btn btn-secondary';
+        caseBtn.disabled = true;
+        caseBtn.textContent = 'case: ' + caseName;
+        var caseElem = document.getElementById("caseStatus");
+        caseElem.textContent = '';
+        caseElem.appendChild(caseBtn);
+      }
+
+      // Load Sigma data
+      loadSigmaData();
+
+      // Setup filter checkboxes
+      $('.filter-checkbox').change(function() {
+        applyFilters();
+        updateActiveFiltersDisplay();
+      });
+      
+      // Prevent dropdown from closing when clicking checkboxes
+      $('.dropdown-item').on('click', function(e) {
+        if ($(this).find('.form-check').length > 0) {
+          e.stopPropagation();
+        }
+      });
+
+      // SVG conversion
+      deSVG('.my_svg', true);
+    });
+    
+    // Update the active filters display in navbar
+    function updateActiveFiltersDisplay() {
+      const activeFilters = [];
+      $('.filter-checkbox:checked').each(function() {
+        const level = $(this).val();
+        const levelClass = 'level-' + level;
+        activeFilters.push(`<span class="badge ${levelClass} filter-tag" onclick="removeFilter('${level}')" style="cursor: pointer;" title="Click to remove">${level} <i class="fas fa-times ms-1"></i></span>`);
+      });
+      
+      if (activeFilters.length > 0) {
+        $('#activeFiltersContainer').show().css('display', 'flex !important');
+        $('#activeFilters').html(activeFilters.join(''));
+      } else {
+        $('#activeFiltersContainer').hide();
+        $('#activeFilters').html('');
+      }
+    }
+    
+    // Remove a specific filter
+    function removeFilter(level) {
+      $(`#filter${level.charAt(0).toUpperCase() + level.slice(1)}`).prop('checked', false);
+      applyFilters();
+      updateActiveFiltersDisplay();
+    }
+
+    // Load Sigma detection results
+    function loadSigmaData() {
+      $('#loadingOverlay').show();
+      
+      $.ajax({
+        url: '/sigma',
+        method: 'GET',
+        dataType: 'json',
+        success: function(data) {
+          sigmaData = data;
+          updateStatistics();
+          initializeDataTable();
+          $('#loadingOverlay').hide();
+        },
+        error: function(xhr, status, error) {
+          console.error('Error loading Sigma data:', error);
+          $('#loadingOverlay').hide();
+          alert('Failed to load Sigma detection results. Please ensure the EVTX file has been processed with --sigma option.');
+        }
+      });
+    }
+
+    // Update statistics cards
+    function updateStatistics() {
+      const stats = {
+        total: sigmaData.length,
+        critical: 0,
+        high: 0,
+        medium: 0,
+        low: 0,
+        informational: 0
+      };
+
+      sigmaData.forEach(item => {
+        const level = item.sigma_level.toLowerCase();
+        if (stats.hasOwnProperty(level)) {
+          stats[level]++;
+        }
+      });
+
+      $('#statTotal').text(stats.total.toLocaleString());
+      $('#statCritical').text(stats.critical.toLocaleString());
+      $('#statHigh').text(stats.high.toLocaleString());
+      $('#statMedium').text(stats.medium.toLocaleString());
+      $('#statLow').text(stats.low.toLocaleString());
+      $('#statInfo').text(stats.informational.toLocaleString());
+    }
+
+    // Build searchable text from all event fields
+    function buildSearchableText(item) {
+      const parts = [];
+      
+      // Add sigma fields
+      parts.push(item.timestamp || '');
+      parts.push(item.sigma_level || '');
+      parts.push(item.sigma_title || '');
+      parts.push(item.sigma_description || '');
+      
+      // Add System fields
+      const systemData = item.event?.System || {};
+      Object.values(systemData).forEach(v => {
+        if (v) parts.push(String(v));
+      });
+      
+      // Add all EventData fields
+      const eventDataFields = item.event?.EventData || {};
+      Object.entries(eventDataFields).forEach(([key, value]) => {
+        if (value) {
+          parts.push(key + ':' + String(value));
+          parts.push(String(value));
+        }
+      });
+      
+      return parts.join(' ').toLowerCase();
+    }
+
+    // Initialize DataTable
+    function initializeDataTable() {
+      if (dataTable) {
+        dataTable.destroy();
+      }
+
+      const tableData = sigmaData.map((item, index) => {
+        const eventData = item.event || {};
+        const systemData = eventData.System || {};
+        const eventDataFields = eventData.EventData || {};
+        
+        // Extract user information
+        let userName = eventDataFields.TargetUserName || 
+                       eventDataFields.SubjectUserName || 
+                       eventDataFields.AccountName ||
+                       '-';
+
+        // Build searchable text including all EventData fields
+        const searchText = buildSearchableText(item);
+
+        return [
+          item.timestamp,
+          item.sigma_level,
+          item.sigma_title,
+          systemData.EventID || '-',
+          systemData.Computer || '-',
+          userName,
+          index,      // Store index for details lookup
+          searchText  // Hidden column for full-text search
+        ];
+      });
+
+      dataTable = $('#sigmaTable').DataTable({
+        data: tableData,
+        columns: [
+          { title: 'Timestamp', width: '140px' },
+          { 
+            title: 'Level', 
+            width: '100px',
+            render: function(data, type, row) {
+              if (type === 'display') {
+                const levelClass = 'level-' + data.toLowerCase();
+                return '<span class="badge badge-level ' + levelClass + '">' + data.toUpperCase() + '</span>';
+              }
+              return data;
+            }
+          },
+          { title: 'Rule Title' },
+          { title: 'EventID', width: '80px' },
+          { 
+            title: 'Computer', 
+            width: '180px',
+            render: function(data, type, row) {
+              if (type === 'display' && data && data !== '-') {
+                return '<a href="#" class="graph-link" onclick="openGraphView(\'Hostname\', \'' + escapeHtml(data) + '\'); return false;" title="View in Graph">' + escapeHtml(data) + '</a>';
+              }
+              return data;
+            }
+          },
+          { 
+            title: 'User', 
+            width: '150px',
+            render: function(data, type, row) {
+              if (type === 'display' && data && data !== '-') {
+                return '<a href="#" class="graph-link" onclick="openGraphView(\'Username\', \'' + escapeHtml(data) + '\'); return false;" title="View in Graph">' + escapeHtml(data) + '</a>';
+              }
+              return data;
+            }
+          },
+          { 
+            title: 'Details', 
+            width: '80px',
+            orderable: false,
+            render: function(data, type, row) {
+              return '<button class="btn btn-sm btn-outline-primary" onclick="showEventDetails(' + data + ')"><i class="fas fa-search"></i></button>';
+            }
+          },
+          { 
+            // Hidden column for full-text search (includes all EventData)
+            visible: false,
+            searchable: true
+          }
+        ],
+        order: [[0, 'desc']],
+        pageLength: 25,
+        lengthMenu: [[10, 25, 50, 100, -1], [10, 25, 50, 100, "All"]],
+        dom: '<"row"<"col-sm-12 col-md-6"l><"col-sm-12 col-md-6"f>>' +
+             '<"row"<"col-sm-12"tr>>' +
+             '<"row"<"col-sm-12 col-md-5"i><"col-sm-12 col-md-7"p>>',
+        language: {
+          search: "Search:",
+          lengthMenu: "Show _MENU_ entries",
+          info: "Showing _START_ to _END_ of _TOTAL_ detections",
+          paginate: {
+            first: "First",
+            last: "Last",
+            next: "Next",
+            previous: "Previous"
+          }
+        }
+      });
+    }
+
+    // Show event details in modal
+    function showEventDetails(index) {
+      const item = sigmaData[index];
+      currentEventData = item;
+      
+      const eventData = item.event || {};
+      const systemData = eventData.System || {};
+      const eventDataFields = eventData.EventData || {};
+
+      // Populate modal
+      $('#modalRuleTitle').text(item.sigma_title);
+      $('#modalRuleLevel').html('<span class="badge badge-level level-' + item.sigma_level.toLowerCase() + '">' + item.sigma_level.toUpperCase() + '</span>');
+      $('#modalRuleDescription').text(item.sigma_description || '-');
+      
+      $('#modalEventID').text(systemData.EventID || '-');
+      $('#modalTimestamp').text(systemData.TimeCreated || item.timestamp);
+      
+      // Make Computer clickable in modal
+      const computerName = systemData.Computer || '-';
+      if (computerName && computerName !== '-') {
+        $('#modalComputer').html('<a href="#" class="graph-link" onclick="openGraphView(\'Hostname\', \'' + escapeHtml(computerName) + '\'); return false;" title="View in Graph">' + escapeHtml(computerName) + '</a>');
+      } else {
+        $('#modalComputer').text('-');
+      }
+      
+      $('#modalChannel').text(systemData.Channel || '-');
+
+      // User-related fields that should be clickable
+      const userFields = ['TargetUserName', 'SubjectUserName', 'AccountName', 'UserName', 'User'];
+      const computerFields = ['WorkstationName', 'SourceHostname', 'DestinationHostname', 'ComputerName'];
+      const ipFields = ['IpAddress', 'SourceAddress', 'DestinationAddress', 'SourceIp', 'DestinationIp'];
+
+      // Format event data as a table
+      let eventDataHtml = '<table class="table table-sm table-bordered mb-0">';
+      eventDataHtml += '<thead class="table-light"><tr><th width="30%">Field</th><th>Value</th></tr></thead><tbody>';
+      
+      for (const [key, value] of Object.entries(eventDataFields)) {
+        const escapedValue = escapeHtml(value || '-');
+        let valueHtml = escapedValue;
+        
+        // Make user fields clickable
+        if (userFields.includes(key) && value && value !== '-') {
+          valueHtml = '<a href="#" class="graph-link" onclick="openGraphView(\'Username\', \'' + escapeHtml(value) + '\'); return false;" title="View in Graph">' + escapedValue + '</a>';
+        }
+        // Make computer fields clickable
+        else if (computerFields.includes(key) && value && value !== '-') {
+          valueHtml = '<a href="#" class="graph-link" onclick="openGraphView(\'Hostname\', \'' + escapeHtml(value) + '\'); return false;" title="View in Graph">' + escapedValue + '</a>';
+        }
+        // Make IP fields clickable
+        else if (ipFields.includes(key) && value && value !== '-' && value !== '::1' && value !== '127.0.0.1') {
+          valueHtml = '<a href="#" class="graph-link" onclick="openGraphView(\'IPAddress\', \'' + escapeHtml(value) + '\'); return false;" title="View in Graph">' + escapedValue + '</a>';
+        }
+        
+        eventDataHtml += '<tr><td><strong>' + key + '</strong></td><td>' + valueHtml + '</td></tr>';
+      }
+      
+      eventDataHtml += '</tbody></table>';
+      $('#modalEventData').html(eventDataHtml);
+
+      // Show modal
+      new bootstrap.Modal(document.getElementById('eventDetailsModal')).show();
+    }
+
+    // Copy event to clipboard
+    function copyEventToClipboard() {
+      if (!currentEventData) return;
+      
+      const text = JSON.stringify(currentEventData, null, 2);
+      navigator.clipboard.writeText(text).then(function() {
+        alert('Event data copied to clipboard!');
+      }).catch(function(err) {
+        console.error('Failed to copy:', err);
+      });
+    }
+
+    // Apply level filters
+    function applyFilters() {
+      const activeFilters = [];
+      $('.filter-checkbox:checked').each(function() {
+        activeFilters.push($(this).val());
+      });
+
+      if (activeFilters.length === 0) {
+        dataTable.column(1).search('').draw();
+      } else {
+        const regex = activeFilters.join('|');
+        dataTable.column(1).search(regex, true, false).draw();
+      }
+    }
+
+    // Clear all filters
+    function clearFilters() {
+      $('.filter-checkbox').prop('checked', false);
+      dataTable.search('').columns().search('').draw();
+      updateActiveFiltersDisplay();
+    }
+
+    // Refresh data
+    function refreshData() {
+      loadSigmaData();
+    }
+
+    // Export functions
+    function exportToCSV() {
+      // Collect all unique EventData field names across all events
+      const allEventDataFields = new Set();
+      sigmaData.forEach(item => {
+        const eventDataFields = item.event?.EventData || {};
+        Object.keys(eventDataFields).forEach(key => allEventDataFields.add(key));
+      });
+      
+      // Sort field names for consistent column order
+      const eventDataFieldNames = Array.from(allEventDataFields).sort();
+      
+      // Build header row
+      const baseHeaders = ['Timestamp', 'Level', 'Rule Title', 'Description', 'EventID', 'Computer', 'Channel', 'TimeCreated'];
+      const headers = [...baseHeaders, ...eventDataFieldNames];
+      
+      // CSV content
+      let csv = headers.map(h => '"' + h + '"').join(',') + '\n';
+      
+      sigmaData.forEach(item => {
+        const systemData = item.event?.System || {};
+        const eventDataFields = item.event?.EventData || {};
+        
+        // Base columns
+        const baseValues = [
+          item.timestamp || '',
+          item.sigma_level || '',
+          (item.sigma_title || '').replace(/"/g, '""'),
+          (item.sigma_description || '').replace(/"/g, '""'),
+          systemData.EventID || '',
+          systemData.Computer || '',
+          systemData.Channel || '',
+          systemData.TimeCreated || ''
+        ];
+        
+        // EventData columns (in same order as header)
+        const eventDataValues = eventDataFieldNames.map(fieldName => {
+          const value = eventDataFields[fieldName] || '';
+          return (value + '').replace(/"/g, '""').replace(/\n/g, ' ').replace(/\r/g, '');
+        });
+        
+        // Combine and quote all values
+        const allValues = [...baseValues, ...eventDataValues];
+        const row = allValues.map(v => '"' + v + '"').join(',');
+        csv += row + '\n';
+      });
+
+      downloadFile(csv, 'sigma_detections_full.csv', 'text/csv');
+    }
+
+    function exportToJSON() {
+      // Export full data with all fields
+      const json = JSON.stringify(sigmaData, null, 2);
+      downloadFile(json, 'sigma_detections_full.json', 'application/json');
+    }
+
+    // Export filtered data only (what's currently visible in the table)
+    function exportFilteredToCSV() {
+      const filteredData = dataTable.rows({ search: 'applied' }).data().toArray();
+      
+      // Collect all unique EventData field names from filtered data
+      const allEventDataFields = new Set();
+      filteredData.forEach((row, idx) => {
+        const item = sigmaData[row[6]]; // row[6] is the index
+        const eventDataFields = item?.event?.EventData || {};
+        Object.keys(eventDataFields).forEach(key => allEventDataFields.add(key));
+      });
+      
+      const eventDataFieldNames = Array.from(allEventDataFields).sort();
+      const baseHeaders = ['Timestamp', 'Level', 'Rule Title', 'Description', 'EventID', 'Computer', 'Channel', 'TimeCreated'];
+      const headers = [...baseHeaders, ...eventDataFieldNames];
+      
+      let csv = headers.map(h => '"' + h + '"').join(',') + '\n';
+      
+      filteredData.forEach(row => {
+        const item = sigmaData[row[6]];
+        if (!item) return;
+        
+        const systemData = item.event?.System || {};
+        const eventDataFields = item.event?.EventData || {};
+        
+        const baseValues = [
+          item.timestamp || '',
+          item.sigma_level || '',
+          (item.sigma_title || '').replace(/"/g, '""'),
+          (item.sigma_description || '').replace(/"/g, '""'),
+          systemData.EventID || '',
+          systemData.Computer || '',
+          systemData.Channel || '',
+          systemData.TimeCreated || ''
+        ];
+        
+        const eventDataValues = eventDataFieldNames.map(fieldName => {
+          const value = eventDataFields[fieldName] || '';
+          return (value + '').replace(/"/g, '""').replace(/\n/g, ' ').replace(/\r/g, '');
+        });
+        
+        const allValues = [...baseValues, ...eventDataValues];
+        csv += allValues.map(v => '"' + v + '"').join(',') + '\n';
+      });
+
+      downloadFile(csv, 'sigma_detections_filtered.csv', 'text/csv');
+    }
+
+    function exportFilteredToJSON() {
+      const filteredData = dataTable.rows({ search: 'applied' }).data().toArray();
+      const filteredItems = filteredData.map(row => sigmaData[row[6]]).filter(item => item);
+      const json = JSON.stringify(filteredItems, null, 2);
+      downloadFile(json, 'sigma_detections_filtered.json', 'application/json');
+    }
+
+    function downloadFile(content, filename, mimeType) {
+      const blob = new Blob([content], { type: mimeType });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    }
+
+    // Load available Sigma rule folders when modal opens
+    $('#rescanModal').on('show.bs.modal', function() {
+      loadSigmaFolders();
+      loadEvtxFiles();
+      $('#rescanResult').hide();
+      $('#rescanProgress').hide();
+      $('#rescanBtn').prop('disabled', false);
+      clearUploadedFiles();
+    });
+
+    // Handle file input change for uploaded Sigma files
+    $('#sigmaFileUpload').on('change', function() {
+      const files = this.files;
+      if (files.length > 0) {
+        $('#uploadedFilesInfo').show();
+        $('#uploadedFileCount').text(files.length);
+        // When files are uploaded, clear server folder selection
+        $('#rulesPathSelect').val('');
+      } else {
+        $('#uploadedFilesInfo').hide();
+      }
+    });
+
+    // Clear uploaded files
+    function clearUploadedFiles() {
+      $('#sigmaFileUpload').val('');
+      $('#uploadedFilesInfo').hide();
+    }
+
+    function loadEvtxFiles() {
+      const container = $('#evtxFileList');
+      container.html('<div class="text-muted">Loading files...</div>');
+      
+      $.ajax({
+        url: '/sigma_files',
+        method: 'GET',
+        dataType: 'json',
+        success: function(files) {
+          container.empty();
+          
+          if (files.length === 0) {
+            container.html('<div class="text-warning"><i class="fas fa-exclamation-triangle me-1"></i>No EVTX files found in upload folder. Please upload files first.</div>');
+          } else {
+            // Select All checkbox
+            container.append(`
+              <div class="form-check mb-2 border-bottom pb-2">
+                <input class="form-check-input" type="checkbox" id="selectAllFiles" checked>
+                <label class="form-check-label fw-bold" for="selectAllFiles">
+                  Select All (${files.length} files)
+                </label>
+              </div>
+            `);
+            
+            files.forEach((file, index) => {
+              container.append(`
+                <div class="form-check">
+                  <input class="form-check-input evtx-file-checkbox" type="checkbox" value="${file.name}" id="evtxFile${index}" checked>
+                  <label class="form-check-label" for="evtxFile${index}">
+                    <i class="fas fa-file me-1"></i>${file.name} <small class="text-muted">(${file.size})</small>
+                  </label>
+                </div>
+              `);
+            });
+            
+            // Select All handler
+            $('#selectAllFiles').change(function() {
+              $('.evtx-file-checkbox').prop('checked', this.checked);
+            });
+            
+            // Update Select All when individual checkbox changes
+            $('.evtx-file-checkbox').change(function() {
+              const allChecked = $('.evtx-file-checkbox:checked').length === $('.evtx-file-checkbox').length;
+              $('#selectAllFiles').prop('checked', allChecked);
+            });
+          }
+        },
+        error: function() {
+          container.html('<div class="text-danger">Failed to load file list</div>');
+        }
+      });
+    }
+
+    function loadSigmaFolders() {
+      $.ajax({
+        url: '/sigma_folders',
+        method: 'GET',
+        dataType: 'json',
+        success: function(folders) {
+          const select = $('#rulesPathSelect');
+          select.empty();
+          
+          if (folders.length === 0) {
+            select.append('<option value="sigma">sigma (default)</option>');
+          } else {
+            folders.forEach(folder => {
+              select.append(`<option value="${folder.path}">${folder.name}</option>`);
+            });
+          }
+        },
+        error: function() {
+          $('#rulesPathSelect').html('<option value="sigma">sigma (default)</option>');
+        }
+      });
+    }
+
+    function performRescan() {
+      // Get selected EVTX files
+      const selectedFiles = [];
+      $('.evtx-file-checkbox:checked').each(function() {
+        selectedFiles.push($(this).val());
+      });
+      
+      // Check if files are uploaded
+      const uploadedFiles = $('#sigmaFileUpload')[0].files;
+      
+      if (uploadedFiles && uploadedFiles.length > 0) {
+        // Use uploaded files
+        performRescanWithUpload(selectedFiles, uploadedFiles);
+      } else {
+        // Use server folder
+        performRescanWithServerFolder(selectedFiles);
+      }
+    }
+
+    function performRescanWithServerFolder(selectedFiles) {
+      // Get rules path from server folder
+      const rulesPath = $('#rulesPathSelect').val();
+      
+      // Show progress
+      $('#rescanProgress').show();
+      $('#rescanResult').hide();
+      $('#rescanBtn').prop('disabled', true);
+      $('#rescanStatus').text(`Scanning ${selectedFiles.length || 'all'} file(s) with Sigma rules...`);
+      
+      $.ajax({
+        url: '/sigma_rescan',
+        method: 'POST',
+        contentType: 'application/json',
+        data: JSON.stringify({ 
+          rules_path: rulesPath,
+          evtx_files: selectedFiles.length > 0 ? selectedFiles : []
+        }),
+        success: function(result) {
+          $('#rescanProgress').hide();
+          $('#rescanBtn').prop('disabled', false);
+          
+          if (result.success) {
+            const fileList = result.file_names ? result.file_names.join(', ') : 'All files';
+            $('#rescanResult').html(`
+              <div class="alert alert-success">
+                <h6><i class="fas fa-check-circle me-1"></i>Rescan Completed</h6>
+                <ul class="mb-0">
+                  <li><strong>Rules Path:</strong> ${result.rules_path}</li>
+                  <li><strong>Files Scanned:</strong> ${result.files_scanned}</li>
+                  <li><strong>Files:</strong> <small>${fileList}</small></li>
+                  <li><strong>Detections:</strong> <span class="badge bg-danger">${result.detections.toLocaleString()}</span></li>
+                </ul>
+              </div>
+            `).show();
+            
+            // Reload data after a short delay
+            setTimeout(function() {
+              loadSigmaData();
+            }, 500);
+          } else {
+            $('#rescanResult').html(`
+              <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-1"></i>${result.error || 'Unknown error'}
+              </div>
+            `).show();
+          }
+        },
+        error: function(xhr) {
+          $('#rescanProgress').hide();
+          $('#rescanBtn').prop('disabled', false);
+          
+          let errorMsg = 'Failed to perform rescan';
+          try {
+            const resp = JSON.parse(xhr.responseText);
+            if (resp.error) errorMsg = resp.error;
+          } catch(e) {}
+          
+          $('#rescanResult').html(`
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-circle me-1"></i>${errorMsg}
+            </div>
+          `).show();
+        }
+      });
+    }
+
+    function performRescanWithUpload(selectedEvtxFiles, sigmaFiles) {
+      // Show progress
+      $('#rescanProgress').show();
+      $('#rescanResult').hide();
+      $('#rescanBtn').prop('disabled', true);
+      $('#rescanStatus').text(`Uploading ${sigmaFiles.length} Sigma rule file(s)...`);
+      
+      // Create FormData with uploaded Sigma files
+      const formData = new FormData();
+      
+      for (let i = 0; i < sigmaFiles.length; i++) {
+        formData.append('sigma_files', sigmaFiles[i]);
+      }
+      
+      // Add EVTX files selection
+      formData.append('evtx_files', JSON.stringify(selectedEvtxFiles));
+      
+      $.ajax({
+        url: '/sigma_rescan_with_upload',
+        method: 'POST',
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function(result) {
+          $('#rescanProgress').hide();
+          $('#rescanBtn').prop('disabled', false);
+          
+          if (result.success) {
+            const fileList = result.file_names ? result.file_names.join(', ') : 'All files';
+            $('#rescanResult').html(`
+              <div class="alert alert-success">
+                <h6><i class="fas fa-check-circle me-1"></i>Rescan Completed</h6>
+                <ul class="mb-0">
+                  <li><strong>Sigma Rules Uploaded:</strong> ${result.rules_uploaded || sigmaFiles.length}</li>
+                  <li><strong>Files Scanned:</strong> ${result.files_scanned}</li>
+                  <li><strong>Files:</strong> <small>${fileList}</small></li>
+                  <li><strong>Detections:</strong> <span class="badge bg-danger">${result.detections.toLocaleString()}</span></li>
+                </ul>
+              </div>
+            `).show();
+            
+            // Reload data after a short delay
+            setTimeout(function() {
+              loadSigmaData();
+            }, 500);
+            
+            // Clear uploaded files after successful scan
+            clearUploadedFiles();
+          } else {
+            $('#rescanResult').html(`
+              <div class="alert alert-danger">
+                <i class="fas fa-exclamation-circle me-1"></i>${result.error || 'Unknown error'}
+              </div>
+            `).show();
+          }
+        },
+        error: function(xhr) {
+          $('#rescanProgress').hide();
+          $('#rescanBtn').prop('disabled', false);
+          
+          let errorMsg = 'Failed to upload and scan with Sigma rules';
+          try {
+            const resp = JSON.parse(xhr.responseText);
+            if (resp.error) errorMsg = resp.error;
+          } catch(e) {}
+          
+          $('#rescanResult').html(`
+            <div class="alert alert-danger">
+              <i class="fas fa-exclamation-circle me-1"></i>${errorMsg}
+            </div>
+          `).show();
+        }
+      });
+    }
+
+    // Helper function to escape HTML
+    function escapeHtml(text) {
+      const div = document.createElement('div');
+      div.textContent = text;
+      return div.innerHTML;
+    }
+
+    // Open Graph View in index.html with search parameters
+    function openGraphView(type, value) {
+      // Encode parameters for URL
+      const params = new URLSearchParams();
+      params.set('searchType', type);
+      params.set('searchValue', value);
+      
+      // Open in new tab with search parameters
+      window.open('/' + '?'  + params.toString(), '_blank');
+    }
+  </script>
+</body>
+
+</html>

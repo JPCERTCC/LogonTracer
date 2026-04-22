@@ -1,11 +1,14 @@
-FROM neo4j:4.4.45
+FROM neo4j:5.26.19
 
 # ensure local python is preferred over distribution python
-ENV PATH /usr/local/bin:$PATH
+ENV PATH=/usr/local/bin:$PATH
 
 # http://bugs.python.org/issue19846
 # > At the moment, setting "LANG=C" on a Linux system *fundamentally breaks Python 3*, and that's not OK.
-ENV LANG C.UTF-8
+ENV LANG=C.UTF-8
+
+# retry up to 3 times on transient download failures
+RUN echo 'Acquire::Retries "3";' > /etc/apt/apt.conf.d/80-retries
 
 # runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -13,8 +16,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 		netbase \
 	&& rm -rf /var/lib/apt/lists/*
 
-ENV GPG_KEY 7169605F62C751356D054A26A821E680E5FA6305
-ENV PYTHON_VERSION 3.12.0
+ENV PYTHON_VERSION=3.12.0
 
 RUN set -eux; \
 	\
@@ -47,7 +49,7 @@ RUN set -eux; \
 	wget -O python.tar.xz "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz"; \
 	wget -O python.tar.xz.asc "https://www.python.org/ftp/python/${PYTHON_VERSION%%[a-z]*}/Python-$PYTHON_VERSION.tar.xz.asc"; \
 	GNUPGHOME="$(mktemp -d)"; export GNUPGHOME; \
-	gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "$GPG_KEY"; \
+	gpg --batch --keyserver hkps://keys.openpgp.org --recv-keys "7169605F62C751356D054A26A821E680E5FA6305"; \
 	gpg --batch --verify python.tar.xz.asc python.tar.xz; \
 	gpgconf --kill all; \
 	rm -rf "$GNUPGHOME" python.tar.xz.asc; \
@@ -124,10 +126,10 @@ RUN set -eux; \
 	done
 
 # if this is called "PIP_VERSION", pip explodes with "ValueError: invalid truth value '<VERSION>'"
-ENV PYTHON_PIP_VERSION 23.2.1
+ENV PYTHON_PIP_VERSION=23.2.1
 # https://github.com/pypa/get-pip
-ENV PYTHON_GET_PIP_URL https://github.com/pypa/get-pip/raw/c6add47b0abf67511cdfb4734771cbab403af062/public/get-pip.py
-ENV PYTHON_GET_PIP_SHA256 22b849a10f86f5ddf7ce148ca2a31214504ee6c83ef626840fde6e5dcd809d11
+ENV PYTHON_GET_PIP_URL=https://github.com/pypa/get-pip/raw/c6add47b0abf67511cdfb4734771cbab403af062/public/get-pip.py
+ENV PYTHON_GET_PIP_SHA256=22b849a10f86f5ddf7ce148ca2a31214504ee6c83ef626840fde6e5dcd809d11
 
 RUN set -eux; \
 	\
@@ -164,7 +166,7 @@ RUN set -ex \
     && apt-get update \
     && apt-get install -y --no-install-recommends git \
 		curl \
-	&& apt-get install -y gcc \
+		gcc \
 		g++ \
 	&& pip install git+https://github.com/Supervisor/supervisor \
     && cd /usr/bin \
@@ -188,17 +190,14 @@ RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
     && pip install numpy \
     && pip install scipy \
     && pip install statsmodels \
-    && pip install -r requirements.txt \
-    && unlink /var/lib/neo4j/data \
-    && mkdir -p /var/lib/neo4j/data/databases \
-    && tar xzf sample/data.tar.gz -C /var/lib/neo4j/
+    && pip install -r requirements.txt
 
 ## Create supervisord.conf
 RUN touch /etc/supervisord.conf \
     && echo "[supervisord]"  >> /etc/supervisord.conf \
     && echo "nodaemon=true"  >> /etc/supervisord.conf \
     && echo "[program:neo4j]" >> /etc/supervisord.conf \
-    && echo "command=/docker-entrypoint.sh neo4j"   >> /etc/supervisord.conf \
+    && echo "command=/startup/docker-entrypoint.sh neo4j"   >> /etc/supervisord.conf \
     && echo "[program:logontracer]" >> /etc/supervisord.conf \
     && echo "command=/usr/local/src/run.sh"   >> /etc/supervisord.conf
 
@@ -209,7 +208,10 @@ RUN echo "#!/bin/bash" > run.sh \
     && chmod 755 run.sh
 
 ## Set env
-RUN sed -i -e "3i NEO4J_EDITION=community" /docker-entrypoint.sh
+RUN sed -i -e "3i NEO4J_EDITION=community" /startup/docker-entrypoint.sh
+
+## Set initial Neo4j password
+RUN neo4j-admin dbms set-initial-password password
 
 WORKDIR /var/lib/neo4j
 

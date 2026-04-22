@@ -1,127 +1,200 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #
+# LICENSE
+# https://github.com/JPCERTCC/LogonTracer/blob/master/LICENSE.txt
+#
 
 import os
 import re
 import sys
-import csv
-import glob
-import pickle
-import shutil
 import argparse
 import datetime
-import subprocess
+import secrets
+import threading
 from functools import wraps
 from logging import getLogger
 from logging.config import dictConfig
-from ssl import create_default_context
 
-try:
-    from lxml import etree
-    has_lxml = True
-except ImportError:
-    has_lxml = False
+# Lazy import flags - check availability without importing heavy modules
+has_lxml = False
+has_evtx = False
+has_neo4j = False
+has_numpy = False
+has_changefinder = False
+has_flask = False
+has_pandas = False
+has_hmmlearn = False
+has_sklearn = False
+has_es = False
+has_pyyaml = False
+has_flask_login = False
+has_flask_sqlalchemy = False
+has_flask_wtf = False
+has_flask_limiter = False
+has_git = False
+has_sigma = False
 
-try:
-    from evtx import PyEvtxParser
-    has_evtx = True
-except ImportError:
-    has_evtx = False
 
-try:
-    from py2neo import Graph, GraphService, ClientError
-    has_py2neo = True
-except ImportError:
-    has_py2neo = False
+def utc_now():
+    """Return a timezone-aware UTC datetime."""
+    return datetime.datetime.now(datetime.timezone.utc)
 
-try:
-    import numpy as np
-    has_numpy = True
-except ImportError:
-    has_numpy = False
 
-try:
-    import changefinder
-    has_changefinder = True
-except ImportError:
-    has_changefinder = False
+def utc_now_naive():
+    """Return a naive UTC datetime for legacy database fields."""
+    return utc_now().replace(tzinfo=None)
 
+# Check availability of optional modules
 try:
-    from flask import Flask, render_template, request, redirect, session
-    has_flask = True
-except ImportError:
-    has_flask = False
+    import importlib.util
+    has_lxml = importlib.util.find_spec("lxml") is not None
+    has_evtx = importlib.util.find_spec("evtx") is not None
+    has_neo4j = importlib.util.find_spec("neo4j") is not None
+    has_numpy = importlib.util.find_spec("numpy") is not None
+    has_changefinder = importlib.util.find_spec("changefinder") is not None
+    has_flask = importlib.util.find_spec("flask") is not None
+    has_pandas = importlib.util.find_spec("pandas") is not None
+    has_hmmlearn = importlib.util.find_spec("hmmlearn") is not None
+    has_sklearn = importlib.util.find_spec("joblib") is not None
+    has_es = importlib.util.find_spec("elasticsearch") is not None
+    has_pyyaml = importlib.util.find_spec("yaml") is not None
+    has_flask_login = importlib.util.find_spec("flask_login") is not None
+    has_flask_sqlalchemy = importlib.util.find_spec("flask_sqlalchemy") is not None
+    has_flask_wtf = importlib.util.find_spec("flask_wtf") is not None
+    has_flask_limiter = importlib.util.find_spec("flask_limiter") is not None
+    has_git = importlib.util.find_spec("git") is not None
+    has_sigma = importlib.util.find_spec("sigma") is not None
+except:
+    # Fallback to try/except import if importlib.util is not available
+    try:
+        from lxml import etree
+        has_lxml = True
+    except ImportError:
+        pass
+    
+    try:
+        from evtx import PyEvtxParser
+        has_evtx = True
+    except ImportError:
+        pass
+    
+    try:
+        from neo4j import GraphDatabase
+        has_neo4j = True
+    except ImportError:
+        pass
+    
+    try:
+        import numpy as np
+        has_numpy = True
+    except ImportError:
+        pass
+    
+    try:
+        import changefinder
+        has_changefinder = True
+    except ImportError:
+        pass
+    
+    try:
+        from flask import Flask
+        has_flask = True
+    except ImportError:
+        pass
+    
+    try:
+        import pandas as pd
+        has_pandas = True
+    except ImportError:
+        pass
+    
+    try:
+        from hmmlearn import hmm
+        has_hmmlearn = True
+    except ImportError:
+        pass
+    
+    try:
+        import joblib
+        has_sklearn = True
+    except ImportError:
+        pass
+    
+    try:
+        from elasticsearch import Elasticsearch
+        has_es = True
+    except ImportError:
+        pass
+    
+    try:
+        import yaml
+        has_pyyaml = True
+    except ImportError:
+        pass
+    
+    try:
+        from flask_login import UserMixin
+        has_flask_login = True
+    except ImportError:
+        pass
+    
+    try:
+        from flask_sqlalchemy import SQLAlchemy
+        has_flask_sqlalchemy = True
+    except ImportError:
+        pass
+    
+    try:
+        from flask_wtf import FlaskForm
+        has_flask_wtf = True
+    except ImportError:
+        pass
 
-try:
-    import pandas as pd
-    has_pandas = True
-except ImportError:
-    has_pandas = False
+    try:
+        from flask_limiter import Limiter
+        has_flask_limiter = True
+    except ImportError:
+        pass
 
-try:
-    from hmmlearn import hmm
-    has_hmmlearn = True
-except ImportError:
-    has_hmmlearn = False
+    try:
+        import git
+        has_git = True
+    except ImportError:
+        pass
+    
+    try:
+        from sigma.rule import SigmaRule
+        from sigma.collection import SigmaCollection
+        from sigma.conditions import ConditionItem, ConditionAND, ConditionOR, ConditionNOT, ConditionFieldEqualsValueExpression
+        has_sigma = True
+    except ImportError:
+        pass
 
-try:
-    import joblib
-    has_sklearn = True
-except ImportError:
-    has_sklearn = False
+def ensure_neo4j_imported():
+    """Ensure Neo4j modules are imported (lazy loading for web UI)"""
+    global GraphDatabase, ClientError, ServiceUnavailable, AuthError, ConfigurationError
+    if has_flask and GraphDatabase is None:
+        from neo4j import GraphDatabase as _GraphDatabase
+        from neo4j.exceptions import ClientError as _ClientError
+        from neo4j.exceptions import ServiceUnavailable as _ServiceUnavailable
+        from neo4j.exceptions import AuthError as _AuthError
+        from neo4j.exceptions import ConfigurationError as _ConfigurationError
+        GraphDatabase = _GraphDatabase
+        ClientError = _ClientError
+        ServiceUnavailable = _ServiceUnavailable
+        AuthError = _AuthError
+        ConfigurationError = _ConfigurationError
 
-try:
-    from elasticsearch import Elasticsearch
-    from elasticsearch_dsl import Search, Q
-    has_es = True
-except ImportError:
-    has_es = False
+# Decorator to ensure Neo4j is imported before route execution
+def with_neo4j(f):
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        ensure_neo4j_imported()
+        return f(*args, **kwargs)
+    return decorated_function
 
-try:
-    import yaml
-    has_pyyaml = True
-except ImportError:
-    has_pyyaml = False
-
-try:
-    from flask_login import UserMixin, LoginManager, login_user, logout_user, current_user
-    has_flask_login = True
-except ImportError:
-    has_flask_login = False
-
-try:
-    from flask_sqlalchemy import SQLAlchemy
-    has_flask_sqlalchemy = True
-except ImportError:
-    has_flask_sqlalchemy = False
-
-try:
-    from flask_wtf import FlaskForm
-    has_flask_wtf = True
-except ImportError:
-    has_flask_wtf = False
-
-try:
-    from wtforms import StringField, PasswordField
-    from wtforms.validators import ValidationError, DataRequired, EqualTo, Length
-    has_wtforms = True
-except ImportError:
-    has_wtforms = False
-
-try:
-    import git
-    has_git = True
-except ImportError:
-    has_git = False
-
-try:
-    from sigma.parser.rule import SigmaParser
-    from sigma.configuration import SigmaConfiguration
-    from sigma.parser.condition import ConditionAND, ConditionOR, ConditionNOT, NodeSubexpression
-    has_sigma = True
-except ImportError:
-    has_sigma = False
+sys.modules.setdefault('logontracer', sys.modules[__name__])
 
 # Check Event Id
 EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719, 5137, 5141]
@@ -133,11 +206,22 @@ EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
 UCHECK = r"[%*+=\[\]\\/|;:\"<>?,&]"
 HCHECK = r"[*\\/|:\"<>?&]"
 
+# Username allowed characters: letters, digits, underscore, hyphen only
+USERNAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]+$')
+
+# Neo4j identifier pattern: only alphanumeric and underscore (for database names, usernames, roles)
+NEO4J_IDENTIFIER_PATTERN = re.compile(r'^[a-zA-Z0-9_]+$')
+
 # IPv4 regex
 IPv4_PATTERN = re.compile(r"\A\d+\.\d+\.\d+\.\d+\Z", re.DOTALL)
 
 # IPv6 regex
 IPv6_PATTERN = re.compile(r"\A(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){0,5})?|([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){0,4})?|:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){0,3})?|:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){0,2})?|:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::(([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3}))?)?|:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})(::([0-9a-f]|[1-9a-f][0-9a-f]{1,3})?|(:([0-9a-f]|[1-9a-f][0-9a-f]{1,3})){3}))))))\Z", re.DOTALL)
+
+# Allowed character patterns (whitelist approach)
+ALLOWED_FILENAME_PATTERN = re.compile(r'^[a-zA-Z0-9_\-. ]+$')  # alphanumeric, underscore, dash, dot, space
+ALLOWED_PATH_PATTERN = re.compile(r'^[a-zA-Z0-9_\-./]+$')  # alphanumeric, underscore, dash, dot, slash
+ALLOWED_EVTX_FILENAME_PATTERN = re.compile(r'^[a-zA-Z0-9_\-. ]+\.evtx$', re.IGNORECASE)  # EVTX files only
 
 # LogonTracer folder path
 FPATH = os.path.dirname(os.path.abspath(__file__))
@@ -209,7 +293,21 @@ AUDITING_CONSTANTS = {
     "{0cce9242-69ae-11d9-bed3-505054503030}": "KerbCredentialValidation",
     "{0cce9243-69ae-11d9-bed3-505054503030}": "NPS"}
 
+# Kerberos Ticket Encryption Types conversion table
+# Based on Microsoft documentation: https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4768
+TICKET_ENCRYPTION_TYPES = {
+    # Hex formats (lowercase with 0x)
+    "0x1": "DES-CBC-CRC",
+    "0x3": "DES-CBC-MD5", 
+    "0x11": "AES128-CTS-HMAC-SHA1-96",
+    "0x12": "AES256-CTS-HMAC-SHA1-96",
+    "0x17": "RC4-HMAC",
+    "0x18": "RC4-HMAC-EXP",
+    "0xffffffff": "-",
+}
+
 # Load logging config
+import yaml
 with open(FPATH + "/config/logging.yml", 'r') as logging_open:
     logging_data = yaml.safe_load(logging_open)
 
@@ -218,9 +316,41 @@ logger = getLogger("agent_logger")
 
 # Flask instance
 if not has_flask:
+    # Logger already initialized above
     logger.error("[!] Flask must be installed for this script.")
     sys.exit(1)
 else:
+    # Import Flask modules at startup (Flask itself is lightweight)
+    from flask import Flask, render_template, request, redirect, session, jsonify, flash, url_for, abort
+    from flask_login import UserMixin, LoginManager, login_user, logout_user, current_user
+    from markupsafe import Markup, escape
+    from flask_sqlalchemy import SQLAlchemy
+    from flask_wtf import FlaskForm
+    from wtforms import StringField, PasswordField, BooleanField, TextAreaField, SelectField, IntegerField, FloatField
+    from wtforms.validators import DataRequired, Length, EqualTo, Optional, ValidationError, Regexp
+    from flask_wtf.csrf import CSRFProtect, generate_csrf
+    if has_flask_limiter:
+        from flask_limiter import Limiter
+        from flask_limiter.util import get_remote_address
+
+    # Import common modules needed by web interface
+    import csv
+    import json
+    import glob
+    import pickle
+    import shutil
+    import subprocess
+    import asyncio
+    from ssl import create_default_context
+    
+    # Neo4j will be imported lazily in functions that need it
+    # This keeps startup time fast for CLI operations
+    GraphDatabase = None
+    ClientError = None
+    ServiceUnavailable = None
+    AuthError = None
+    ConfigurationError = None
+    
     app = Flask(__name__)
 
 parser = argparse.ArgumentParser(description="Visualizing and analyzing active directory Windows logon event logs.")
@@ -245,7 +375,11 @@ parser.add_argument("--wsport", dest="wsport", action="store", type=str, metavar
 parser.add_argument("-l", "--learn", action="store_true", default=False,
                     help="Machine learning event logs using Hidden Markov Model.")
 parser.add_argument("--sigma", action="store_true", default=False,
-                    help="Scan using Sigma rule. (default: False)")                    
+                    help="Scan using Sigma rule. (default: False)")
+parser.add_argument("--sigma-only", dest="sigma_only", action="store_true", default=False,
+                    help="Sigma scan only mode. Scan EVTX file with Sigma rules without Neo4j processing. (default: False)")
+parser.add_argument("--sigma-rules", dest="sigma_rules_path", action="store", type=str, metavar="PATH",
+                    help="Path to Sigma rules folder. (default: sigma)")
 parser.add_argument("--es-server", dest="esserver", action="store", type=str, metavar="ESSERVER",
                     help="Elastic Search server address. (default: localhost:9200)")
 parser.add_argument("--es-index", dest="esindex", action="store", type=str, metavar="ESINDEX",
@@ -287,56 +421,65 @@ parser.add_argument("--delete", action="store_true", default=False,
 args = parser.parse_args()
 
 statement_user = """
-  MERGE (user:Username{{ user:'{user}' }}) set user.rights='{rights}', user.sid='{sid}', user.rank={rank}, user.status='{status}', user.counts='{counts}', user.counts4624='{counts4624}', user.counts4625='{counts4625}', user.counts4768='{counts4768}', user.counts4769='{counts4769}', user.counts4776='{counts4776}', user.detect='{detect}'
+  MERGE (user:Username{ user: $user }) 
+  SET user.rights = $rights, user.sid = $sid, user.rank = $rank, user.status = $status, 
+      user.counts = $counts, user.counts4624 = $counts4624, user.counts4625 = $counts4625, 
+      user.counts4768 = $counts4768, user.counts4769 = $counts4769, user.counts4776 = $counts4776, 
+      user.detect = $detect
   RETURN user
   """
 
 statement_ip = """
-  MERGE (ip:IPAddress{{ IP:'{IP}' }}) set ip.rank={rank}, ip.hostname='{hostname}'
+  MERGE (ip:IPAddress{ IP: $IP }) 
+  SET ip.rank = $rank, ip.hostname = $hostname
   RETURN ip
   """
 
 statement_r = """
-  MATCH (user:Username{{ user:'{user}' }})
-  MATCH (ip:IPAddress{{ IP:'{IP}' }})
-  CREATE (ip)-[event:Event]->(user) set event.id={id}, event.logintype={logintype}, event.status='{status}', event.count={count}, event.authname='{authname}', event.date={date}
-
+  MATCH (user:Username{ user: $user })
+  MATCH (ip:IPAddress{ IP: $IP })
+  CREATE (ip)-[event:Event]->(user) 
+  SET event.id = $id, event.logintype = $logintype, event.status = $status, 
+      event.count = $count, event.authname = $authname, event.servicename = $servicename, 
+      event.ticketencryptiontype = $ticketencryptiontype, event.date = $date
   RETURN user, ip
   """
 
 statement_date = """
-  MERGE (date:Date{{ date:'{Daterange}' }}) set date.start='{start}', date.end='{end}'
+  MERGE (date:Date{ date: $Daterange }) 
+  SET date.start = $start, date.end = $end
   RETURN date
   """
 
 statement_domain = """
-  MERGE (domain:Domain{{ domain:'{domain}' }})
+  MERGE (domain:Domain{ domain: $domain })
   RETURN domain
   """
 
 statement_dr = """
-  MATCH (domain:Domain{{ domain:'{domain}' }})
-  MATCH (user:Username{{ user:'{user}' }})
+  MATCH (domain:Domain{ domain: $domain })
+  MATCH (user:Username{ user: $user })
   CREATE (user)-[group:Group]->(domain)
-
   RETURN user, domain
   """
 
 statement_del = """
-  MERGE (date:Deletetime{{ date:'{deletetime}' }}) set date.user='{user}', date.domain='{domain}'
+  MERGE (date:Deletetime{ date: $deletetime }) 
+  SET date.user = $user, date.domain = $domain
   RETURN date
   """
 
 statement_pl = """
-  MERGE (id:ID{{ id:{id} }}) set id.changetime='{changetime}', id.category='{category}', id.sub='{sub}'
+  MERGE (id:ID{ id: $id }) 
+  SET id.changetime = $changetime, id.category = $category, id.sub = $sub
   RETURN id
   """
 
 statement_pr = """
-  MATCH (id:ID{{ id:{id} }})
-  MATCH (user:Username{{ user:'{user}' }})
-  CREATE (user)-[group:Policy]->(id) set group.date='{date}'
-
+  MATCH (id:ID{ id: $id })
+  MATCH (user:Username{ user: $user })
+  CREATE (user)-[group:Policy]->(id) 
+  SET group.date = $date
   RETURN user, id
   """
 
@@ -349,16 +492,16 @@ statement_dd = """
   """
 
 statement_cu = """
-  CREATE USER {username} SET PASSWORD '{password}' CHANGE NOT REQUIRED;
+  CREATE USER {username} SET PASSWORD $password CHANGE NOT REQUIRED;
   """
 
 # for Neo4j enterprise edition
 #statement_cu = """
-#  CREATE USER {username} SET PASSWORD '{password}' CHANGE NOT REQUIRED SET STATUS ACTIVE;
+#  CREATE USER {username} SET PASSWORD $password CHANGE NOT REQUIRED SET STATUS ACTIVE;
 #  """
 
 statement_au = """
-  ALTER CURRENT USER SET PASSWORD FROM '{oldPassword}' TO '{newPassword}';
+  ALTER CURRENT USER SET PASSWORD FROM $oldPassword TO $newPassword;
   """
 
 statement_du = """
@@ -373,8 +516,8 @@ statement_role_add = """
   CREATE OR REPLACE ROLE {username}_role AS COPY OF {role};
   """
 
-statement_role_revole = """
-  REVOKE GRANT ACCESS ON DATABASES {database} FROM {username}_role;
+statement_role_revoke = """
+  REVOKE ACCESS ON DATABASE {database} FROM {username}_role;
   """
 
 statement_role_set = """
@@ -417,10 +560,6 @@ if not has_flask_wtf:
     logger.error("[!] flask_wtf must be installed for this script.")
     sys.exit(1)
 
-if not has_wtforms:
-    logger.error("[!] wtforms must be installed for this script.")
-    sys.exit(1)
-
 if args.config:
     config_path = args.config
 else:
@@ -435,8 +574,10 @@ NEO4J_PASSWORD = config_data["neo4j"]["NEO4J_PASSWORD"]
 NEO4J_USER = config_data["neo4j"]["NEO4J_USER"]
 # neo4j server
 NEO4J_SERVER = config_data["neo4j"]["NEO4J_SERVER"]
-# neo4j listen port
-NEO4J_PORT = config_data["neo4j"]["NEO4J_PORT"]
+# neo4j HTTP port (for legacy compatibility)
+NEO4J_HTTP_PORT = config_data["neo4j"]["NEO4J_PORT"]
+# neo4j Bolt port (for driver connections)
+NEO4J_PORT = config_data["neo4j"]["WS_PORT"]
 # Web application port
 WEB_PORT = config_data["logontracer"]["WEB_PORT"]
 # Web application address
@@ -507,15 +648,122 @@ if args.case:
 
 # Setup login user
 app.config["SESSION_COOKIE_SECURE"] = USE_HTTPS
+app.config["SESSION_COOKIE_HTTPONLY"] = True
+app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + database_name
-app.config["SECRET_KEY"] = os.urandom(24)
-app.permanent_session_lifetime = datetime.timedelta(minutes=60)
-db = SQLAlchemy(app)
 
+# Persist SECRET_KEY across restarts
+_secret_key_file = os.path.join(FPATH, '.secret_key')
+if os.path.exists(_secret_key_file):
+    with open(_secret_key_file, 'rb') as _f:
+        _secret_key = _f.read()
+else:
+    _secret_key = os.urandom(32)
+    with open(_secret_key_file, 'wb') as _f:
+        _f.write(_secret_key)
+    os.chmod(_secret_key_file, 0o600)
+app.config["SECRET_KEY"] = _secret_key
+
+app.permanent_session_lifetime = datetime.timedelta(minutes=60)
+
+# Initialize SQLAlchemy
+db = SQLAlchemy()
+db.init_app(app)
+
+# Server-side credential cache (opaque token in session, credentials in memory)
+_cred_cache = {}
+_cred_cache_lock = threading.Lock()
+
+def store_neo4j_creds(username, password):
+    """Store Neo4j credentials server-side; save only opaque key in session."""
+    cache_key = secrets.token_urlsafe(32)
+    expires = utc_now() + datetime.timedelta(minutes=60)
+    with _cred_cache_lock:
+        _cred_cache[cache_key] = {"username": username, "password": password, "expires": expires}
+    session["neo4j_cache_key"] = cache_key
+
+def get_neo4j_creds():
+    """Retrieve Neo4j credentials from server-side cache."""
+    cache_key = session.get("neo4j_cache_key")
+    if not cache_key:
+        return None, None
+    with _cred_cache_lock:
+        entry = _cred_cache.get(cache_key)
+        if entry is None:
+            return None, None
+        if entry["expires"] < utc_now():
+            _cred_cache.pop(cache_key, None)
+            return None, None
+        return entry["username"], entry["password"]
+
+def invalidate_neo4j_creds():
+    """Remove credentials from server-side cache on logout."""
+    cache_key = session.get("neo4j_cache_key")
+    if cache_key:
+        with _cred_cache_lock:
+            _cred_cache.pop(cache_key, None)
+        session.pop("neo4j_cache_key", None)
+
+# Initialize CSRF protection
+csrf = CSRFProtect(app)
+
+@app.after_request
+def set_csrf_cookie(response):
+    response.set_cookie('csrf_token', generate_csrf(), samesite='Lax')
+    return response
+
+@app.after_request
+def set_security_headers(response):
+    """Add security headers to every response."""
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['X-XSS-Protection'] = '1; mode=block'
+    response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
+    if USE_HTTPS:
+        response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
+    # Content-Security-Policy: allow inline scripts (required for current templates),
+    # CDN resources (Bootstrap, jQuery, Cytoscape, Chart.js, DataTables, Font Awesome, etc.),
+    # and Neo4j bolt connections via connect-src
+    _cdn = (
+        "https://cdn.jsdelivr.net "
+        "https://cdnjs.cloudflare.com "
+        "https://ajax.googleapis.com "
+        "https://cdn.datatables.net "
+        "https://maxcdn.bootstrapcdn.com "
+        "https://use.fontawesome.com"
+    )
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' " + _cdn + "; "
+        "style-src 'self' 'unsafe-inline' " + _cdn + "; "
+        "img-src 'self' data: blob:; "
+        "font-src 'self' data: " + _cdn + "; "
+        "connect-src 'self' bolt: bolts: bolt+ssc: wss: ws:; "
+        "frame-ancestors 'none'"
+    )
+    return response
+
+# Initialize rate limiter
+if has_flask_limiter:
+    limiter = Limiter(
+        get_remote_address,
+        app=app,
+        default_limits=[],
+        storage_uri="memory://"
+    )
+else:
+    # No-op limiter stub when flask-limiter is not installed
+    class _NoopLimiter:
+        def limit(self, *args, **kwargs):
+            return lambda f: f
+    limiter = _NoopLimiter()
+
+# Initialize LoginManager
 login_manager = LoginManager()
 login_manager.init_app(app)
 
+# Define User model
 class User(UserMixin, db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(50), nullable=False, unique=True)
@@ -537,11 +785,21 @@ class SettingForm(FlaskForm):
     password2 = PasswordField('Password (again)', validators=[DataRequired(), Length(min=3, max=20)])
 
 class LoginForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=50)])
+    username = StringField('Username', validators=[
+        DataRequired(),
+        Length(min=3, max=50),
+        Regexp(r'^[a-zA-Z0-9_-]+$',
+               message='Username can only contain letters, numbers, underscores, and hyphens.')
+    ])
     password = PasswordField('Password', validators=[DataRequired(), Length(min=3, max=20)])
 
 class RegistrationForm(FlaskForm):
-    username = StringField('Username', validators=[DataRequired(), Length(min=3, max=50)])
+    username = StringField('Username', validators=[
+        DataRequired(),
+        Length(min=3, max=50),
+        Regexp(r'^[a-zA-Z0-9_-]+$',
+               message='Username can only contain letters, numbers, underscores, and hyphens.')
+    ])
     password1 = PasswordField('Password', validators=[DataRequired(), EqualTo('password2', message='Passwords must match.'), Length(min=3, max=20)])
     password2 = PasswordField('Password (again)', validators=[DataRequired(), Length(min=3, max=20)])
 
@@ -553,9 +811,42 @@ class RegistrationForm(FlaskForm):
 class CaseForm(FlaskForm):
     case = StringField('Case', validators=[DataRequired()])
 
+class AISettingForm(FlaskForm):
+    ai_enabled = BooleanField('Enable AI Analysis')
+    openai_api_key = StringField('OpenAI API Key', validators=[Optional()])
+    openai_model = SelectField('OpenAI Model', 
+                              choices=[('gpt-5', 'GPT-5'),
+                                     ('gpt-5-mini', 'GPT-5 Mini'),
+                                     ('gpt-5.1', 'GPT-5.1'),
+                                     ('gpt-5.2', 'GPT-5.2'),
+                                     ('gpt-5.4', 'GPT-5.4'),
+                                     ('gpt-5.4-mini', 'GPT-5.4 Mini'),],
+                              default='gpt-5-mini')
+    max_completion_tokens = IntegerField('Max Completion Tokens', default=8000, validators=[Optional()])
+    temperature = FloatField('Temperature', default=1, validators=[Optional()])
+    agent_max_iterations = IntegerField('Agent Max Iterations', default=10, validators=[Optional()])
+    response_language = SelectField('Response Language',
+                                  choices=[('en', 'English'),
+                                         ('ja', '日本語 (Japanese)'),
+                                         ('fr', 'Français (French)')],
+                                  default='en')
+
+class AISetting(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    ai_enabled = db.Column(db.Boolean, default=True)  # default Enable
+    openai_api_key = db.Column(db.String(255), nullable=True)
+    openai_model = db.Column(db.String(50), default='gpt-5-mini')
+    max_completion_tokens = db.Column(db.Integer, default=8000)
+    temperature = db.Column(db.Float, default=1)
+    agent_max_iterations = db.Column(db.Integer, default=10)
+    response_language = db.Column(db.String(10), default='en')  # Language for AI responses
+    created_at = db.Column(db.DateTime, default=utc_now_naive)
+    updated_at = db.Column(db.DateTime, default=utc_now_naive, onupdate=utc_now_naive)
+
+# Initialize database tables and default user
 with app.app_context():
     db.create_all()
-
+    
     user_query = User.query.filter_by(username=default_user).first()
     if user_query is None:
         create_user = User(username=default_user, urole="ADMIN")
@@ -583,11 +874,183 @@ def http_request_logging(f):
     return decorated_function
 
 
+def is_safe_path(base_dir, user_path):
+    """
+    Validate that a user-provided path is within the allowed base directory.
+
+    Args:
+        base_dir: The allowed base directory (absolute path)
+        user_path: The user-provided path to validate
+    
+    Returns:
+        bool: True if the path is safe, False otherwise
+    """
+    # Resolve both paths to absolute, normalized paths
+    base_dir = os.path.realpath(base_dir)
+    full_path = os.path.realpath(os.path.join(base_dir, user_path))
+    
+    # Check if the resolved path is within the base directory
+    return full_path.startswith(base_dir + os.sep) or full_path == base_dir
+
+
+def sanitize_filename(filename, file_type=None):
+    """
+    Sanitize a filename. Only allows alphanumeric characters and safe punctuation.
+
+    Args:
+        filename: The filename to sanitize
+        file_type: Optional file type restriction ('evtx', 'xml', etc.)
+    
+    Returns:
+        tuple: (sanitized_filename or None, error_message or None)
+    """
+    if not filename or not isinstance(filename, str):
+        return None, "Filename is required"
+    
+    # Check length limit
+    if len(filename) > 255:
+        return None, "Filename too long (max 255 characters)"
+    
+    dangerous_patterns = ['..', '\x00', '\n', '\r', '\t', '/', '\\', '|', ';', '&', '$', '`', '>', '<', '\'', '"']
+    for pattern in dangerous_patterns:
+        if pattern in filename:
+            return None, f"Filename contains forbidden characters"
+    
+    # Whitelist check on ORIGINAL input: Only allow alphanumeric, dash, underscore, dot, and space
+    if not ALLOWED_FILENAME_PATTERN.match(filename):
+        return None, "Filename contains invalid characters (only alphanumeric, dash, underscore, dot, and space allowed)"
+    
+    # Now safe to use basename (should be same as input since no path separators allowed)
+    filename = os.path.basename(filename)
+    
+    # Check for empty filename after basename
+    if not filename:
+        return None, "Invalid filename"
+    
+    # Check for file type restriction
+    if file_type:
+        if file_type.lower() == 'evtx':
+            if not ALLOWED_EVTX_FILENAME_PATTERN.match(filename):
+                return None, "Only .evtx files are allowed"
+        elif file_type.lower() == 'xml':
+            if not filename.lower().endswith('.xml'):
+                return None, "Only .xml files are allowed"
+    
+    # Prevent hidden files (starting with dot)
+    if filename.startswith('.'):
+        return None, "Hidden files are not allowed"
+    
+    return filename, None
+
+
+def validate_relative_path(path, allowed_prefixes=None):
+    """
+    Validate a relative path for security.
+    Uses whitelist approach - only allows specific characters.
+    
+    Args:
+        path: The path to validate
+        allowed_prefixes: List of allowed path prefixes (e.g., ['sigma', 'upload'])
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if not path or not isinstance(path, str):
+        return False, "Path is required"
+    
+    # Check length limit
+    if len(path) > 500:
+        return False, "Path too long (max 500 characters)"
+    
+    # Check for null bytes and control characters
+    if '\x00' in path or any(ord(c) < 32 for c in path):
+        return False, "Invalid characters in path"
+    
+    # Reject parent directory references
+    if '..' in path:
+        return False, "Directory traversal not allowed"
+    
+    # Check for absolute paths
+    if path.startswith('/') or (len(path) > 1 and path[1] == ':'):
+        return False, "Absolute paths not allowed"
+    
+    # Whitelist: Only allow alphanumeric, underscore, dash, dot, and forward slash
+    if not ALLOWED_PATH_PATTERN.match(path):
+        return False, "Path contains invalid characters (only alphanumeric, underscore, dash, dot, and slash allowed)"
+    
+    # Check for double slashes
+    if '//' in path:
+        return False, "Invalid path format"
+    
+    # Check allowed prefixes if specified
+    if allowed_prefixes:
+        if not any(path == prefix or path.startswith(prefix + '/') for prefix in allowed_prefixes):
+            return False, f"Path must start with one of: {', '.join(allowed_prefixes)}"
+    
+    return True, None
+
+
+def validate_input_string(value, field_name, max_length=200, allowed_pattern=None):
+    """
+    Generic input validation for string values.
+    
+    Args:
+        value: The input value to validate
+        field_name: Name of the field (for error messages)
+        max_length: Maximum allowed length
+        allowed_pattern: Regex pattern for allowed characters (optional)
+    
+    Returns:
+        tuple: (is_valid, error_message)
+    """
+    if value is None:
+        return False, f"{field_name} is required"
+    
+    if not isinstance(value, str):
+        return False, f"{field_name} must be a string"
+    
+    if len(value) > max_length:
+        return False, f"{field_name} too long (max {max_length} characters)"
+    
+    # Check for null bytes and control characters
+    if '\x00' in value or any(ord(c) < 32 and c not in '\n\r\t' for c in value):
+        return False, f"{field_name} contains invalid characters"
+    
+    # Check allowed pattern if specified
+    if allowed_pattern and not allowed_pattern.match(value):
+        return False, f"{field_name} contains invalid characters"
+    
+    return True, None
+
+
+def is_valid_timezone(value):
+    """
+    Validate a UTC timezone offset string.
+    Accepts integer values in the range -12 to +14 (inclusive),
+    which covers all real-world UTC offsets defined by ISO 8601.
+
+    Args:
+        value: The timezone string to validate (e.g. "9", "-5", "14")
+
+    Returns:
+        bool: True if valid, False otherwise
+    """
+    if not isinstance(value, str):
+        return False
+    # Must be an optional leading minus followed by 1-2 digits
+    if not re.fullmatch(r"-?[0-9]{1,2}", value):
+        return False
+    tz_int = int(value)
+    return -12 <= tz_int <= 14
+
+
 # Costom login_required with role
 def login_required(role="ANY"):
     def wrapper(fn):
         @wraps(fn)
         def decorated_view(*args, **kwargs):
+            # Ensure Neo4j is imported for authenticated routes
+            ensure_neo4j_imported()
             if not current_user.is_authenticated:
                return login_manager.unauthorized()
             urole = current_user.get_urole()
@@ -600,7 +1063,9 @@ def login_required(role="ANY"):
 
 # Web application login page
 @app.route('/login', methods=['GET', 'POST'])
+@limiter.limit("10 per minute; 50 per hour")
 @http_request_logging
+@with_neo4j
 def login():
     if current_user.is_authenticated:
         return redirect('/')
@@ -614,18 +1079,30 @@ def login():
         password = form.password.data
         remember = True if request.form.get("remember") else False
 
+        # Server-side username format check
+        if not USERNAME_PATTERN.match(username):
+            return render_template('login.html', form=form,
+                                   messages=Markup('<div class="alert alert-danger" role="alert">Invalid username format.</div>'))
+
         session["username"] = username
-        session["password"] = password
+        store_neo4j_creds(username, password)
 
         try:
-            GraphService(host=NEO4J_SERVER, user=session["username"], password=session["password"])
+            # Test Neo4j connection with user credentials
+            neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+            driver = GraphDatabase.driver(neo4j_uri, auth=(username, password))
+            with driver.session() as test_session:
+                test_session.run("RETURN 1")
+            driver.close()
+
             user = User.query.filter_by(username=username).first()
             logger.info("[+] login user {0}.".format(username))
             login_user(user, remember=remember)
             return redirect('/')
-        except:
-            logger.error("[!] login failed user {0}.".format(username))
-            return render_template('login.html', form=form, messages='<div class="alert alert-danger" role="alert">Invalid username or password.</div>')
+        except Exception as e:
+            logger.error("[!] login failed user {0}: {1}".format(username, str(e)))
+            return render_template('login.html', form=form,
+                                   messages=Markup('<div class="alert alert-danger" role="alert">Invalid username or password.</div>'))
 
     return render_template('login.html', form=form, messages="")
 
@@ -654,12 +1131,18 @@ def signup():
             db.session.commit()
 
         try:
-            service = GraphService(host=NEO4J_SERVER, user=session["username"], password=session["password"])
-        except:
-            logger.error("[!] Can't connect Neo4j Database GraphService.")
-            sys.exit(1)
+            # Use admin credentials for user creation
+            neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+            _admin_user, _admin_pass = get_neo4j_creds()
+            if _admin_user is None:
+                return render_template('signup.html', form=form, messages=Markup('<div class="alert alert-danger" role="alert">Session expired. Please log in again.</div>'))
+            admin_driver = GraphDatabase.driver(neo4j_uri, auth=(_admin_user, _admin_pass))
+        except Exception as e:
+            logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
+            return render_template('signup.html', form=form, messages=Markup('<div class="alert alert-danger" role="alert">Database connection failed.</div>'))
 
-        create_neo4j_user(service, username, password, role_neo4j)
+        create_neo4j_user(admin_driver, username, password, role_neo4j)
+        admin_driver.close()
 
         return redirect('/')
     else:
@@ -686,24 +1169,33 @@ def setting():
             db.session.commit()
 
         try:
-            service = GraphService(host=NEO4J_SERVER, user=session["username"], password=session["password"])
-        except:
-            logger.error("[!] Can't connect Neo4j Database GraphService.")
-            sys.exit(1)
+            # Use current user credentials to connect
+            neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+            _cur_user, _cur_pass = get_neo4j_creds()
+            if _cur_user is None:
+                return render_template('setting.html', form=form, messages=Markup('<div class="alert alert-danger" role="alert">Session expired. Please log in again.</div>'))
+            driver = GraphDatabase.driver(neo4j_uri, auth=(_cur_user, _cur_pass))
+        except Exception as e:
+            logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
+            return render_template('setting.html', form=form, messages=Markup('<div class="alert alert-danger" role="alert">Database connection failed.</div>'))
 
         try:
-            system = service.system_graph
-            system.run(statement_au.format(**{"oldPassword": session["password"], "newPassword": password}))
+            with driver.session(database="system") as neo4j_session:
+                neo4j_session.run(statement_au, {"oldPassword": _cur_pass, "newPassword": password})
             logger.info("[+] Change user {0} password for neo4j.".format(username))
-        except ClientError as e:
+
+            # Update server-side credential cache with new password
+            store_neo4j_creds(username, password)
+
+        except Exception as e:
             if "User does not exist" in str(e):
                 logger.error("[!] User does not exist {0}.".format(username))
             elif "Unsupported administration command" in str(e):
                 logger.error("[!] Can't change password.")
             else:
                 logger.error(str(e))
-
-        session["password"] = password
+        finally:
+            driver.close()
 
         return redirect('/')
     else:
@@ -715,6 +1207,7 @@ def setting():
 @http_request_logging
 @login_required(role="ANY")
 def logout():
+    invalidate_neo4j_creds()
     logout_user()
     return redirect('/login')
 
@@ -724,27 +1217,39 @@ def logout():
 @http_request_logging
 @login_required(role="ADMIN")
 def addcase():
+    # Check if user has access to Enterprise features
+    try:
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        _u, _p = get_neo4j_creds()
+        if _u is None:
+            return redirect('/login')
+        driver = GraphDatabase.driver(neo4j_uri, auth=(_u, _p))
+
+        if not check_neo4j_enterprise(driver):
+            driver.close()
+            flash('Case management is only available with Neo4j Enterprise edition.', 'warning')
+            return render_template("index.html", case_name=CASE_NAME)
+    except Exception as e:
+        logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
+        flash('Database connection failed.', 'error')
+        return render_template("index.html", case_name=CASE_NAME)
+
     form = CaseForm(request.form)
     if form.validate_on_submit():
-        try:
-            service = GraphService(host=NEO4J_SERVER, user=session["username"], password=session["password"])
-        except:
-            logger.error("[!] Can't connect Neo4j Database GraphService.")
-            sys.exit(1)
+        case = form.case.data
+        if not re.search(r"\A[0-9a-zA-Z]{2,20}\Z", case):
+            driver.close()
+            return render_template('addcase.html', form=form,
+                                   messages=Markup('<div class="alert alert-danger" role="alert">You can use letters upper/lowercase and numbers.</div>'))
 
-        if "Enterprise" in service.product:
-            case = form.case.data
-            if not re.search(r"\A[0-9a-zA-Z]{2,20}\Z", case):
-                return render_template('addcase.html', form=form, messages='<div class="alert alert-danger" role="alert">You can use letters upper/lowercase and numbers.</div>')
+        session["case"] = case
+        create_database(driver, case)
+        driver.close()
 
-            session["case"] = case
-            create_database(service, case)
-
-            return render_template("index.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=case)
-        else:
-            return render_template("index.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=CASE_NAME)
+        return render_template("index.html", case_name=case)
     else:
-        return render_template('addcase.html', form=form, messages='<div class="alert alert-info" role="alert">This feature is in Neo4j Enterprise.</div>')
+        driver.close()
+        return render_template('addcase.html', form=form, messages='')
 
 
 # Web application delete case
@@ -752,24 +1257,38 @@ def addcase():
 @http_request_logging
 @login_required(role="ADMIN")
 def delcase():
+    # Check if user has access to Enterprise features
+    try:
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        _u, _p = get_neo4j_creds()
+        if _u is None:
+            return redirect('/login')
+        driver = GraphDatabase.driver(neo4j_uri, auth=(_u, _p))
+
+        if not check_neo4j_enterprise(driver):
+            driver.close()
+            flash('Case management is only available with Neo4j Enterprise edition.', 'warning')
+            return render_template("delcase.html", case_name=session["case"],
+                                   messages=Markup('<div><div class="alert alert-danger" role="alert">This feature is in Neo4j Enterprise.</div></div>'))
+    except Exception as e:
+        logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
+        flash('Database connection failed.', 'error')
+        return render_template("index.html", case_name=CASE_NAME)
+
     if request.method == "POST":
         case_name = request.form.get('caseName')
 
-        try:
-            service = GraphService(host=NEO4J_SERVER, user=session["username"], password=session["password"])
-        except:
-            logger.error("[!] Can't connect Neo4j Database GraphService.")
-            sys.exit(1)
-
-        if "Enterprise" in service.product:
-            if re.search(r"\A[0-9a-zA-Z]{2,20}\Z", case_name):
-                delete_database(service, case_name)
-
-            return render_template("delcase.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='<div><div class="alert alert-success" role="alert">Deleted case ' + case_name + '</div></div>')
+        if re.search(r"\A[0-9a-zA-Z]{2,20}\Z", case_name):
+            delete_database(driver, case_name)
+            message = Markup('<div><div class="alert alert-success" role="alert">Deleted case ') + escape(case_name) + Markup('</div></div>')
         else:
-            return render_template("delcase.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='<div><div class="alert alert-danger" role="alert">This feature is in Neo4j Enterprise.</div></div>')
+            message = Markup('<div><div class="alert alert-danger" role="alert">Invalid case name.</div></div>')
+
+        driver.close()
+        return render_template("delcase.html", case_name=session["case"], messages=message)
     else:
-        return render_template("delcase.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='')
+        driver.close()
+        return render_template("delcase.html", case_name=session["case"], messages='')
 
 
 # Web application change case
@@ -784,9 +1303,9 @@ def changecase():
 
         session["case"] = case_name
 
-        return render_template("index.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=case_name)
+        return render_template("index.html", case_name=case_name)
     else:
-        return render_template("changecase.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"])
+        return render_template("changecase.html")
 
 
 @app.route('/changecase_t', methods=['GET', 'POST'])
@@ -800,9 +1319,9 @@ def changecase_t():
 
         session["case"] = case_name
 
-        return render_template("timeline.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=case_name)
+        return render_template("timeline.html", case_name=case_name)
     else:
-        return render_template("changecase.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"])
+        return render_template("changecase.html")
 
 
 # Web application add case management
@@ -810,25 +1329,39 @@ def changecase_t():
 @http_request_logging
 @login_required(role="ADMIN")
 def case_management():
+    # Check if user has access to Enterprise features
+    try:
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        _u, _p = get_neo4j_creds()
+        if _u is None:
+            return redirect('/login')
+        driver = GraphDatabase.driver(neo4j_uri, auth=(_u, _p))
+
+        if not check_neo4j_enterprise(driver):
+            driver.close()
+            flash('Case management is only available with Neo4j Enterprise edition.', 'warning')
+            return render_template("casemng.html", case_name=session["case"],
+                                   messages=Markup('<div><div class="alert alert-danger" role="alert">This feature is in Neo4j Enterprise.</div></div>'))
+    except Exception as e:
+        logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
+        flash('Database connection failed.', 'error')
+        return render_template("index.html", case_name=CASE_NAME)
+
     if request.method == "POST":
         user = request.form.get("userSelect")
         case_name = request.form.get('caseName')
 
-        try:
-            service = GraphService(host=NEO4J_SERVER, user=session["username"], password=session["password"])
-        except:
-            logger.error("[!] Can't connect Neo4j Database GraphService.")
-            sys.exit(1)
-
-        if "Enterprise" in service.product:
-            if not re.search(UCHECK, user) and re.search(r"\A[0-9a-zA-Z]{2,20}\Z", case_name):
-                add_db_access_role(service, user, case_name)
-
-            return render_template("casemng.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='<div><div class="alert alert-success" role="alert">Added access role for case ' + case_name + ' of user ' + user + '</div></div>')
+        if not re.search(UCHECK, user) and re.search(r"\A[0-9a-zA-Z]{2,20}\Z", case_name):
+            add_db_access_role(driver, user, case_name)
+            message = Markup('<div><div class="alert alert-success" role="alert">Added access role for case ') + escape(case_name) + Markup(' of user ') + escape(user) + Markup('</div></div>')
         else:
-            return render_template("casemng.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='<div><div class="alert alert-danger" role="alert">This feature is in Neo4j Enterprise.</div></div>')
+            message = Markup('<div><div class="alert alert-danger" role="alert">Invalid user or case name.</div></div>')
+
+        driver.close()
+        return render_template("casemng.html", case_name=session["case"], messages=message)
     else:
-        return render_template("casemng.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='')
+        driver.close()
+        return render_template("casemng.html", case_name=session["case"], messages='')
 
 
 # Web application delete case management
@@ -836,25 +1369,45 @@ def case_management():
 @http_request_logging
 @login_required(role="ADMIN")
 def case_management_del():
+    # Check if user has access to Enterprise features
+    try:
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        _u, _p = get_neo4j_creds()
+        if _u is None:
+            return redirect('/login')
+        driver = GraphDatabase.driver(neo4j_uri, auth=(_u, _p))
+
+        if not check_neo4j_enterprise(driver):
+            driver.close()
+            flash('Case management is only available with Neo4j Enterprise edition.', 'warning')
+            return render_template("delcasemng.html", case_name=session["case"],
+                                   messages=Markup('<div><div class="alert alert-danger" role="alert">This feature is in Neo4j Enterprise.</div></div>'))
+    except Exception as e:
+        logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
+        flash('Database connection failed.', 'error')
+        return render_template("index.html", case_name=CASE_NAME)
+
     if request.method == "POST":
         user_db = [userlist.split("_") for userlist in request.form.getlist("userlist")]
 
-        try:
-            service = GraphService(host=NEO4J_SERVER, user=session["username"], password=session["password"])
-        except:
-            logger.error("[!] Can't connect Neo4j Database GraphService.")
-            sys.exit(1)
+        messages = []
+        for user_data in user_db:
+            if len(user_data) >= 2:
+                user = user_data[0]
+                dbname = user_data[1]
+                if not re.search(UCHECK, user) and re.search(r"\A[0-9a-zA-Z]{2,20}\Z", dbname):
+                    delete_db_access_role(driver, user, dbname)
+                    messages.append(Markup('<div class="alert alert-success" role="alert">Deleted access role for case ') + escape(dbname) + Markup(' of user ') + escape(user) + Markup('</div>'))
 
-        if "Enterprise" in service.product:
-            for user, case_name in user_db:
-                if not re.search(UCHECK, user) and re.search(r"\A[0-9a-zA-Z]{2,20}\Z", case_name):
-                    delete_db_access_role(service, user, case_name)
-
-            return render_template("delcasemng.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='<div><div class="alert alert-success" role="alert">Deleted access role to case ' + case_name + ' for user ' + user + '</div></div>')
+        driver.close()
+        if messages:
+            message_html = Markup('<div>') + Markup('').join(messages) + Markup('</div>')
         else:
-            return render_template("delcasemng.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='<div><div class="alert alert-danger" role="alert">This feature is in Neo4j Enterprise.</div></div>')
+            message_html = Markup('<div><div class="alert alert-info" role="alert">No valid selections processed.</div></div>')
+        return render_template("delcasemng.html", case_name=session["case"], messages=message_html)
     else:
-        return render_template("delcasemng.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"], messages='')
+        driver.close()
+        return render_template("delcasemng.html", case_name=session["case"], messages='')
 
 
 # Web application user management
@@ -863,31 +1416,42 @@ def case_management_del():
 @login_required(role="ADMIN")
 def user_management():
     if request.method == "POST":
-        users = [userlist.strip("Check_") for userlist in request.form.getlist("userlist")]
-        action = request.form.get("action")
+        users = [userlist.removeprefix("Check_") for userlist in request.form.getlist("userlist")]
+        action = request.form.get("action", "")
+
+        VALID_ACTIONS = {"delete", "suspended", "active"}
+        if action not in VALID_ACTIONS:
+            logger.warning("[!] Security: Invalid action rejected: %s", action)
+            return render_template("usermng.html")
 
         try:
-            service = GraphService(host=NEO4J_SERVER, user=session["username"], password=session["password"])
-        except:
-            logger.error("[!] Can't connect Neo4j Database GraphService.")
-            sys.exit(1)
+            neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+            _u, _p = get_neo4j_creds()
+            if _u is None:
+                return redirect('/login')
+            driver = GraphDatabase.driver(neo4j_uri, auth=(_u, _p))
+        except Exception as e:
+            logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
+            return render_template("usermng.html")
 
-        if "delete" in action:
+        if action == "delete":
             for user in users:
                 if not re.search(UCHECK, user):
-                    delete_neo4j_user(service, user)
+                    delete_neo4j_user(driver, user)
                     with app.app_context():
                         user_query = User.query.filter_by(username=user).first()
-                        db.session.delete(user_query)
-                        db.session.commit()
-        elif ("suspended" in action or "active" in action) and "Enterprise" in service.product:
+                        if user_query:
+                            db.session.delete(user_query)
+                            db.session.commit()
+        elif action in ("suspended", "active"):
             for user in users:
                 if not re.search(UCHECK, user):
-                    change_status_neo4j_user(service, user, action)
+                    change_status_neo4j_user(driver, user, action)
 
-        return render_template("usermng.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"])
+        driver.close()
+        return render_template("usermng.html")
     else:
-        return render_template("usermng.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"])
+        return render_template("usermng.html")
 
 
 # Web application index.html
@@ -895,7 +1459,7 @@ def user_management():
 @http_request_logging
 @login_required(role="ANY")
 def index():
-    return render_template("index.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"])
+    return render_template("index.html", case_name=session["case"])
 
 
 # Timeline view
@@ -903,7 +1467,7 @@ def index():
 @login_required(role="ANY")
 @http_request_logging
 def timeline():
-    return render_template("timeline.html", server_ip=NEO4J_SERVER, ws_port=WS_PORT, neo4j_password=session["password"], neo4j_user=session["username"], case_name=session["case"])
+    return render_template("timeline.html", case_name=session["case"])
 
 
 # Web application logs
@@ -912,16 +1476,441 @@ def timeline():
 def logs():
     with open(FPATH + "/static/logontracer.log", "r") as lf:
         logdata = lf.read()
-    return logdata
+    from flask import Response
+    return Response(logdata, mimetype='text/plain')
 
 
 # Sigma rule scan results
 @app.route('/sigma')
 @login_required(role="ANY")
 def sigma():
-    with open(FPATH + "/static/sigma_results.csv", "r") as sf:
-        sigma_logs = sf.read()
-    return sigma_logs
+    # Support both JSON and CSV formats
+    json_path = FPATH + "/static/" + SIGMA_RESULTS_FILE
+    
+    if os.path.exists(json_path):
+        with open(json_path, "r", encoding='utf-8') as sf:
+            sigma_data = json.load(sf)
+        return jsonify(sigma_data)
+    else:
+        return jsonify({"error": "No Sigma results found"}), 404
+
+
+# Sigma detection results view
+@app.route('/sigma_view')
+@login_required(role="ANY")
+@http_request_logging
+def sigma_view():
+    return render_template("sigma.html", neo4j_user=session["username"], case_name=session["case"])
+
+
+# Neo4j API endpoints
+@app.route('/api/neo4j/credentials')
+@login_required(role="ANY")
+def neo4j_credentials():
+    """Return Neo4j connection info for visualization pages (no password in HTML)."""
+    _u, _p = get_neo4j_creds()
+    if _u is None:
+        return jsonify({"error": "Session expired"}), 401
+    return jsonify({
+        "server": NEO4J_SERVER,
+        "port": WS_PORT,
+        "username": _u,
+        "password": _p,
+        "case_name": session.get("case", CASE_NAME)
+    })
+
+
+@app.route('/api/neo4j/users')
+@login_required(role="ANY")
+def neo4j_users():
+    """Return list of Neo4j users (SHOW USERS)."""
+    try:
+        _u, _p = get_neo4j_creds()
+        if _u is None:
+            return jsonify({"error": "Session expired"}), 401
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        driver = GraphDatabase.driver(neo4j_uri, auth=(_u, _p))
+        users = []
+        with driver.session(database="system") as s:
+            result = s.run("SHOW USERS")
+            for record in result:
+                row = {"user": record.get("user", "")}
+                if "roles" in record.keys():
+                    row["roles"] = list(record.get("roles") or [])
+                if "suspended" in record.keys():
+                    row["suspended"] = record.get("suspended")
+                users.append(row)
+        driver.close()
+        return jsonify(users)
+    except Exception as e:
+        logger.error("[!] neo4j_users error: {0}".format(str(e)))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/neo4j/databases')
+@login_required(role="ANY")
+def neo4j_databases():
+    """Return list of Neo4j databases (SHOW DATABASES)."""
+    try:
+        _u, _p = get_neo4j_creds()
+        if _u is None:
+            return jsonify({"error": "Session expired"}), 401
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        driver = GraphDatabase.driver(neo4j_uri, auth=(_u, _p))
+        databases = []
+        with driver.session(database="system") as s:
+            result = s.run("SHOW DATABASES")
+            for record in result:
+                databases.append(record.get("name", ""))
+        driver.close()
+        return jsonify(databases)
+    except Exception as e:
+        logger.error("[!] neo4j_databases error: {0}".format(str(e)))
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route('/api/neo4j/user-privileges')
+@login_required(role="ANY")
+def neo4j_user_privileges():
+    """Return privilege info for all users (SHOW USER X PRIVILEGES)."""
+    try:
+        _u, _p = get_neo4j_creds()
+        if _u is None:
+            return jsonify({"error": "Session expired"}), 401
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        driver = GraphDatabase.driver(neo4j_uri, auth=(_u, _p))
+        # First get users, then get their privileges
+        users = []
+        with driver.session(database="system") as s:
+            result = s.run("SHOW USERS")
+            for record in result:
+                users.append(record.get("user", ""))
+        privileges = []
+        for user in users:
+            try:
+                with driver.session(database="system") as s:
+                    safe_user = _safe_neo4j_identifier(user, "username")
+                    result = s.run("SHOW USER " + safe_user + " PRIVILEGES")
+                    for record in result:
+                        priv = {"user": user}
+                        if "graph" in record.keys():
+                            priv["graph"] = record.get("graph", "")
+                        if "access" in record.keys():
+                            priv["access"] = record.get("access", "")
+                        privileges.append(priv)
+            except Exception:
+                pass
+        driver.close()
+        return jsonify(privileges)
+    except Exception as e:
+        logger.error("[!] neo4j_user_privileges error: {0}".format(str(e)))
+        return jsonify({"error": str(e)}), 500
+
+
+# Sigma rescan API
+@app.route('/sigma_rescan', methods=["POST"])
+@login_required(role="ANY")
+@http_request_logging
+def sigma_rescan():
+    """
+    Re-scan EVTX files with Sigma rules.
+    Request JSON: { 
+        "rules_path": "sigma/rules",  (optional, defaults to "sigma")
+        "evtx_files": ["file1.evtx", "file2.evtx"]  (optional, defaults to files in upload folder)
+    }
+    """
+    try:
+        data = request.get_json() or {}
+        rules_path = data.get("rules_path", "sigma")
+        evtx_files_input = data.get("evtx_files", [])
+        
+        # Validate rules_path input type
+        if not isinstance(rules_path, str):
+            return jsonify({"error": "Invalid rules_path type"}), 400
+        
+        # Validate and resolve rules path using security helper
+        if not rules_path:
+            rules_path = "sigma"
+        
+        # Security: validate relative path with allowed prefixes
+        is_valid, error_msg = validate_relative_path(rules_path, allowed_prefixes=['sigma'])
+        if not is_valid:
+            logger.warning(f"[!] Security: Invalid rules_path rejected: {rules_path} - {error_msg}")
+            return jsonify({"error": f"Invalid rules path: {error_msg}"}), 400
+        
+        full_rules_path = os.path.join(FPATH, rules_path)
+        
+        # Security: verify path is within allowed directory
+        if not is_safe_path(FPATH, rules_path):
+            logger.warning(f"[!] Security: Path traversal attempt detected: {rules_path}")
+            return jsonify({"error": "Invalid rules path"}), 400
+        
+        if not os.path.exists(full_rules_path):
+            return jsonify({"error": f"Rules path not found: {rules_path}"}), 404
+        
+        # Determine EVTX files to scan
+        upload_dir = os.path.join(FPATH, 'upload')
+        sample_dir = os.path.join(FPATH, 'sample')
+        evtx_files = []
+        
+        # Validate evtx_files_input type
+        if not isinstance(evtx_files_input, list):
+            return jsonify({"error": "evtx_files must be a list"}), 400
+        
+        if evtx_files_input:
+            # Use specified files
+            for filename in evtx_files_input:
+                # Validate each filename type
+                if not isinstance(filename, str):
+                    return jsonify({"error": "Invalid filename type"}), 400
+                
+                # Security: sanitize filename with EVTX type restriction
+                safe_filename, error_msg = sanitize_filename(filename, file_type='evtx')
+                if safe_filename is None:
+                    logger.warning(f"[!] Security: Invalid filename rejected: {filename} - {error_msg}")
+                    return jsonify({"error": f"Invalid file name: {error_msg}"}), 400
+                
+                # Try upload folder first, then sample folder
+                filepath = os.path.join(upload_dir, safe_filename)
+                if not os.path.exists(filepath):
+                    filepath = os.path.join(sample_dir, safe_filename)
+                
+                # Security: verify final path is within allowed directories
+                if os.path.exists(filepath):
+                    real_path = os.path.realpath(filepath)
+                    if not (real_path.startswith(os.path.realpath(upload_dir) + os.sep) or 
+                            real_path.startswith(os.path.realpath(sample_dir) + os.sep)):
+                        logger.warning(f"[!] Security: File path traversal attempt: {filename}")
+                        return jsonify({"error": f"Invalid file path: {filename}"}), 400
+                    evtx_files.append(filepath)
+                else:
+                    return jsonify({"error": f"File not found: {filename}"}), 404
+        else:
+            # Scan all EVTX files in upload folder
+            if os.path.exists(upload_dir):
+                for filename in os.listdir(upload_dir):
+                    if filename.lower().endswith('.evtx'):
+                        evtx_files.append(os.path.join(upload_dir, filename))
+        
+        if not evtx_files:
+            return jsonify({"error": "No EVTX files found. Please upload EVTX files first."}), 404
+        
+        # Run Sigma scan
+        logger.info(f"[+] Starting Sigma rescan: {len(evtx_files)} files with rules from {rules_path}")
+        sigma_results = sigma_scan_evtx(evtx_files, full_rules_path, timezone=0)
+        
+        # Save results to file
+        output_path = FPATH + "/static/" + SIGMA_RESULTS_FILE
+        with open(output_path, 'w', encoding='utf8') as f:
+            json.dump(sigma_results, f, ensure_ascii=False, indent=2)
+        
+        logger.info(f"[+] Sigma rescan completed: {len(sigma_results)} detections")
+        
+        return jsonify({
+            "success": True,
+            "rules_path": rules_path,
+            "files_scanned": len(evtx_files),
+            "file_names": [os.path.basename(f) for f in evtx_files],
+            "detections": len(sigma_results)
+        })
+        
+    except Exception as e:
+        logger.error(f"[!] Sigma rescan error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": str(e)}), 500
+
+
+# Sigma rescan with uploaded files
+@app.route('/sigma_rescan_with_upload', methods=["POST"])
+@login_required(role="ANY")
+@http_request_logging
+def sigma_rescan_with_upload():
+    """
+    Re-scan EVTX files with Sigma rules uploaded from the client.
+    Form data:
+        - sigma_files: multipart files (Sigma rule .yml files)
+        - evtx_files: JSON string of EVTX filenames to scan
+    """
+    import tempfile
+    import shutil
+    
+    temp_dir = None
+    try:
+        # Get uploaded Sigma files
+        sigma_files = request.files.getlist('sigma_files')
+        evtx_files_json = request.form.get('evtx_files', '[]')
+        
+        if not sigma_files:
+            return jsonify({"error": "No Sigma rule files uploaded"}), 400
+        
+        # Parse EVTX files list
+        try:
+            evtx_files_input = json.loads(evtx_files_json)
+        except json.JSONDecodeError:
+            evtx_files_input = []
+        
+        # Create temporary directory for uploaded Sigma rules
+        temp_dir = tempfile.mkdtemp(prefix='sigma_upload_')
+        logger.info(f"[+] Created temporary directory for uploaded Sigma rules: {temp_dir}")
+        
+        # Save uploaded files to temporary directory
+        saved_files = 0
+        for sigma_file in sigma_files:
+            if sigma_file.filename:
+                # Security: sanitize filename
+                filename = sigma_file.filename
+                # Remove path separators for security
+                filename = os.path.basename(filename)
+                
+                # Only accept .yml and .yaml files
+                if not (filename.lower().endswith('.yml') or filename.lower().endswith('.yaml')):
+                    continue
+                
+                # Validate filename doesn't contain dangerous characters
+                if '..' in filename or filename.startswith('.'):
+                    logger.warning(f"[!] Security: Invalid filename rejected: {filename}")
+                    continue
+                
+                # Save file
+                file_path = os.path.join(temp_dir, filename)
+                sigma_file.save(file_path)
+                saved_files += 1
+        
+        if saved_files == 0:
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+            return jsonify({"error": "No valid Sigma rule files (.yml or .yaml) were uploaded"}), 400
+        
+        logger.info(f"[+] Saved {saved_files} Sigma rule files to temporary directory")
+        
+        # Determine EVTX files to scan
+        upload_dir = os.path.join(FPATH, 'upload')
+        sample_dir = os.path.join(FPATH, 'sample')
+        evtx_files = []
+        
+        if evtx_files_input and isinstance(evtx_files_input, list):
+            # Use specified files
+            for filename in evtx_files_input:
+                if not isinstance(filename, str):
+                    continue
+                
+                # Security: sanitize filename with EVTX type restriction
+                safe_filename, error_msg = sanitize_filename(filename, file_type='evtx')
+                if safe_filename is None:
+                    logger.warning(f"[!] Security: Invalid filename rejected: {filename}")
+                    continue
+                
+                # Try upload folder first, then sample folder
+                filepath = os.path.join(upload_dir, safe_filename)
+                if not os.path.exists(filepath):
+                    filepath = os.path.join(sample_dir, safe_filename)
+                
+                if os.path.exists(filepath):
+                    real_path = os.path.realpath(filepath)
+                    if (real_path.startswith(os.path.realpath(upload_dir) + os.sep) or 
+                        real_path.startswith(os.path.realpath(sample_dir) + os.sep)):
+                        evtx_files.append(filepath)
+        else:
+            # Scan all EVTX files in upload folder
+            if os.path.exists(upload_dir):
+                for filename in os.listdir(upload_dir):
+                    if filename.lower().endswith('.evtx'):
+                        evtx_files.append(os.path.join(upload_dir, filename))
+        
+        if not evtx_files:
+            if temp_dir and os.path.exists(temp_dir):
+                shutil.rmtree(temp_dir)
+            return jsonify({"error": "No EVTX files found. Please upload EVTX files first."}), 404
+        
+        # Run Sigma scan with uploaded rules
+        logger.info(f"[+] Starting Sigma scan: {len(evtx_files)} files with {saved_files} uploaded rules")
+        sigma_results = sigma_scan_evtx(evtx_files, temp_dir, timezone=0)
+        
+        # Save results to file
+        output_path = FPATH + "/static/" + SIGMA_RESULTS_FILE
+        with open(output_path, 'w', encoding='utf8') as f:
+            json.dump(sigma_results, f, ensure_ascii=False, indent=2)
+        
+        logger.info(f"[+] Sigma scan completed: {len(sigma_results)} detections")
+        
+        # Cleanup temporary directory
+        if temp_dir and os.path.exists(temp_dir):
+            shutil.rmtree(temp_dir)
+            logger.info(f"[+] Cleaned up temporary Sigma rules directory")
+        
+        return jsonify({
+            "success": True,
+            "rules_uploaded": saved_files,
+            "files_scanned": len(evtx_files),
+            "file_names": [os.path.basename(f) for f in evtx_files],
+            "detections": len(sigma_results)
+        })
+        
+    except Exception as e:
+        logger.error(f"[!] Sigma rescan with upload error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        
+        # Cleanup on error
+        if temp_dir and os.path.exists(temp_dir):
+            try:
+                shutil.rmtree(temp_dir)
+            except:
+                pass
+        
+        return jsonify({"error": str(e)}), 500
+
+
+# List available EVTX files
+@app.route('/sigma_files')
+@login_required(role="ANY")
+def sigma_files():
+    """Return list of available EVTX files in upload folder"""
+    files = []
+    upload_dir = os.path.join(FPATH, 'upload')
+    
+    if os.path.exists(upload_dir):
+        for filename in sorted(os.listdir(upload_dir)):
+            filepath = os.path.join(upload_dir, filename)
+            if os.path.isfile(filepath) and filename.lower().endswith('.evtx'):
+                # Get file size
+                size = os.path.getsize(filepath)
+                size_str = f"{size / 1024 / 1024:.1f} MB" if size > 1024*1024 else f"{size / 1024:.1f} KB"
+                files.append({
+                    "name": filename,
+                    "size": size_str,
+                    "path": filename
+                })
+    
+    return jsonify(files)
+
+
+# List available Sigma rule folders
+@app.route('/sigma_folders')
+@login_required(role="ANY")
+def sigma_folders():
+    """Return list of available Sigma rule folders"""
+    folders = []
+    sigma_base = os.path.join(FPATH, 'sigma')
+    
+    if os.path.exists(sigma_base):
+        # Add root sigma folder
+        folders.append({"path": "sigma", "name": "sigma (default)"})
+        
+        # Add subfolders
+        for item in sorted(os.listdir(sigma_base)):
+            item_path = os.path.join(sigma_base, item)
+            if os.path.isdir(item_path) and not item.startswith('.'):
+                folders.append({"path": f"sigma/{item}", "name": f"sigma/{item}"})
+                
+                # Add second level folders (e.g., sigma/rules/windows)
+                for subitem in sorted(os.listdir(item_path)):
+                    subitem_path = os.path.join(item_path, subitem)
+                    if os.path.isdir(subitem_path) and not subitem.startswith('.'):
+                        folders.append({"path": f"sigma/{item}/{subitem}", "name": f"sigma/{item}/{subitem}"})
+    
+    return jsonify(folders)
 
 
 # Web application upload
@@ -930,7 +1919,7 @@ def sigma():
 @http_request_logging
 def do_upload():
     UPLOAD_DIR = os.path.join(FPATH, 'upload')
-    filelist = ""
+    filelist = []
 
     if os.path.exists(UPLOAD_DIR) is False:
         os.makedirs(UPLOAD_DIR)
@@ -942,38 +1931,62 @@ def do_upload():
         addlog = request.form["addlog"]
         sigmascan = request.form["sigmascan"]
         casename = request.form["casename"]
+        
+        # Generate unique timestamp for this upload batch
+        from datetime import datetime
+        upload_timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        
         for i in range(0, len(request.files)):
             loadfile = "file" + str(i)
             file = request.files[loadfile]
             if file and file.filename:
+                # Create unique filename: timestamp_index.ext
                 if "EVTX" in logtype:
-                    filename = os.path.join(UPLOAD_DIR, str(i) + ".evtx")
+                    unique_filename = f"{upload_timestamp}_{i:02d}.evtx"
+                    filename = os.path.join(UPLOAD_DIR, unique_filename)
                 elif "XML" in logtype:
-                    filename = os.path.join(UPLOAD_DIR, str(i) + ".xml")
+                    unique_filename = f"{upload_timestamp}_{i:02d}.xml"
+                    filename = os.path.join(UPLOAD_DIR, unique_filename)
                 else:
                     continue
                 file.save(filename)
-                filelist += filename + " "
+                filelist.append(filename)
+                logger.info(f"[+] Uploaded file saved as: {unique_filename}")
+                
         if "EVTX" in logtype:
-            logoption = " -e "
+            logoption = "-e"
         elif "XML" in logtype:
-            logoption = " -x "
+            logoption = "-x"
         else:
             return "FAIL"
-        if not re.search(r"\A-{0,1}[0-9]{1,2}\Z", timezone):
+        if not is_valid_timezone(timezone):
             return "FAIL"
         if addlog in "true":
             add_option = "--add"
         else:
             add_option = "--delete"
         if sigmascan in "true":
-            add_option += " --sigma"
+            sigma_option = ["--sigma"]
+        else:
+            sigma_option = []
         if not re.search(r"\A[0-9a-zA-Z]{2,20}\Z", casename):
             return "FAIL"
 
-        parse_command = "nohup python3 " + FPATH + "/logontracer.py " + add_option + " --case " + casename + " -z " + timezone + logoption + filelist + " -s " + NEO4J_SERVER + " -u " + session["username"] + " -p " + session["password"] + " >  " + FPATH + "/static/logontracer.log 2>&1 &"
-        subprocess.call("rm -f " + FPATH + "/static/logontracer.log > /dev/null", shell=True)
-        subprocess.call(parse_command, shell=True)
+        log_file = os.path.join(FPATH, "static", "logontracer.log")
+        if os.path.exists(log_file):
+            os.remove(log_file)
+
+        _up_user, _up_pass = get_neo4j_creds()
+        if _up_user is None:
+            return "FAIL"
+        parse_command = ["python3", os.path.join(FPATH, "logontracer.py"),
+                         add_option, "--case", casename, "-z", timezone,
+                         logoption] + filelist + sigma_option + [
+                         "-s", NEO4J_SERVER,
+                         "-u", _up_user,
+                         "-p", _up_pass]
+        with open(log_file, "w") as lf:
+            subprocess.Popen(parse_command, stdout=lf, stderr=subprocess.STDOUT)
         # parse_evtx(filename)
         return "SUCCESS"
 
@@ -995,31 +2008,29 @@ def es_load():
         casename = request.form["casename"]
         addes = request.form["addes"]
 
+        from_option = []
         if fromdatetime not in "false":
             try:
                 datetime.datetime.strptime(fromdatetime, "%Y-%m-%dT%H:%M:%S")
-                fromdatetime = " -f " + fromdatetime
+                from_option = ["-f", fromdatetime]
             except:
                 return "FAIL"
-        else:
-            fromdatetime = ""
 
+        to_option = []
         if todatetime not in "false":
             try:
                 datetime.datetime.strptime(todatetime, "%Y-%m-%dT%H:%M:%S")
-                todatetime = " -t " + todatetime
+                to_option = ["-t", todatetime]
             except:
                 return "FAIL"
-        else:
-            todatetime = ""
 
         es_ip, es_port = es_server.split(":")
         if (re.search(IPv4_PATTERN, es_ip) or es_ip in "localhost") and re.search(r"\A\d{2,5}\Z", es_port):
-            es_server = " --es-server " + es_server
+            es_server_option = ["--es-server", es_server]
         else:
             return "FAIL"
 
-        if not re.search(r"\A-{0,1}[0-9]{1,2}\Z", timezone):
+        if not is_valid_timezone(timezone):
             return "FAIL"
 
         if addlog in "true":
@@ -1028,16 +2039,31 @@ def es_load():
             log_option = "--delete"
 
         if addes in "true":
-            es_option = " --postes "
+            es_option = ["--postes"]
         else:
-            es_option = ""
+            es_option = []
 
         if not re.search(r"\A[0-9a-zA-Z]{2,20}\Z", casename):
             return "FAIL"
 
-        parse_command = "nohup python3 " + FPATH + "/logontracer.py --es " + log_option + es_option + " --case " + casename + " -z " + timezone + fromdatetime + todatetime + es_server  + " -s " + NEO4J_SERVER + " -u " + session["username"] + " -p " + session["password"] + " --es-index " + ES_INDEX + " --es-prefix " + ES_PREFIX + " >  " + FPATH + "/static/logontracer.log 2>&1 &"
-        subprocess.call("rm -f " + FPATH + "/static/logontracer.log > /dev/null", shell=True)
-        subprocess.call(parse_command, shell=True)
+        log_file = os.path.join(FPATH, "static", "logontracer.log")
+        if os.path.exists(log_file):
+            os.remove(log_file)
+
+        _es_user, _es_pass = get_neo4j_creds()
+        if _es_user is None:
+            return "FAIL"
+        parse_command = ["python3", os.path.join(FPATH, "logontracer.py"),
+                         "--es", log_option] + es_option + [
+                         "--case", casename, "-z", timezone
+                         ] + from_option + to_option + es_server_option + [
+                         "-s", NEO4J_SERVER,
+                         "-u", _es_user,
+                         "-p", _es_pass,
+                         "--es-index", ES_INDEX,
+                         "--es-prefix", ES_PREFIX]
+        with open(log_file, "w") as lf:
+            subprocess.Popen(parse_command, stdout=lf, stderr=subprocess.STDOUT)
         return "SUCCESS"
 
     except:
@@ -1049,8 +2075,218 @@ def favicon():
     return app.send_static_file("favicon.ico")
 
 
+# AI Analysis API Endpoints
+@app.route("/api/analyze-security-pattern", methods=["POST"])
+@login_required(role="ANY")
+def analyze_security_pattern():
+    """AI-powered security pattern analysis"""
+    try:
+        from intelligence.analysis_engine import SecurityAnalysisEngine
+        
+        data = request.get_json()
+        if not data:
+            return jsonify({"success": False, "error": "No data provided"}), 400
+        
+        query_type = data.get('query_type', 'general_analysis')
+        analysis_data = data.get('analysis_data', {})
+        graph_stats = data.get('graph_stats', {})
+        
+        # Initialize AI analysis engine
+        engine = SecurityAnalysisEngine()
+        
+        # Run async analysis
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            analysis_result = loop.run_until_complete(
+                engine.analyze_query_results(query_type, analysis_data, graph_stats)
+            )
+        finally:
+            loop.close()
+        
+        return jsonify({
+            "success": True,
+            "analysis": analysis_result
+        })
+        
+    except Exception as e:
+        logger.error(f"AI analysis error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Analysis failed: {str(e)}"
+        }), 500
+
+
+@app.route("/api/ai-status", methods=["GET"])
+@login_required(role="ANY")
+def ai_status():
+    """Get AI analysis engine status"""
+    try:
+        from intelligence.analysis_engine import SecurityAnalysisEngine
+        
+        engine = SecurityAnalysisEngine()
+        status = engine.get_status()
+        
+        return jsonify({
+            "success": True,
+            "status": status
+        })
+        
+    except Exception as e:
+        logger.error(f"AI status check error: {str(e)}")
+        return jsonify({
+            "success": False,
+            "error": f"Status check failed: {str(e)}"
+        }), 500
+
+
+# LLM Agent API Endpoints
+@app.route("/api/ai/agent-detect", methods=["POST"])
+@login_required(role="ANY")
+def ai_agent_detect():
+    """Run autonomous threat detection using LLM Agent"""
+    try:
+        from intelligence.agent_engine import LLMDetectionAgent
+        
+        data = request.get_json()
+        initial_context = data.get("context", "Detect suspicious logon behavior in Active Directory")
+
+        _agent_user, _agent_pass = get_neo4j_creds()
+        if _agent_user is None:
+            return jsonify({"success": False, "error": "Session expired. Please log in again."}), 401
+
+        # Create agent instance
+        neo4j_uri = f"bolt://{NEO4J_SERVER}:{WS_PORT}"
+        agent = LLMDetectionAgent(neo4j_uri, _agent_user, _agent_pass, session.get('case', CASE_NAME))
+        
+        # Run autonomous detection
+        import asyncio
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        
+        try:
+            result = loop.run_until_complete(
+                agent.run_autonomous_detection(initial_context)
+            )
+        finally:
+            loop.close()
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Agent detection error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'investigation_completed': False,
+            'threats_discovered': 0
+        }), 500
+
+@app.route("/api/ai/agent-status", methods=["GET"])
+@login_required(role="ANY")
+def ai_agent_status():
+    """Get LLM Agent status"""
+    try:
+        from intelligence.agent_engine import LLMDetectionAgent
+        
+        _agent_user, _agent_pass = get_neo4j_creds()
+        if _agent_user is None:
+            return jsonify({"success": False, "error": "Session expired. Please log in again."}), 401
+
+        # Check agent configuration
+        neo4j_uri = f"bolt://{NEO4J_SERVER}:{WS_PORT}"
+        agent = LLMDetectionAgent(neo4j_uri, _agent_user, _agent_pass, session.get('case', CASE_NAME))
+        
+        return jsonify({
+            'success': True,
+            'max_iterations': agent.max_iterations,
+            'model': agent.config.model if agent.is_enabled else None
+        })
+        
+    except Exception as e:
+        logger.error(f"Agent status error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+        }), 500
+
+
+@app.route("/api/ai/generate-sigma-rules", methods=["POST"])
+@login_required(role="ANY")
+def ai_generate_sigma_rules():
+    """Generate Sigma rules from AI Analysis results"""
+    try:
+        from intelligence.openai_client import OpenAIClient
+        from intelligence.llm_config import get_llm_config, validate_config
+        
+        data = request.get_json()
+        
+        if not data:
+            return jsonify({
+                'success': False,
+                'message': 'No analysis result provided',
+                'sigma_rules': []
+            }), 400
+        
+        analysis_result = data.get('analysis_result', {})
+        
+        if not analysis_result:
+            return jsonify({
+                'success': False,
+                'message': 'Empty analysis result',
+                'sigma_rules': []
+            }), 400
+        
+        # Check risk level - look in multiple locations
+        risk_level = (
+            analysis_result.get('overall_risk_level') or 
+            analysis_result.get('risk_level') or 
+            analysis_result.get('final_report', {}).get('overall_risk_level') or
+            'low'
+        )
+        
+        if risk_level.lower() not in ['high', 'critical']:
+            return jsonify({
+                'success': False,
+                'message': f'Sigma rule generation requires High or Critical risk level. Current level: {risk_level}',
+                'sigma_rules': []
+            }), 400
+        
+        # Initialize OpenAI client using proper config loading
+        from intelligence.llm_config import get_llm_config, validate_config
+        
+        config = get_llm_config()
+        if not validate_config(config):
+            return jsonify({
+                'success': False,
+                'message': 'AI Analysis is not enabled. Please configure API key.',
+                'sigma_rules': []
+            }), 400
+        
+        client = OpenAIClient(config)
+        
+        # Generate Sigma rules (async)
+        async def generate():
+            return await client.generate_sigma_rules(analysis_result)
+        
+        result = asyncio.run(generate())
+        
+        return jsonify(result)
+        
+    except Exception as e:
+        logger.error(f"Sigma rule generation error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'message': f'Error: {str(e)}',
+            'sigma_rules': []
+        }), 500
+
+
 # Calculate ChangeFinder
 def adetection(counts, users, starttime, tohours):
+    import numpy as np
+    import changefinder
+    
     count_array = np.zeros((5, len(users), tohours + 1))
     count_all_array = []
     result_array = []
@@ -1160,6 +2396,9 @@ def pagerank(event_set, admins, hmm, cf, ntml):
 
 # Calculate Hidden Markov Model
 def decodehmm(frame, users, stime):
+    import numpy as np
+    import joblib
+    
     detect_hmm = []
     model = joblib.load(FPATH + "/model/hmm.pkl")
     while(1):
@@ -1196,6 +2435,10 @@ def decodehmm(frame, users, stime):
 
 # Learning Hidden Markov Model
 def learnhmm(frame, users, stime):
+    import numpy as np
+    from hmmlearn import hmm
+    import joblib
+    
     lengths = []
     data_array = np.array([])
     # start_probability = np.array([0.52, 0.37, 0.11])
@@ -1246,6 +2489,8 @@ def create_map(es, index):
 
 
 def to_lxml(record_xml):
+    from lxml import etree
+    
     rep_xml = record_xml.replace("xmlns=\"http://schemas.microsoft.com/win/2004/08/events/event\"", "")
     fin_xml = rep_xml.encode("utf-8")
     parser = etree.XMLParser(resolve_entities=False)
@@ -1253,6 +2498,9 @@ def to_lxml(record_xml):
 
 
 def xml_records(filename):
+    from evtx import PyEvtxParser
+    from lxml import etree
+    
     if args.evtx:
         with open(filename, "rb") as evtx:
             parser = PyEvtxParser(evtx)
@@ -1286,11 +2534,53 @@ def convert_logtime(logtime, tzone):
         return datetime.datetime.strptime(tzless, "%Y-%m-%dT%H:%M:%S") + datetime.timedelta(hours=tzone)
 
 
-# Create database for neo4j
-def create_database(service, database):
+def _safe_neo4j_identifier(value, label="identifier"):
+    """
+    Validate and backtick-quote a Neo4j identifier (database name, username, role).
+    Raises ValueError if the value is not a safe identifier.
+    """
+    if not value or not isinstance(value, str):
+        raise ValueError(f"Invalid {label}: empty or wrong type")
+    if len(value) > 50:
+        raise ValueError(f"Invalid {label}: too long (max 50)")
+    if not NEO4J_IDENTIFIER_PATTERN.match(value):
+        raise ValueError(f"Invalid {label}: only alphanumeric and underscore allowed")
+    # Backtick-quote the identifier
+    return "`" + value + "`"
+
+
+# Check Neo4j edition
+def check_neo4j_enterprise(driver):
+    """
+    Check if Neo4j is Enterprise edition
+    Returns True if Enterprise, False if Community
+    """
     try:
-        system = service.system_graph
-        system.run(statement_cd.format(**{"case": database}))
+        with driver.session(database="system") as session:
+            result = session.run("CALL dbms.components() YIELD name, edition")
+            service_info = result.single()
+            if service_info:
+                edition = service_info.get("edition", "").lower()
+                return "enterprise" in edition
+            return False
+    except Exception as e:
+        logger.warning("[!] Could not determine Neo4j edition: {0}. Assuming Community edition.".format(str(e)))
+        return False
+
+
+# Create database for neo4j
+def create_database(driver, database):
+    from neo4j.exceptions import ClientError
+
+    try:
+        safe_db = _safe_neo4j_identifier(database, "database name")
+    except ValueError as e:
+        logger.error("[!] Invalid database name: {0}".format(str(e)))
+        return "neo4j"
+
+    try:
+        with driver.session(database="system") as system:
+            system.run("CREATE DATABASE " + safe_db + ";")
         logger.info("[+] Created database {0}.".format(database))
     except ClientError as e:
         if "Database already exists" in str(e):
@@ -1304,11 +2594,19 @@ def create_database(service, database):
     return database
 
 
-# Create database for neo4j
-def delete_database(service, database):
+# Delete database for neo4j
+def delete_database(driver, database):
+    from neo4j.exceptions import ClientError
+
     try:
-        system = service.system_graph
-        system.run(statement_dd.format(**{"case": database}))
+        safe_db = _safe_neo4j_identifier(database, "database name")
+    except ValueError as e:
+        logger.error("[!] Invalid database name: {0}".format(str(e)))
+        return
+
+    try:
+        with driver.session(database="system") as system:
+            system.run("DROP DATABASE " + safe_db + ";")
         logger.info("[+] Delete database {0}.".format(database))
     except ClientError as e:
         if "Database does not exist" in str(e):
@@ -1320,11 +2618,20 @@ def delete_database(service, database):
 
 
 # Create user for neo4j
-def create_neo4j_user(service, username, password, role):
-    system = service.system_graph
+def create_neo4j_user(driver, username, password, role):
+    from neo4j.exceptions import ClientError
 
     try:
-        system.run(statement_cu.format(**{"username": username, "password": password}))
+        safe_user = _safe_neo4j_identifier(username, "username")
+        safe_role = _safe_neo4j_identifier(role, "role")
+    except ValueError as e:
+        logger.error("[!] Invalid identifier: {0}".format(str(e)))
+        return
+
+    try:
+        with driver.session(database="system") as system:
+            system.run("CREATE USER " + safe_user + " SET PASSWORD $password CHANGE NOT REQUIRED;",
+                        {"password": password})
         logger.info("[+] Created user {0} for neo4j.".format(username))
     except ClientError as e:
         if "User already exists" in str(e):
@@ -1334,32 +2641,60 @@ def create_neo4j_user(service, username, password, role):
         else:
             logger.error(str(e))
 
-    if "Enterprise" in service.product:
-        try:
-            # For admin role, do not revokes database access.
-            if "admin" in role:
-                system.run(statement_role_set_admin.format(**{"username": username}))
-                logger.info("[+] Set {0} admin role for neo4j.".format(username))
+    # Check if Neo4j Enterprise features are available and set up roles
+    try:
+        with driver.session(database="system") as system:
+            # Test if this is Neo4j Enterprise by trying to check components
+            result = system.run("CALL dbms.components() YIELD name, edition")
+            service_info = result.single()
+            is_enterprise = "enterprise" in str(service_info)
+
+            if is_enterprise:
+                # For admin role, grant admin privileges directly
+                if "admin" in role:
+                    system.run("GRANT ROLE admin TO " + safe_user + ";")
+                    logger.info("[+] Set {0} admin role for neo4j.".format(username))
+                else:
+                    # For other roles, create custom role and manage database access
+                    safe_role_name = _safe_neo4j_identifier(username + "_role", "role name")
+                    system.run("CREATE OR REPLACE ROLE " + safe_role_name + " AS COPY OF " + safe_role + ";")
+                    # Note: Revoke all access and then grant specific access
+                    try:
+                        system.run("REVOKE ACCESS ON DATABASE * FROM " + safe_role_name + ";")
+                    except:
+                        logger.info("[!] Could not revoke all database access. This may be expected in some Neo4j configurations.")
+                    system.run("GRANT ROLE " + safe_role_name + " TO " + safe_user + ";")
+                    system.run("GRANT ACCESS ON DATABASE neo4j TO " + safe_role_name + ";")
+                    logger.info("[+] Created {0}_role for neo4j.".format(username))
             else:
-                system.run(statement_role_add.format(**{"username": username, "role": role}))
-                system.run(statement_role_revole.format(**{"database": "*", "username": username}))
-                system.run(statement_role_set.format(**{"username": username}))
-                system.run(statement_default_db_access.format(**{"username": username}))
-                logger.info("[+] Created {0}_role for neo4j.".format(username))
-        except ClientError as e:
-            if "Role already exists" in str(e):
-                logger.error("[!] Role already exists {0}.".format(username))
-            elif "Unsupported administration command" in str(e):
-                logger.error("[!] Can't create role. This feature is in Neo4j Enterprise.")
-            else:
-                logger.error(str(e))
+                logger.info("[+] Neo4j Community Edition detected. Role management is limited.")
+
+    except ClientError as e:
+        if "Role already exists" in str(e):
+            logger.error("[!] Role already exists {0}.".format(username))
+        elif "Unsupported administration command" in str(e):
+            logger.error("[!] Can't create role. This feature is in Neo4j Enterprise.")
+        else:
+            logger.error(str(e))
+    except Exception as e:
+        logger.warning("[!] Could not determine Neo4j edition or set up roles: {0}".format(str(e)))
+
+    logger.info("[+] User creation completed for {0}.".format(username))
 
 
 # Delete user for neo4j
-def delete_neo4j_user(service, username):
+def delete_neo4j_user(driver, username):
+    from neo4j.exceptions import ClientError
+
     try:
-        system = service.system_graph
-        system.run(statement_du.format(**{"username": username}))
+        safe_user = _safe_neo4j_identifier(username, "username")
+    except ValueError as e:
+        logger.error("[!] Invalid username: {0}".format(str(e)))
+        return
+
+    try:
+        with driver.session(database="system") as system:
+            system.run("DROP USER " + safe_user + ";")
         logger.info("[+] Delete user {0} for neo4j.".format(username))
     except ClientError as e:
         if "User does not exist" in str(e):
@@ -1371,53 +2706,80 @@ def delete_neo4j_user(service, username):
 
 
 # Change user status for neo4j
-def change_status_neo4j_user(service, username, action):
+def change_status_neo4j_user(driver, username, action):
+    VALID_STATUS = {"suspended": "SUSPENDED", "active": "ACTIVE"}
+    safe_action = VALID_STATUS.get(action)
+    if safe_action is None:
+        logger.error("[!] Invalid action for user status change: {0}".format(action))
+        return
+
     try:
-        system = service.system_graph
-        system.run(statement_su.format(**{"username": username, "action": action}))
-        logger.info("[+] Change user {0} status {1} for neo4j.".format(username, action))
-    except ClientError as e:
+        safe_user = _safe_neo4j_identifier(username, "username")
+    except ValueError as e:
+        logger.error("[!] Invalid username: {0}".format(str(e)))
+        return
+
+    try:
+        with driver.session(database="system") as neo4j_session:
+            neo4j_session.run("ALTER USER " + safe_user + " SET STATUS " + safe_action + ";")
+        logger.info("[+] Change user {0} status {1} for neo4j.".format(username, safe_action))
+    except Exception as e:
         if "User does not exist" in str(e):
             logger.error("[!] User does not exist {0}.".format(username))
         elif "Unsupported administration command" in str(e):
-            logger.error("[!] Can't delete user.")
+            logger.error("[!] Can't change user status.")
         else:
             logger.error(str(e))
 
 
 # Add user access role for database
-def add_db_access_role(service, username, dbname):
+def add_db_access_role(driver, username, dbname):
     try:
-        system = service.system_graph
-        system.run(statement_db_access.format(**{"username": username, "database": dbname}))
+        safe_role_name = _safe_neo4j_identifier(username + "_role", "role name")
+        safe_db = _safe_neo4j_identifier(dbname, "database name")
+    except ValueError as e:
+        logger.error("[!] Invalid identifier: {0}".format(str(e)))
+        return
+
+    try:
+        with driver.session(database="system") as neo4j_session:
+            neo4j_session.run("GRANT ACCESS ON DATABASE " + safe_db + " TO " + safe_role_name + ";")
         logger.info("[+] Added database access role: user {0} database {1}.".format(username, dbname))
-    except ClientError as e:
+    except Exception as e:
         if "Role does not exist" in str(e):
             logger.error("[!] User does not exist {0}.".format(username))
         elif "Unsupported administration command" in str(e):
-            logger.error("[!] Can't delete user.")
+            logger.error("[!] Can't add database access role.")
         else:
             logger.error(str(e))
 
 
 # Delete user access role for database
-def delete_db_access_role(service, username, dbname):
-    print("test")
+def delete_db_access_role(driver, username, dbname):
     try:
-        system = service.system_graph
-        system.run(statement_role_revole.format(**{"database": dbname, "username": username}))
+        safe_role_name = _safe_neo4j_identifier(username + "_role", "role name")
+        safe_db = _safe_neo4j_identifier(dbname, "database name")
+    except ValueError as e:
+        logger.error("[!] Invalid identifier: {0}".format(str(e)))
+        return
+
+    try:
+        with driver.session(database="system") as neo4j_session:
+            neo4j_session.run("REVOKE ACCESS ON DATABASE " + safe_db + " FROM " + safe_role_name + ";")
         logger.info("[+] Deleted database access role: user {0} database {1}.".format(username, dbname))
-    except ClientError as e:
+    except Exception as e:
         if "Role does not exist" in str(e):
             logger.error("[!] User does not exist {0}.".format(username))
         elif "Unsupported administration command" in str(e):
-            logger.error("[!] Can't delete user.")
+            logger.error("[!] Can't delete database access role.")
         else:
             logger.error(str(e))
 
 
 # git clone or pull from url
 def git_clone_pull(url, download_path):
+    import git
+    
     if os.path.exists(download_path):
         try:
             repo = git.Repo(download_path)
@@ -1436,57 +2798,86 @@ def git_clone_pull(url, download_path):
 
 # Load sigma rules
 def load_sigma(download_path):
-    sigma_status = ["stable", "test", None] 
+    """
+    Load Sigma rules
+    Returns: (sigma_rules, eventids_set)
+        sigma_rules: List of [event_ids, detection_conditions, title, description, level]
+        eventids_set: Set of all Event IDs from loaded rules
+    """
+    # Lazy import for Sigma rule processing - must import at function level for availability
+    import glob
+    from sigma.collection import SigmaCollection
+    from sigma.rule import SigmaRule
+    
+    # Note: rule.status is an Enum, so we convert to string for comparison
+    allowed_status_str = ["stable", "test"]  # "experimental" etc can be added
     sigma_rules = []
     eventids = []
-
-    config = SigmaConfiguration()
 
     if os.path.exists(download_path):
         logger.info("[+] Load sigma rules from {0}.".format(download_path))
         sigma_rules_files = glob.glob(download_path + '/**/*.yml', recursive=True)
+        
         for rules_file in sigma_rules_files:
             # ignore rules
             if ".github" in rules_file or "config" in rules_file or "test" in rules_file:
                 continue
 
-            with open(rules_file, "r", encoding='utf-8') as file:
-                try:
-                    parser = SigmaParser(yaml.safe_load(file), config)
-                except:
-                    logger.info("[+] Can't load sigma rule file {0}.".format(rules_file))
-                    continue
-
-                if not 'product' in parser.parsedyaml["logsource"].keys() or not 'service' in parser.parsedyaml["logsource"].keys():
-                    continue
-
-                if "windows" in parser.parsedyaml["logsource"]["product"] and "security" in parser.parsedyaml["logsource"]["service"] and parser.parsedyaml["status"] in sigma_status:
-                    if not re.search("count", str(parser.parsedyaml["detection"]["condition"])):
-                        for parsed in parser.condparsed:
-                            try:
-                                parsed_sigma = generateQuery(parsed)[0]
-                            except:
-                                logger.info("[+] Can't parse sigma rule file {0}.".format(rules_file))
+            try:
+                # Load using modern SigmaCollection API
+                collection = SigmaCollection.load_ruleset([rules_file], collect_errors=True)
+                
+                for rule in collection.rules:
+                    # Check for errors in rule
+                    if rule.errors:
+                        logger.debug(f"[+] Rule {rules_file} has errors: {rule.errors}")
+                        continue
+                    
+                    # Check logsource - must be Windows Security logs
+                    logsource = rule.logsource
+                    if not logsource:
+                        continue
                         
-                        for sigma_rule_path in list(load_sigma_rules(parsed_sigma)):
-                            #print(sigma_rule_path)
-                            if depth(sigma_rule_path) == 1:
-                                break
-                        else:
+                    product = logsource.product if logsource.product else ""
+                    service = logsource.service if logsource.service else ""
+                    
+                    if "windows" not in product.lower() or "security" not in service.lower():
+                        continue
+                    
+                    # Check status (Enum comparison - convert to string)
+                    status_str = str(rule.status).lower() if rule.status else ""
+                    if status_str not in allowed_status_str:
+                        continue
+                    
+                    # Skip count-based detection conditions
+                    condition_str = " ".join(rule.detection.condition) if rule.detection.condition else ""
+                    if re.search(r"count", condition_str, re.IGNORECASE):
+                        continue
+                    
+                    # Extract detection conditions using modern API
+                    try:
+                        detection_dict = extract_detection_conditions(rule)
+                        if not detection_dict:
                             continue
-                        
-                        # export event id from sigma rules
-                        eid = []
-                        if isinstance(parsed_sigma, dict):
-                            eid.append(parsed_sigma['EventID'])
-                        else:
-                            for d in flatten(parsed_sigma):
-                                if isinstance(d, dict):
-                                    if 'EventID' in d.keys():
-                                        eid.append(d['EventID'])
-                        eid_list = list(flatten(eid))
-                        eventids.extend(eid_list)
-                        sigma_rules.append([eid_list, parsed_sigma, parser.parsedyaml["title"], parser.parsedyaml["description"], parser.parsedyaml["level"]])
+                    except Exception as e:
+                        logger.debug(f"[+] Can't extract detection from {rules_file}: {e}")
+                        continue
+                    
+                    # Extract Event IDs
+                    eid_list = extract_event_ids(detection_dict)
+                    eventids.extend(eid_list)
+                    
+                    # Get rule metadata
+                    title = rule.title if rule.title else "Untitled"
+                    description = rule.description if rule.description else ""
+                    # Convert Enum to string for level
+                    level = str(rule.level).lower() if rule.level else "unknown"
+                    
+                    sigma_rules.append([eid_list, detection_dict, title, description, level])
+                    
+            except Exception as e:
+                logger.debug(f"[+] Can't load sigma rule file {rules_file}: {e}")
+                continue
     else:
         logger.error("[!] Not found {0}.".format(download_path))
 
@@ -1495,106 +2886,643 @@ def load_sigma(download_path):
     return sigma_rules, set(eventids)
 
 
-# Sigma rule parse helpers
-def generateQuery(parsed):
-    nodes = []
-
-    if type(parsed.parsedSearch) == NodeSubexpression:
-        nodes.append(parsed.parsedSearch.items)
-    elif isinstance(parsed.parsedSearch, tuple):
-        nodes.append(parsed.parsedSearch)
-    else:
-        nodes.append(parsed.parsedSearch)
+def sigma_scan_evtx(evtx_files, sigma_rules_path, timezone=0):
+    """
+    Sigma scan only mode - scan EVTX files with Sigma rules without Neo4j processing
     
-    return generateANDNode(nodes)
+    Args:
+        evtx_files: List of EVTX file paths to scan
+        sigma_rules_path: Path to Sigma rules folder
+        timezone: Timezone offset (default: 0)
+    
+    Returns:
+        List of detection results
+    """
+    from evtx import PyEvtxParser
+    from lxml import etree as lxml_etree
+    
+    # Load Sigma rules
+    git_clone_pull(SIGMA_URL, os.path.join(FPATH, 'sigma'))
+    sigma_rules, sigma_eventids = load_sigma(sigma_rules_path)
+    
+    if not sigma_rules:
+        logger.error("[!] No Sigma rules loaded from {0}".format(sigma_rules_path))
+        return []
+    
+    sigma_results = []
+    total_events = 0
+    matched_events = 0
+    
+    logger.info("[+] Starting Sigma-only scan on {0} file(s)".format(len(evtx_files)))
+    
+    for evtx_file in evtx_files:
+        logger.info("[+] Scanning: {0}".format(evtx_file))
+        
+        # Check file exists and is EVTX format
+        if not os.path.exists(evtx_file):
+            logger.error("[!] File not found: {0}".format(evtx_file))
+            continue
+            
+        with open(evtx_file, "rb") as fb:
+            fb_data = fb.read(8)
+            if fb_data != EVTX_HEADER:
+                logger.error("[!] Not an EVTX file: {0}".format(evtx_file))
+                continue
+        
+        # Parse EVTX file directly (not using xml_records which depends on args)
+        try:
+            with open(evtx_file, "rb") as evtx:
+                parser = PyEvtxParser(evtx)
+                for record in parser.records():
+                    total_events += 1
+                    
+                    if not total_events % 1000:
+                        sys.stdout.write("\r[+] Processed {0} events, {1} detections".format(total_events, matched_events))
+                        sys.stdout.flush()
+                    
+                    try:
+                        node = to_lxml(record["data"])
+                    except lxml_etree.XMLSyntaxError:
+                        continue
+                    
+                    try:
+                        eventid = int(node.xpath("/Event/System/EventID")[0].text)
+                    except:
+                        continue
+                    
+                    # Only process events that match Sigma rule event IDs
+                    if eventid not in sigma_eventids:
+                        continue
+                    
+                    # Get timestamp
+                    try:
+                        logtime = node.xpath("/Event/System/TimeCreated")[0].get("SystemTime")
+                        etime = convert_logtime(logtime, timezone)
+                    except:
+                        etime = None
+                    
+                    # Get event data
+                    event_data = node.xpath("/Event/EventData/Data")
+                    
+                    # Add EventID as a data element for matching
+                    eventid_elem = lxml_etree.Element("Data")
+                    eventid_elem.set("Name", "EventID")
+                    eventid_elem.text = str(eventid)
+                    enriched_event_data = list(event_data) + [eventid_elem]
+                    
+                    # Match against each Sigma rule
+                    for search_eid, detection_dict, sigma_title, sigma_details, sigma_level in sigma_rules:
+                        if eventid not in search_eid:
+                            continue
+                        
+                        try:
+                            if evaluate_sigma_condition(detection_dict, enriched_event_data):
+                                matched_events += 1
+                                
+                                # Parse event XML into structured data
+                                event_xml_bytes = lxml_etree.tostring(node, encoding="utf-8")
+                                event_parsed = parse_event_xml(event_xml_bytes)
+                                
+                                sigma_results.append({
+                                    "timestamp": etime.strftime("%Y-%m-%d %H:%M:%S") if etime else "-",
+                                    "sigma_level": sigma_level,
+                                    "sigma_title": sigma_title,
+                                    "sigma_description": sigma_details,
+                                    "event": event_parsed,
+                                    "source_file": os.path.basename(evtx_file)
+                                })
+                        except Exception as e:
+                            logger.debug("[!] Error evaluating rule '{0}': {1}".format(sigma_title, str(e)))
+                            continue
+        except Exception as e:
+            logger.error("[!] Error parsing EVTX file {0}: {1}".format(evtx_file, str(e)))
+            continue
+    
+    print()  # New line after progress
+    logger.info("[+] Sigma scan completed: {0} detections from {1} events".format(matched_events, total_events))
+    
+    return sigma_results
 
 
-def generateNode(node):
-    if type(node) == ConditionAND:
-        return generateANDNode(node)
-    elif type(node) == ConditionOR:
-        return generateORNode(node)
-    elif type(node) == ConditionNOT:
-        return generateNOTNode(node)
-    elif type(node) == NodeSubexpression:
-        return generateSubexpressionNode(node)
-    elif type(node) == tuple:
-        return dict((node,))
-    else:
-        raise TypeError("Node type %s was not expected in Sigma parse tree" % (str(type(node))))
+def extract_detection_conditions(rule):
+    """
+    Extract detection conditions from modern SigmaRule object using parsed condition tree
+    Returns dict with field:value mappings or complex nested structure
+    
+    This implementation uses pySigma's parsed condition tree to accurately handle
+    complex conditions including parentheses, nested AND/OR/NOT, and field expressions.
+    """
+    if not rule.detection or not rule.detection.parsed_condition:
+        return None
+    
+    # Get the parsed condition tree from pySigma
+    # parsed_condition is a list, typically with one SigmaCondition
+    sigma_condition = rule.detection.parsed_condition[0]
+    
+    if not sigma_condition.parsed:
+        return None
+    
+    # Recursively walk the parsed condition tree
+    return _parse_condition_node(sigma_condition.parsed)
 
 
-def generateANDNode(node):
-    if type(node) == ConditionAND:
-        return ["AND", [generateNode(val) for val in node]]
-    else:
-        return [generateNode(val) for val in node]
-
-
-def generateORNode(node):
-    return ["OR", [generateNode(val) for val in node]]
-
-
-def generateNOTNode(node):
-    return ["NOT", generateNode(node.item)]
-
-
-def generateSubexpressionNode(node):
-    if type(node.items) == NodeSubexpression:
-        return [check_condition(node), dict(list(flatten(node.items)))]
-    else:
-        return generateNode(node.items)
-
-
-def check_condition(parsed):
-    if isinstance(parsed.items, ConditionOR):
-        return "OR"
-    elif isinstance(parsed.items, ConditionAND):
-        return "AND"
-    elif isinstance(parsed, ConditionNOT):
-        return "NOT"
+def _parse_condition_node(node):
+    """
+    Recursively parse a pySigma condition tree node
+    Returns a dict structure compatible with evaluate_sigma_condition()
+    """
+    from sigma.conditions import (
+        ConditionAND, ConditionOR, ConditionNOT,
+        ConditionFieldEqualsValueExpression,
+        ConditionItem
+    )
+    
+    node_type = type(node).__name__
+    
+    # Handle AND nodes
+    if isinstance(node, ConditionAND):
+        if hasattr(node, 'args') and node.args:
+            args = [_parse_condition_node(arg) for arg in node.args]
+            # Filter out None values
+            args = [a for a in args if a is not None]
+            if len(args) == 0:
+                return None
+            elif len(args) == 1:
+                return args[0]
+            else:
+                return {"AND": args}
+        return None
+    
+    # Handle OR nodes
+    elif isinstance(node, ConditionOR):
+        if hasattr(node, 'args') and node.args:
+            args = [_parse_condition_node(arg) for arg in node.args]
+            # Filter out None values
+            args = [a for a in args if a is not None]
+            if len(args) == 0:
+                return None
+            elif len(args) == 1:
+                return args[0]
+            else:
+                return {"OR": args}
+        return None
+    
+    # Handle NOT nodes
+    elif isinstance(node, ConditionNOT):
+        if hasattr(node, 'args') and node.args:
+            # NOT should have exactly one argument
+            inner = _parse_condition_node(node.args[0])
+            if inner is not None:
+                return {"NOT": inner}
+        return None
+    
+    # Handle field=value expressions
+    elif isinstance(node, ConditionFieldEqualsValueExpression):
+        field = node.field
+        value = node.value
+        
+        # Detect modifier from value type and add to field name if not already present
+        # pySigma uses typed value objects (SigmaCIDRExpression, etc.) instead of field modifiers
+        modifier_suffix = ""
+        
+        # Check value type to determine modifier
+        value_class = type(value).__name__
+        if 'CIDR' in value_class:
+            modifier_suffix = "|cidr"
+        elif 'Regex' in value_class:
+            modifier_suffix = "|re"
+        
+        # Add modifier to field name if detected and not already present
+        if modifier_suffix and '|' not in field:
+            field = field + modifier_suffix
+        
+        # Convert SigmaNumber and other types to appropriate format
+        if hasattr(value, 'number'):  # SigmaNumber
+            value = str(value.number)
+        elif hasattr(value, 'cidr'):  # SigmaCIDRExpression
+            value = str(value.cidr)
+        elif isinstance(value, (list, tuple)):
+            converted_values = []
+            for v in value:
+                if hasattr(v, 'number'):
+                    converted_values.append(str(v.number))
+                elif hasattr(v, 'cidr'):
+                    converted_values.append(str(v.cidr))
+                else:
+                    converted_values.append(str(v))
+            value = converted_values
+        else:
+            value = str(value)
+        
+        return {field: value}
+    
+    # Handle other ConditionItem types (future expansion)
+    elif isinstance(node, ConditionItem):
+        # For now, return None for unsupported condition types
+        return None
+    
+    # Unknown node type
     else:
         return None
 
 
-# Sigma compare helpers
-def load_sigma_rules(node):
-    val, *children = node
-    if any(children):
-        for child in children: 
-            if isinstance(child, dict):
-                yield [val, child]
-            else:
-                for path in load_sigma_rules(child):
-                    yield [val] + path
-    else:
-        yield [val]
+def parse_event_xml(xml_bytes):
+    """
+    Parse Windows Event Log XML and extract structured data
+    
+    Args:
+        xml_bytes: XML bytes from lxml etree.tostring()
+    
+    Returns:
+        dict: Structured event data with System and EventData fields
+    """
+    try:
+        from lxml import etree as lxml_etree
+        
+        # Parse XML bytes
+        if isinstance(xml_bytes, bytes):
+            root = lxml_etree.fromstring(xml_bytes)
+        else:
+            root = xml_bytes
+        
+        event_data = {}
+        
+        # Extract System section
+        system = root.find(".//{http://schemas.microsoft.com/win/2004/08/events/event}System")
+        if system is None:
+            system = root.find(".//System")
+        
+        if system is not None:
+            event_data["System"] = {}
+            
+            # EventID
+            eventid_elem = system.find(".//{http://schemas.microsoft.com/win/2004/08/events/event}EventID")
+            if eventid_elem is None:
+                eventid_elem = system.find(".//EventID")
+            if eventid_elem is not None:
+                event_data["System"]["EventID"] = eventid_elem.text
+            
+            # TimeCreated
+            time_elem = system.find(".//{http://schemas.microsoft.com/win/2004/08/events/event}TimeCreated")
+            if time_elem is None:
+                time_elem = system.find(".//TimeCreated")
+            if time_elem is not None:
+                event_data["System"]["TimeCreated"] = time_elem.get("SystemTime")
+            
+            # Computer
+            computer_elem = system.find(".//{http://schemas.microsoft.com/win/2004/08/events/event}Computer")
+            if computer_elem is None:
+                computer_elem = system.find(".//Computer")
+            if computer_elem is not None:
+                event_data["System"]["Computer"] = computer_elem.text
+            
+            # Channel
+            channel_elem = system.find(".//{http://schemas.microsoft.com/win/2004/08/events/event}Channel")
+            if channel_elem is None:
+                channel_elem = system.find(".//Channel")
+            if channel_elem is not None:
+                event_data["System"]["Channel"] = channel_elem.text
+        
+        # Extract EventData section
+        eventdata = root.find(".//{http://schemas.microsoft.com/win/2004/08/events/event}EventData")
+        if eventdata is None:
+            eventdata = root.find(".//EventData")
+        
+        if eventdata is not None:
+            event_data["EventData"] = {}
+            
+            # Extract all Data elements with Name attribute
+            for data_elem in eventdata.findall(".//{http://schemas.microsoft.com/win/2004/08/events/event}Data"):
+                name = data_elem.get("Name")
+                if name:
+                    event_data["EventData"][name] = data_elem.text or ""
+            
+            # Also try without namespace
+            if not event_data["EventData"]:
+                for data_elem in eventdata.findall(".//Data"):
+                    name = data_elem.get("Name")
+                    if name:
+                        event_data["EventData"][name] = data_elem.text or ""
+        
+        return event_data
+        
+    except Exception as e:
+        logger.debug(f"[!] Error parsing event XML: {e}")
+        return {}
+
+
+def detection_item_to_dict(detection_item):
+    """
+    Convert SigmaDetection/SigmaDetectionItem to dict structure
+    Converts all values to strings to match EVTX text data
+    """
+    try:
+        # Use to_plain() method to convert to dict/list/value
+        plain = detection_item.to_plain()
+        
+        # Convert all values to strings to match event data
+        if isinstance(plain, dict):
+            str_plain = {}
+            for k, v in plain.items():
+                if isinstance(v, list):
+                    str_plain[k] = [str(item) for item in v]
+                else:
+                    str_plain[k] = str(v)
+            return str_plain
+        else:
+            return plain
+    except Exception as e:
+        logger.debug(f"[+] Can't convert detection item to dict: {e}")
+        return None
+
+
+def extract_event_ids(detection_dict):
+    """
+    Extract Event IDs from detection dictionary
+    Returns list of event IDs (as integers for comparison with parsed eventid)
+    """
+    event_ids = []
+    
+    def search_eventid(obj):
+        """Recursively search for EventID field"""
+        if isinstance(obj, dict):
+            for key, value in obj.items():
+                if key.lower() == "eventid":
+                    if isinstance(value, list):
+                        # Convert to int for comparison
+                        event_ids.extend([int(v) for v in value])
+                    else:
+                        # Convert to int for comparison
+                        event_ids.append(int(value))
+                else:
+                    search_eventid(value)
+        elif isinstance(obj, list):
+            for item in obj:
+                search_eventid(item)
+    
+    search_eventid(detection_dict)
+    return event_ids
+
+
+# Sigma rule matching helpers (updated for modern pySigma)
+
+def match_cidr(ip_address, cidr_range):
+    """
+    Check if an IP address is within a CIDR range.
+    
+    Args:
+        ip_address: IP address string to check
+        cidr_range: CIDR range string (e.g., '10.0.0.0/8')
+    
+    Returns:
+        bool: True if IP is in the range, False otherwise
+    """
+    try:
+        import ipaddress
+        
+        # Handle empty or invalid input
+        if not ip_address or ip_address == '-':
+            return False
+        
+        # Parse the IP address
+        try:
+            ip = ipaddress.ip_address(ip_address.strip())
+        except ValueError:
+            return False
+        
+        # Parse the network
+        try:
+            network = ipaddress.ip_network(cidr_range.strip(), strict=False)
+        except ValueError:
+            return False
+        
+        # Check if IP is in network
+        return ip in network
+        
+    except Exception:
+        return False
+
+
+def match_field_with_modifier(field_name, field_value, event_value):
+    """
+    Match a field value considering Sigma modifiers.
+    
+    Args:
+        field_name: Field name (may include modifiers like 'IpAddress|cidr')
+        field_value: Expected value(s) from Sigma rule
+        event_value: Actual value from event data
+    
+    Returns:
+        bool: True if match found
+    """
+    if event_value is None:
+        return False
+    
+    # Parse field name and modifiers
+    parts = field_name.split('|')
+    base_field = parts[0]
+    modifiers = [m.lower() for m in parts[1:]] if len(parts) > 1 else []
+    
+    # Convert to list for uniform handling
+    values = field_value if isinstance(field_value, list) else [field_value]
+    
+    for value in values:
+        matched = False
+        value_str = str(value)
+        event_str = str(event_value)
+        
+        # Handle CIDR modifier
+        if 'cidr' in modifiers:
+            if match_cidr(event_str, value_str):
+                matched = True
+        
+        # Handle contains modifier
+        elif 'contains' in modifiers:
+            if value_str.lower() in event_str.lower():
+                matched = True
+        
+        # Handle startswith modifier
+        elif 'startswith' in modifiers:
+            if event_str.lower().startswith(value_str.lower()):
+                matched = True
+        
+        # Handle endswith modifier
+        elif 'endswith' in modifiers:
+            if event_str.lower().endswith(value_str.lower()):
+                matched = True
+        
+        # Handle re (regex) modifier
+        elif 're' in modifiers:
+            try:
+                if re.search(value_str, event_str, re.IGNORECASE):
+                    matched = True
+            except re.error:
+                pass
+        
+        # Handle base64 modifier (decode and compare)
+        elif 'base64' in modifiers:
+            try:
+                import base64
+                decoded = base64.b64decode(event_str).decode('utf-8', errors='ignore')
+                if value_str.lower() in decoded.lower():
+                    matched = True
+            except Exception:
+                pass
+        
+        # Handle all modifier (all values must be present - for multi-value fields)
+        elif 'all' in modifiers:
+            # For 'all', we need all values to match (handled at higher level)
+            pattern = convert_to_regex_pattern(value_str)
+            if re.fullmatch(pattern, event_str, re.IGNORECASE):
+                matched = True
+        
+        # Default: exact match with wildcard support
+        else:
+            pattern = convert_to_regex_pattern(value_str)
+            if re.fullmatch(pattern, event_str, re.IGNORECASE):
+                matched = True
+        
+        # For OR logic within a field (any value matches)
+        if matched:
+            return True
+    
+    return False
 
 
 def sigma_search(sigma_filter, event_data):
-    sigma_hit = 1
+    """
+    Search for a single Sigma filter in event data.
+    Supports field modifiers like cidr, contains, startswith, endswith, re.
+    
+    Returns True if match found, False otherwise
+    """
+    if not sigma_filter:
+        return False
+    
     for sigma_key, sigma_text in sigma_filter.items():
+        field_matched = False
+        
+        # Parse field name (may include modifiers)
+        parts = sigma_key.split('|')
+        base_field = parts[0]
+        
         for data in event_data:
-            if data.get("Name") in sigma_key and data.text is not None:
-                if type(sigma_text) is list and sigma_hit >= 1:
-                    for data_field in sigma_text:
-                        if re.fullmatch(reescape(data_field), data.text):
-                            sigma_hit = 2
-                            break
-                        else:
-                            sigma_hit = 0
-                elif sigma_hit >= 1:
-                    if re.fullmatch(reescape(sigma_text), data.text):
-                        sigma_hit = 2
-                    else:
-                        sigma_hit = 0
-                        break
-        if sigma_hit == 0:
-            break
-    return sigma_hit
+            if data.get("Name") == base_field and data.text is not None:
+                # Use modifier-aware matching
+                if match_field_with_modifier(sigma_key, sigma_text, data.text):
+                    field_matched = True
+                    break
+        
+        # If any required field doesn't match, the filter fails (implicit AND)
+        if not field_matched:
+            return False
+    
+    # All fields matched
+    return True
+
+
+def convert_to_regex_pattern(value):
+    """
+    Convert Sigma value to regex pattern
+    Handles wildcards (* and ?) and returns escaped regex
+    """
+    if value is None:
+        return ".*"
+    
+    # Convert to string
+    value_str = str(value)
+    
+    # If it already looks like a pattern with wildcards
+    if '*' in value_str or '?' in value_str:
+        # Escape special regex characters except * and ?
+        escaped = re.escape(value_str)
+        # Convert Sigma wildcards to regex
+        escaped = escaped.replace(r'\*', '.*')  # * -> .*
+        escaped = escaped.replace(r'\?', '.')   # ? -> .
+        return escaped
+    else:
+        # Exact match - escape all special characters
+        return re.escape(value_str)
+
+
+def evaluate_sigma_condition(detection_dict, event_data):
+    """
+    Evaluate Sigma detection conditions against event data
+    
+    Args:
+        detection_dict: Detection dictionary from modern pySigma API
+        event_data: Event data to match against
+    
+    Returns:
+        True if condition matches, False otherwise
+    """
+    if not detection_dict:
+        return False
+    
+    # Simple dict case: direct field matching (implicit AND)
+    if isinstance(detection_dict, dict):
+        # Check for explicit condition operators
+        if "AND" in detection_dict:
+            # AND all items
+            items = detection_dict["AND"]
+            if isinstance(items, list):
+                return all(evaluate_sigma_condition(item, event_data) for item in items)
+            else:
+                return evaluate_sigma_condition(items, event_data)
+        
+        elif "OR" in detection_dict:
+            # OR all items
+            items = detection_dict["OR"]
+            if isinstance(items, list):
+                return any(evaluate_sigma_condition(item, event_data) for item in items)
+            else:
+                return evaluate_sigma_condition(items, event_data)
+        
+        elif "NOT" in detection_dict:
+            # NOT the item
+            item = detection_dict["NOT"]
+            return not evaluate_sigma_condition(item, event_data)
+        
+        else:
+            # Normal field:value matching (implicit AND of all fields)
+            return sigma_search(detection_dict, event_data)
+    
+    # List case: evaluate each item
+    elif isinstance(detection_dict, list):
+        # Default to OR logic for lists
+        return any(evaluate_sigma_condition(item, event_data) for item in detection_dict)
+    
+    # Single value case
+    else:
+        return False
 
 
 # Helpers
+def convert_ticket_encryption_type(encryption_type_id):
+    """
+    Convert Ticket Encryption Type ID to Type Name
+    Based on Microsoft documentation: 
+    https://learn.microsoft.com/en-us/previous-versions/windows/it-pro/windows-10/security/threat-protection/auditing/event-4768
+    
+    Handles input formats like "0x17", "23", "RC4-HMAC" etc.
+    """
+    if encryption_type_id is None or encryption_type_id == "-":
+        return "-"
+    
+    # Remove any whitespace and convert to string
+    type_id = str(encryption_type_id).strip()
+    
+    # If empty string, return default
+    if not type_id:
+        return "-"
+    
+    # Try direct lookup first (for pre-formatted values)
+    if type_id in TICKET_ENCRYPTION_TYPES:
+        return TICKET_ENCRYPTION_TYPES[type_id]
+
+    # Return original value if no conversion found
+    return type_id
+
 def flatten(l):
     for i in l:
         if type(i) == list:
@@ -1617,6 +3545,11 @@ def depth(k):
 
 # Parse the EVTX file
 def parse_evtx(evtx_list, case):
+    import pandas as pd
+    import pickle
+    from evtx import PyEvtxParser
+    from neo4j import GraphDatabase
+    
     cache_dir = os.path.join(FPATH, 'cache', case)
 
     # Download sigma rules from github
@@ -1667,7 +3600,7 @@ def parse_evtx(evtx_list, case):
         with open(os.path.join(cache_dir, "date.pkl"), "rb") as f:
             starttime, endtime = pickle.load(f)
     else:
-        event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname", "date"])
+        event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname", "servicename", "ticketencryptiontype", "date"])
         count_set = pd.DataFrame(index=[], columns=["dates", "eventid", "username"])
         ml_frame = pd.DataFrame(index=[], columns=["date", "user", "host", "id"])
         username_set = []
@@ -1751,6 +3684,12 @@ def parse_evtx(evtx_list, case):
 
     # Parse Event log
     logger.info("[+] Start parsing the EVTX file.")
+    
+    # Batch processing variables
+    batch_size = 1000
+    batch_events = []
+    batch_ml_events = []
+    batch_count_events = []
 
     for evtx_file in evtx_list:
         logger.info("[+] Parse the EVTX file {0}.".format(evtx_file))
@@ -1913,6 +3852,8 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4776: The domain controller attempted to validate the credentials for an account
                 ###
                 else:
+                    servicename = "-"
+                    ticketencryptiontype = "-"
                     for data in event_data:
                         # parse IP Address
                         if data.get("Name") in ["IpAddress", "Workstation"] and data.text is not None and (not re.search(HCHECK, data.text) or re.search(IPv4_PATTERN, data.text) or re.search(r"\A::ffff:\d+\.\d+\.\d+\.\d+\Z", data.text) or re.search(IPv6_PATTERN, data.text)):
@@ -1946,22 +3887,40 @@ def parse_evtx(evtx_list, case):
                         # parse Authentication package name
                         if data.get("Name") in "AuthenticationPackageName" and re.search(r"\A\w*\Z", data.text):
                             authname = data.text
+                        # parse Service Name for EventID 4768 and 4769
+                        if eventid in [4768, 4769] and data.get("Name") == "ServiceName" and data.text is not None:
+                            servicename = data.text
+                        # parse Ticket Encryption Type for EventID 4768 and 4769
+                        if eventid in [4768, 4769] and data.get("Name") == "TicketEncryptionType" and data.text is not None:
+                            ticketencryptiontype = convert_ticket_encryption_type(data.text)
 
                     if username != "-" and username != "anonymous logon" and ipaddress != "::1" and ipaddress != "127.0.0.1" and (ipaddress != "-" or hostname != "-"):
-                        # generate pandas series
+                        # accumulate event data for batch processing
                         if ipaddress != "-":
-                            event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
-                            ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, ipaddress, eventid],  index=ml_frame.columns)
+                            batch_events.append([eventid, ipaddress, username, logintype, status, authname, servicename, ticketencryptiontype, int(stime.timestamp())])
+                            batch_ml_events.append([etime.strftime("%Y-%m-%d %H:%M:%S"), username, ipaddress, eventid])
                         else:
-                            event_series = pd.Series([eventid, hostname, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
-                            ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, hostname, eventid],  index=ml_frame.columns)
-                        # append pandas series to dataframe
-                        event_set = pd.concat([event_set, event_series.set_axis(event_set.columns).to_frame().T], ignore_index=True)
-                        ml_frame = pd.concat([ml_frame, ml_series.set_axis(ml_frame.columns).to_frame().T], ignore_index=True)
-                        # print("%s,%i,%s,%s,%s,%s" % (eventid, ipaddress, username, comment, logintype))
-                        count_series = pd.Series([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username], index=count_set.columns)
-                        count_set = pd.concat([count_set, count_series.set_axis(count_set.columns).to_frame().T], ignore_index=True)
-                        # print("%s,%s" % (stime.strftime("%Y-%m-%d %H:%M:%S"), username))
+                            batch_events.append([eventid, hostname, username, logintype, status, authname, servicename, ticketencryptiontype, int(stime.timestamp())])
+                            batch_ml_events.append([etime.strftime("%Y-%m-%d %H:%M:%S"), username, hostname, eventid])
+                        
+                        batch_count_events.append([stime.strftime("%Y-%m-%d %H:%M:%S"), eventid, username])
+
+                        # Process batch when it reaches batch_size
+                        if len(batch_events) >= batch_size:
+                            # Create DataFrames from batch data
+                            batch_df = pd.DataFrame(batch_events, columns=event_set.columns)
+                            batch_ml_df = pd.DataFrame(batch_ml_events, columns=ml_frame.columns)
+                            batch_count_df = pd.DataFrame(batch_count_events, columns=count_set.columns)
+                            
+                            # Concatenate batch DataFrames to main DataFrames
+                            event_set = pd.concat([event_set, batch_df], ignore_index=True)
+                            ml_frame = pd.concat([ml_frame, batch_ml_df], ignore_index=True)
+                            count_set = pd.concat([count_set, batch_count_df], ignore_index=True)
+                            
+                            # Clear batch lists
+                            batch_events.clear()
+                            batch_ml_events.clear()
+                            batch_count_events.clear()
 
                         if domain != "-":
                             domain_set.append([username, domain])
@@ -1985,26 +3944,33 @@ def parse_evtx(evtx_list, case):
                 ###
                 if args.sigma:
                     if eventid in sigma_eventids:
-                        for search_eid, sigma_filters, sigma_title, sigma_details, sigma_level in sigma_rules:
+                        for search_eid, detection_dict, sigma_title, sigma_details, sigma_level in sigma_rules:
                             if eventid in search_eid:
-                                sigma_hit = 1
-
-                                # If the detection rule is only event id
-                                if isinstance(sigma_filters, dict):
-                                    sigma_results.append([etime.strftime("%Y-%m-%d %H:%M:%S"), sigma_level, sigma_title, sigma_details, etree.tostring(node, encoding="utf-8")])
+                                # Evaluate Sigma detection conditions
+                                try:
+                                    enriched_event_data = list(event_data)
+                                    from lxml import etree as lxml_etree
+                                    eventid_elem = lxml_etree.Element("Data")
+                                    eventid_elem.set("Name", "EventID")
+                                    eventid_elem.text = str(eventid)
+                                    enriched_event_data.append(eventid_elem)
+                                    
+                                    if evaluate_sigma_condition(detection_dict, enriched_event_data):
+                                        from lxml import etree as lxml_etree
+                                        # Parse event XML into structured data
+                                        event_xml_bytes = lxml_etree.tostring(node, encoding="utf-8")
+                                        event_parsed = parse_event_xml(event_xml_bytes)
+                                        
+                                        sigma_results.append({
+                                            "timestamp": etime.strftime("%Y-%m-%d %H:%M:%S"),
+                                            "sigma_level": sigma_level,
+                                            "sigma_title": sigma_title,
+                                            "sigma_description": sigma_details,
+                                            "event": event_parsed
+                                        })
+                                except Exception as e:
+                                    logger.debug("[!] Error evaluating Sigma rule '{0}': {1}".format(sigma_title, str(e)))
                                     continue
-                                
-                                for sigma_filter_list in load_sigma_rules(sigma_filters):
-                                    for sigma_filter_list_path in sigma_filter_list:
-                                        if isinstance(sigma_filter_list_path, dict):
-                                            sigma_hit = sigma_search(sigma_filter_list_path, event_data)
-                                        if sigma_hit == 0:
-                                            break
-                                    if sigma_hit == 0:
-                                        break
-
-                                if sigma_hit == 2:
-                                    sigma_results.append([etime.strftime("%Y-%m-%d %H:%M:%S"), sigma_level, sigma_title, sigma_details, etree.tostring(node, encoding="utf-8")])
                                 
             ###
             # Detect the audit log deletion
@@ -2033,7 +3999,16 @@ def parse_evtx(evtx_list, case):
                 else:
                     deletelog.append("-")
 
-    logger.info("\n[+] Load finished.")
+    # Process remaining events in batches (final batch)
+    if batch_events:
+        batch_df = pd.DataFrame(batch_events, columns=event_set.columns)
+        batch_ml_df = pd.DataFrame(batch_ml_events, columns=ml_frame.columns)
+        batch_count_df = pd.DataFrame(batch_count_events, columns=count_set.columns)
+        
+        event_set = pd.concat([event_set, batch_df], ignore_index=True)
+        ml_frame = pd.concat([ml_frame, batch_ml_df], ignore_index=True)
+        count_set = pd.concat([count_set, batch_count_df], ignore_index=True)
+        logger.info("\n[+] Load finished.")
     logger.info("[+] Total Event log is {0}.".format(count))
 
     if not username_set or not len(event_set):
@@ -2086,10 +4061,10 @@ def parse_evtx(evtx_list, case):
         event_set = event_set.replace(hosts)
 
     event_set_bydate = event_set
-    event_set_bydate["count"] = event_set_bydate.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname", "date"])["eventid"].transform("count")
+    event_set_bydate["count"] = event_set_bydate.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname", "servicename", "ticketencryptiontype", "date"])["eventid"].transform("count")
     event_set_bydate = event_set_bydate.drop_duplicates()
     event_set = event_set.drop("date", axis=1)
-    event_set["count"] = event_set.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname"])["eventid"].transform("count")
+    event_set["count"] = event_set.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname", "servicename", "ticketencryptiontype"])["eventid"].transform("count")
     event_set = event_set.drop_duplicates()
     count_set["count"] = count_set.groupby(["dates", "eventid", "username"])["dates"].transform("count")
     count_set = count_set.drop_duplicates()
@@ -2098,11 +4073,13 @@ def parse_evtx(evtx_list, case):
     # Create Sigma scan results file
     if args.sigma:
         logger.info("[+] {0} event logs hit the Sigma rules.".format(len(sigma_results)))
-        with open(FPATH + "/static/" + SIGMA_RESULTS_FILE, 'w', newline='', encoding='utf8') as f:
-            writer = csv.writer(f)
-            writer.writerow(["date","sigma_level","sigma_title","sigma_details","event_log"])
-            writer.writerows(sigma_results)
-        logger.info("[+] Created Sigma scan results file {0}.".format(FPATH + "/static/" + SIGMA_RESULTS_FILE))
+        
+        output_path = FPATH + "/static/" + SIGMA_RESULTS_FILE
+        
+        with open(output_path, 'w', encoding='utf8') as f:
+            json.dump(sigma_results, f, ensure_ascii=False, indent=2)
+        
+        logger.info("[+] Created Sigma scan results file {0}.".format(output_path))
 
     # Learning event logs using Hidden Markov Model
     if hosts:
@@ -2128,15 +4105,20 @@ def parse_evtx(evtx_list, case):
     logger.info("[+] Creating a graph data.")
 
     try:
-        graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD + "@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
-        GRAPH = Graph(graph_http, name=case)
-    except:
-        logger.error("[!] Can't connect Neo4j Database.")
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        driver = GraphDatabase.driver(neo4j_uri, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        session = driver.session(database=case)
+    except Exception as e:
+        logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
         sys.exit(1)
 
     if args.postes:
         # Parse Event log
         logger.info("[+] Start sending the ES.")
+        
+        # Import for Elasticsearch
+        from elasticsearch import Elasticsearch
+        from ssl import create_default_context
 
         # Create a new ES client
         if args.espassword and args.escafile:
@@ -2157,7 +4139,6 @@ def parse_evtx(evtx_list, case):
 
         es_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
-    tx = GRAPH.begin()
     hosts_inv = {v: k for k, v in hosts.items()}
     for ipaddress in event_set["ipaddress"].drop_duplicates():
         if ipaddress in hosts_inv:
@@ -2165,7 +4146,7 @@ def parse_evtx(evtx_list, case):
         else:
             hostname = ipaddress
         # add the IPAddress node to neo4j
-        tx.run(statement_ip.format(**{"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname}))
+        session.run(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname})
 
         # add host data to Elasticsearch
         if args.postes:
@@ -2196,11 +4177,11 @@ def parse_evtx(evtx_list, case):
             ustatus = "-"
 
         # add the username node to neo4j
-        tx.run(statement_user.format(**{"user": username[:-1], "rank": ranks[username], "rights": rights, "sid": sid, "status": ustatus,
+        session.run(statement_user, {"user": username[:-1], "rank": ranks[username], "rights": rights, "sid": sid, "status": ustatus,
                                          "counts": ",".join(map(str, timelines[i*6])), "counts4624": ",".join(map(str, timelines[i*6+1])),
                                          "counts4625": ",".join(map(str, timelines[i*6+2])), "counts4768": ",".join(map(str, timelines[i*6+3])),
                                          "counts4769": ",".join(map(str, timelines[i*6+4])), "counts4776": ",".join(map(str, timelines[i*6+5])),
-                                         "detect": ",".join(map(str, detects[i]))}))
+                                         "detect": ",".join(map(str, detects[i]))})
         i += 1
 
         # add user data to Elasticsearch
@@ -2210,24 +4191,25 @@ def parse_evtx(evtx_list, case):
 
     for domain in domains:
         # add the domain node to neo4j
-        tx.run(statement_domain.format(**{"domain": domain}))
+        session.run(statement_domain, {"domain": domain})
 
     for _, events in event_set_bydate.iterrows():
         # add the (username)-(event)-(ip) link to neo4j
-        tx.run(statement_r.format(**{"user": events["username"][:-1], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
-                                      "status": events["status"], "count": events["count"], "authname": events["authname"], "date": events["date"]}))
+        session.run(statement_r, {"user": events["username"][:-1], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
+                                      "status": events["status"], "count": events["count"], "authname": events["authname"], "date": events["date"], "servicename": events["servicename"],
+                                      "ticketencryptiontype": events["ticketencryptiontype"]})
 
     for username, domain in domain_set_uniq:
         # add (username)-()-(domain) link to neo4j
-        tx.run(statement_dr.format(**{"user": username[:-1], "domain": domain}))
+        session.run(statement_dr, {"user": username[:-1], "domain": domain})
 
     # add the date node to neo4j
-    tx.run(statement_date.format(**{"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
-                                     "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")}))
+    session.run(statement_date, {"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
+                                     "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")})
 
     if len(deletelog):
         # add the delete flag node to neo4j
-        tx.run(statement_del.format(**{"deletetime": deletelog[0], "user": deletelog[1], "domain": deletelog[2]}))
+        session.run(statement_del, {"deletetime": deletelog[0], "user": deletelog[1], "domain": deletelog[2]})
 
     if len(policylist):
         id = 0
@@ -2242,25 +4224,18 @@ def parse_evtx(evtx_list, case):
                 sub = policy[3]
             username = policy[1]
             # add the policy id node to neo4j
-            tx.run(statement_pl.format(**{"id": id, "changetime": policy[0], "category": category, "sub": sub}))
+            session.run(statement_pl, {"id": id, "changetime": policy[0], "category": category, "sub": sub})
             # add (username)-(policy)-(id) link to neo4j
-            tx.run(statement_pr.format(**{"user": username[:-1], "id": id, "date": policy[4]}))
+            session.run(statement_pr, {"user": username[:-1], "id": id, "date": policy[4]})
             id += 1
 
     #tx.process()
-    try:
-        # for py2neo 2021.1 or later
-        GRAPH.commit(tx)
-    except:
-        # for py2neo 2021.0 or earlier
-        tx.commit()
-
     logger.info("[+] Creation of a graph data finished.")
 
 # Parse from Elastic Search cluster
 # Porting by 0xThiebaut
 def parse_es(case):        
-    event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname", "date"])
+    event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname", "servicename", "ticketencryptiontype", "date"])
     count_set = pd.DataFrame(index=[], columns=["dates", "eventid", "username"])
     ml_frame = pd.DataFrame(index=[], columns=["date", "user", "host", "id"])
     username_set = []
@@ -2315,6 +4290,11 @@ def parse_es(case):
             sys.exit(1)
     # Parse Event log
     logger.info("[+] Start searching the ES.")
+    
+    # Import for Elasticsearch
+    from elasticsearch import Elasticsearch
+    from elasticsearch_dsl import Search, Q
+    from ssl import create_default_context
 
     # Create a new ES client
     if args.espassword and args.escafile:
@@ -2501,51 +4481,55 @@ def parse_es(case):
             #  EventID 4776: The domain controller attempted to validate the credentials for an account
             ###
             else:
-                # parse IP Address
-                if hasattr(event.event_data, "IpAddress"):
-                    ipaddress = event.event_data.IpAddress.split("@")[0]
-                    ipaddress = ipaddress.lower().replace("::ffff:", "")
-                    ipaddress = ipaddress.replace("\\", "")
-                elif hasattr(event.event_data, "Workstation"):
-                    ipaddress = event.event_data.Workstation.split("@")[0]
-                    ipaddress = ipaddress.lower().replace("::ffff:", "")
-                    ipaddress = ipaddress.replace("\\", "")
-                # Parse hostname
-                if hasattr(event.event_data, "WorkstationName"):
-                    hostname = event.event_data.WorkstationName.split("@")[0]
-                    hostname = hostname.lower().replace("::ffff:", "")
-                    hostname = hostname.replace("\\", "")
-                # Parse username
-                if hasattr(event.event_data, "TargetUserName"):
-                    username = event.event_data.TargetUserName.split("@")[0]
-                    if username[-1:] not in "$":
-                        username = username.lower() + "@"
-                    else:
-                        username = "-"
-                # Parse targeted domain name
-                if hasattr(event.event_data, "TargetDomainName"):
-                    domain = event.event_data.TargetDomainName
-                # parse trageted user SID
-                if hasattr(event.event_data, "TargetUserSid"):
-                    sid = event.event_data.TargetUserSid
-                if hasattr(event.event_data, "TargetSid"):
-                    sid = event.event_data.TargetSid
-                # parse login type
-                if hasattr(event.event_data, "LogonType"):
-                    logintype = event.event_data.LogonType
-                # parse status
-                if hasattr(event.event_data, "Status"):
-                    status = event.event_data.Status
-                # parse Authentication package name
-                if hasattr(event.event_data, "AuthenticationPackageName"):
-                    authname = event.event_data.AuthenticationPackageName
+                servicename = "-"
+                ticketencryptiontype = "-"
+                for data in event_data:
+                    # parse IP Address
+                    if data.get("Name") in ["IpAddress", "Workstation"] and data.text is not None and (not re.search(HCHECK, data.text) or re.search(IPv4_PATTERN, data.text) or re.search(r"\A::ffff:\d+\.\d+\.\d+\.\d+\Z", data.text) or re.search(IPv6_PATTERN, data.text)):
+                        ipaddress = data.text.split("@")[0]
+                        ipaddress = ipaddress.lower().replace("::ffff:", "")
+                        ipaddress = ipaddress.replace("\\", "")
+                    # Parse hostname
+                    if data.get("Name") == "WorkstationName" and data.text is not None and (not re.search(HCHECK, data.text) or re.search(IPv4_PATTERN, data.text) or re.search(r"\A::ffff:\d+\.\d+\.\d+\.\d+\Z", data.text) or re.search(IPv6_PATTERN, data.text)):
+                        hostname = data.text.split("@")[0]
+                        hostname = hostname.lower().replace("::ffff:", "")
+                        hostname = hostname.replace("\\", "")
+                    # Parse username
+                    if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        username = data.text.split("@")[0]
+                        if username[-1:] not in "$":
+                            username = username.lower() + "@"
+                        else:
+                            username = "-"
+                    # Parse targeted domain name
+                    if data.get("Name") in "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
+                        domain = data.text
+                    # parse trageted user SID
+                    if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
+                        sid = data.text
+                    # parse lonon type
+                    if data.get("Name") in "LogonType" and re.search(r"\A\d{1,2}\Z", data.text):
+                        logintype = int(data.text)
+                    # parse status
+                    if data.get("Name") in "Status" and re.search(r"\A0x\w{8}\Z", data.text):
+                        status = data.text
+                    # parse Authentication package name
+                    if data.get("Name") in "AuthenticationPackageName" and re.search(r"\A\w*\Z", data.text):
+                        authname = data.text
+                    # parse Service Name for EventID 4768 and 4769
+                    if eventid in [4768, 4769] and data.get("Name") == "ServiceName" and data.text is not None:
+                        servicename = data.text
+                    # parse Ticket encryption type for EventID 4768 and 4769
+                    if eventid in [4768, 4769] and data.get("Name") == "TicketEncryptionType" and data.text is not None:
+                        ticketencryptiontype = convert_ticket_encryption_type(data.text)
+
                 if username != "-" and username != "anonymous logon" and ipaddress != "::1" and ipaddress != "127.0.0.1" and (ipaddress != "-" or hostname != "-"):
                     # generate pandas series
                     if ipaddress != "-":
-                        event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
+                        event_series = pd.Series([eventid, ipaddress, username, logintype, status, authname, servicename, ticketencryptiontype, int(stime.timestamp())], index=event_set.columns)
                         ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, ipaddress, eventid],  index=ml_frame.columns)
                     else:
-                        event_series = pd.Series([eventid, hostname, username, logintype, status, authname, int(stime.timestamp())], index=event_set.columns)
+                        event_series = pd.Series([eventid, hostname, username, logintype, status, authname, servicename, ticketencryptiontype, int(stime.timestamp())], index=event_set.columns)
                         ml_series = pd.Series([etime.strftime("%Y-%m-%d %H:%M:%S"), username, hostname, eventid],  index=ml_frame.columns)
                     # append pandas series to dataframe
                     event_set = pd.concat([event_set, event_series.set_axis(event_set.columns).to_frame().T], ignore_index=True)
@@ -2610,10 +4594,10 @@ def parse_es(case):
     if hosts:
         event_set = event_set.replace(hosts)
     event_set_bydate = event_set
-    event_set_bydate["count"] = event_set_bydate.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname", "date"])["eventid"].transform("count")
+    event_set_bydate["count"] = event_set_bydate.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname", "servicename", "ticketencryptiontype", "date"])["eventid"].transform("count")
     event_set_bydate = event_set_bydate.drop_duplicates()
     event_set = event_set.drop("date", axis=1)
-    event_set["count"] = event_set.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname"])["eventid"].transform("count")
+    event_set["count"] = event_set.groupby(["eventid", "ipaddress", "username", "logintype", "status", "authname", "servicename", "ticketencryptiontype"])["eventid"].transform("count")
     event_set = event_set.drop_duplicates()
     count_set["count"] = count_set.groupby(["dates", "eventid", "username"])["dates"].transform("count")
     count_set = count_set.drop_duplicates()
@@ -2643,10 +4627,11 @@ def parse_es(case):
     logger.info("[+] Creating a graph data.")
 
     try:
-        graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD + "@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
-        GRAPH = Graph(graph_http, name=case)
-    except:
-        logger.error("[!] Can't connect Neo4j Database.")
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        driver = GraphDatabase.driver(neo4j_uri, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        session = driver.session(database=case)
+    except Exception as e:
+        logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
         sys.exit(1)
 
     if args.postes:
@@ -2662,7 +4647,6 @@ def parse_es(case):
 
         es_timestamp = datetime.datetime.now().strftime('%Y-%m-%dT%H:%M:%S.%fZ')
 
-    tx = GRAPH.begin()
     hosts_inv = {v: k for k, v in hosts.items()}
     for ipaddress in event_set["ipaddress"].drop_duplicates():
         if ipaddress in hosts_inv:
@@ -2670,7 +4654,7 @@ def parse_es(case):
         else:
             hostname = ipaddress
         # add the IPAddress node to neo4j
-        tx.run(statement_ip.format(**{"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname}))
+        session.run(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname})
 
         # add host data to Elasticsearch
         if args.postes:
@@ -2701,11 +4685,11 @@ def parse_es(case):
             ustatus = "-"
 
         # add the username node to neo4j
-        tx.run(statement_user.format(**{"user": username[:-1], "rank": ranks[username], "rights": rights, "sid": sid, "status": ustatus,
+        session.run(statement_user, {"user": username[:-1], "rank": ranks[username], "rights": rights, "sid": sid, "status": ustatus,
                                          "counts": ",".join(map(str, timelines[i*6])), "counts4624": ",".join(map(str, timelines[i*6+1])),
                                          "counts4625": ",".join(map(str, timelines[i*6+2])), "counts4768": ",".join(map(str, timelines[i*6+3])),
                                          "counts4769": ",".join(map(str, timelines[i*6+4])), "counts4776": ",".join(map(str, timelines[i*6+5])),
-                                         "detect": ",".join(map(str, detects[i]))}))
+                                         "detect": ",".join(map(str, detects[i]))})
         i += 1
 
         # add user data to Elasticsearch
@@ -2715,24 +4699,25 @@ def parse_es(case):
 
     for domain in domains:
         # add the domain node to neo4j
-        tx.run(statement_domain.format(**{"domain": domain}))
+        session.run(statement_domain, {"domain": domain})
 
     for _, events in event_set_bydate.iterrows():
         # add the (username)-(event)-(ip) link to neo4j
-        tx.run(statement_r.format(**{"user": events["username"][:-1], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
-                                      "status": events["status"], "count": events["count"], "authname": events["authname"], "date": events["date"]}))
+        session.run(statement_r, {"user": events["username"][:-1], "IP": events["ipaddress"], "id": events["eventid"], "logintype": events["logintype"],
+                                      "status": events["status"], "count": events["count"], "authname": events["authname"], "date": events["date"], "servicename": events["servicename"],
+                                      "ticketencryptiontype": events["ticketencryptiontype"]})
 
     for username, domain in domain_set_uniq:
         # add (username)-()-(domain) link to neo4j
-        tx.run(statement_dr.format(**{"user": username[:-1], "domain": domain}))
+        session.run(statement_dr, {"user": username[:-1], "domain": domain})
 
     # add the date node to neo4j
-    tx.run(statement_date.format(**{"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
-                                     "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")}))
+    session.run(statement_date, {"Daterange": "Daterange", "start": datetime.datetime(*starttime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S"),
+                                     "end": datetime.datetime(*endtime.timetuple()[:4]).strftime("%Y-%m-%d %H:%M:%S")})
 
     if len(deletelog):
         # add the delete flag node to neo4j
-        tx.run(statement_del.format(**{"deletetime": deletelog[0], "user": deletelog[1], "domain": deletelog[2]}))
+        session.run(statement_del, {"deletetime": deletelog[0], "user": deletelog[1], "domain": deletelog[2]})
 
     if len(policylist):
         id = 0
@@ -2747,24 +4732,63 @@ def parse_es(case):
                 sub = policy[3]
             username = policy[1]
             # add the policy id node to neo4j
-            tx.run(statement_pl.format(**{"id": id, "changetime": policy[0], "category": category, "sub": sub}))
+            session.run(statement_pl, {"id": id, "changetime": policy[0], "category": category, "sub": sub})
             # add (username)-(policy)-(id) link to neo4j
-            tx.run(statement_pr.format(**{"user": username[:-1], "id": id, "date": policy[4]}))
+            session.run(statement_pr, {"user": username[:-1], "id": id, "date": policy[4]})
             id += 1
-
-    #tx.process()
-    try:
-        # for py2neo 2021.1 or later
-        GRAPH.commit(tx)
-    except:
-        # for py2neo 2021.0 or earlier
-        tx.commit()
 
     logger.info("[+] Creation of a graph data finished.")
 
+# AI Settings page
+@app.route('/ai-settings', methods=['GET', 'POST'])
+@http_request_logging
+@login_required(role="ADMIN")
+def ai_settings():
+    """AI Settings page"""
+    form = AISettingForm()
+    
+    # Get current settings
+    current_setting = AISetting.query.first()
+    if not current_setting:
+        current_setting = AISetting()
+        db.session.add(current_setting)
+        db.session.commit()
+    
+    if request.method == 'GET':
+        # Populate form with current settings
+        form.ai_enabled.data = current_setting.ai_enabled
+        form.openai_api_key.data = current_setting.openai_api_key
+        form.openai_model.data = current_setting.openai_model
+        form.max_completion_tokens.data = current_setting.max_completion_tokens
+        form.temperature.data = current_setting.temperature
+        form.agent_max_iterations.data = current_setting.agent_max_iterations
+        form.response_language.data = current_setting.response_language
+    
+    if form.validate_on_submit():
+        # Update settings from form
+        current_setting.ai_enabled = form.ai_enabled.data
+        current_setting.openai_api_key = form.openai_api_key.data
+        current_setting.openai_model = form.openai_model.data
+        current_setting.max_completion_tokens = form.max_completion_tokens.data
+        current_setting.temperature = form.temperature.data
+        current_setting.agent_max_iterations = form.agent_max_iterations.data
+        current_setting.response_language = form.response_language.data
+        current_setting.updated_at = utc_now_naive()
+        
+        try:
+            db.session.commit()
+            flash('AI settings have been updated successfully.', 'success')
+        except Exception as e:
+            db.session.rollback()
+            flash(f'Error updating AI settings: {str(e)}', 'error')
+            
+        return redirect(url_for('ai_settings'))
+    
+    return render_template('ai_settings.html', form=form, current_setting=current_setting)
+
 def main():
-    if not has_py2neo:
-        logger.error("[!] py2neo must be installed for this script.")
+    if not has_neo4j:
+        logger.error("[!] neo4j driver must be installed for this script.")
         sys.exit(1)
 
     if not has_evtx:
@@ -2806,31 +4830,47 @@ def main():
     if not has_sigma:
         logger.error("[!] sigma must be installed for this script.")
         sys.exit(1)
-        
+    
+    # Import Neo4j modules
+    from neo4j import GraphDatabase
+    from neo4j.exceptions import ClientError, ServiceUnavailable, AuthError, ConfigurationError
+    
     try:
-        service = GraphService(host=NEO4J_SERVER, user=NEO4J_USER, password=NEO4J_PASSWORD)
-    except:
-        logger.error("[!] Can't connect Neo4j Database GraphService.")
+        neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+        driver = GraphDatabase.driver(neo4j_uri, auth=(NEO4J_USER, NEO4J_PASSWORD))
+        # Test connection
+        with driver.session() as session:
+            result = session.run("RETURN 1")
+            result.single()
+        logger.info("[+] Successfully connected to Neo4j Database.")
+    except Exception as e:
+        logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
         sys.exit(1)
 
     logger.info("[+] Script start. {0}".format(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
 
     try:
-        logger.info("[+] {0}".format(service.product))
+        # Get Neo4j version info
+        with driver.session() as session:
+            result = session.run("CALL dbms.components() YIELD name, versions")
+            for record in result:
+                if record["name"] == "Neo4j Kernel":
+                    logger.info("[+] Neo4j version {0}".format(record["versions"][0]))
+                    break
     except:
-        logger.warning("[!] Can't get Neo4j kernel version.")
+        logger.warning("[!] Can't get Neo4j version.")
 
-    case = create_database(service, CASE_NAME)
+    case = create_database(driver, CASE_NAME)
 
     if args.create_user and args.create_password:
         if args.role:
             role = args.role
         else:
             role = "reader"
-        create_neo4j_user(service, args.create_user, args.create_password, role)
+        create_neo4j_user(driver, args.create_user, args.create_password, role)
 
     if args.delete_user:
-        delete_neo4j_user(service, args.delete_user)
+        delete_neo4j_user(driver, args.delete_user)
 
     if args.run:
         try:
@@ -2842,19 +4882,53 @@ def main():
     # Delete database data
     if args.delete:
         try:
-            graph_http = "http://" + NEO4J_USER + ":" + NEO4J_PASSWORD + "@" + NEO4J_SERVER + ":" + NEO4J_PORT + "/db/data/"
-            GRAPH = Graph(graph_http, name=case)
-        except:
-            logger.error("[!] Can't connect Neo4j Database.")
+            neo4j_uri = "bolt://" + NEO4J_SERVER + ":" + NEO4J_PORT
+            delete_driver = GraphDatabase.driver(neo4j_uri, auth=(NEO4J_USER, NEO4J_PASSWORD))
+            with delete_driver.session(database=case) as session:
+                session.run("MATCH (n) DETACH DELETE n")
+            delete_driver.close()
+        except Exception as e:
+            logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
             sys.exit(1)
 
-        GRAPH.delete_all()
         logger.info("[+] Delete all nodes and relationships from this Neo4j database.")
 
         cache_dir = os.path.join(FPATH, 'cache', case)
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
             logger.info("[+] Delete cache folder {0}.".format(cache_dir))
+
+    # Sigma-only scan mode (does not require Neo4j processing)
+    if args.sigma_only:
+        if not args.evtx and not args.xmls:
+            logger.error("[!] --sigma-only requires -e (EVTX file) or -x (XML file) option.")
+            sys.exit(1)
+        
+        # Determine Sigma rules path
+        if args.sigma_rules_path:
+            sigma_rules_path = args.sigma_rules_path
+            if not sigma_rules_path.startswith('/'):
+                sigma_rules_path = os.path.join(FPATH, sigma_rules_path)
+        else:
+            sigma_rules_path = os.path.join(FPATH, 'sigma')
+        
+        # Get timezone
+        timezone = args.timezone if args.timezone else 0
+        
+        # Get file list
+        evtx_files = args.evtx if args.evtx else args.xmls
+        
+        # Run Sigma scan
+        sigma_results = sigma_scan_evtx(evtx_files, sigma_rules_path, timezone)
+        
+        # Save results
+        output_path = FPATH + "/static/" + SIGMA_RESULTS_FILE
+        with open(output_path, 'w', encoding='utf8') as f:
+            json.dump(sigma_results, f, ensure_ascii=False, indent=2)
+        
+        logger.info("[+] Sigma scan results saved to {0}".format(output_path))
+        logger.info("[+] Script end. {0}".format(datetime.datetime.now().strftime("%Y/%m/%d %H:%M:%S")))
+        sys.exit(0)
 
     if args.evtx:
         for evtx_file in args.evtx:

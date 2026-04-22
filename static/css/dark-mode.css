@@ -1,3 +1,11 @@
+/* =====================================================
+   LogonTracer – Dark Mode Stylesheet  (v2.0)
+   All selectors use [data-theme="dark"] on <html>.
+   ===================================================== */
+
+/* =====================================================
+   1. Base
+   ===================================================== */
 [data-theme="dark"] {
   background-color: #202020;
   color: #eee;
@@ -15,22 +23,18 @@
   background-color: #eee;
 }
 
-[data-theme="dark"] .list-group-item-light.list-group-item-action:focus {
-  color: WHITE;
-  background-color: #6c757d;
+[data-theme="dark"] hr {
+  border-color: #555;
+  opacity: 0.5;
 }
 
-[data-theme="dark"] .list-group-item-light.list-group-item-action:hover {
-  color: WHITE;
-  background-color: #6c757d;
+[data-theme="dark"] .text-muted {
+  color: #888 !important;
 }
 
-[data-theme="dark"] .list-group-item-light {
-  color: WHITE;
-  background-color: #202020;
-  border: 1px solid WHITE;
-}
-
+/* =====================================================
+   2. Layout – SVG logo
+   ===================================================== */
 [data-theme="dark"] .my_svg {
   fill: WHITE;
   stroke: WHITE;
@@ -38,23 +42,128 @@
   width: 200px;
 }
 
+/* =====================================================
+   3. Navbar & Dropdowns
+   ===================================================== */
+[data-theme="dark"] .navbar {
+  background-color: #2d2d2d !important;
+}
+
+[data-theme="dark"] .navbar-light .navbar-nav .nav-link {
+  color: rgba(255, 255, 255, 0.55);
+}
+
+[data-theme="dark"] .navbar .nav-link,
+[data-theme="dark"] .navbar .dropdown-item {
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .navbar .dropdown-menu {
+  background-color: #3d3d3d;
+  border-color: #555;
+}
+
+[data-theme="dark"] .navbar .dropdown-item:hover {
+  background-color: #4d4d4d;
+  color: #fff;
+}
+
+[data-theme="dark"] .navbar .dropdown-divider {
+  border-color: #555;
+}
+
+[data-theme="dark"] .navbar .dropdown-header {
+  color: #aaa;
+}
+
+[data-theme="dark"] .dropdown-menu {
+  color: WHITE;
+  background-color: #202020;
+}
+
+[data-theme="dark"] .dropdown-item {
+  color: WHITE;
+}
+
+[data-theme="dark"] .dropdown-item:hover {
+  color: Black;
+}
+
+[data-theme="dark"] .dropdown-item:active {
+  color: Black;
+}
+
+/* Navbar layout helpers (light + dark) */
+.navbar .navbar-nav {
+  align-items: center;
+}
+
+.navbar .nav-item {
+  display: flex;
+  align-items: center;
+}
+
+.navbar .nav-link {
+  display: flex;
+  align-items: center;
+}
+
+/* =====================================================
+   4. Sidebar list-group
+   ===================================================== */
+[data-theme="dark"] .list-group-item-light {
+  color: WHITE;
+  background-color: #202020;
+  border: 1px solid WHITE;
+}
+
+[data-theme="dark"] .list-group-item-light.list-group-item-action:hover {
+  color: WHITE;
+  background-color: #6c757d;
+}
+
+[data-theme="dark"] .list-group-item-light.list-group-item-action:focus {
+  color: WHITE;
+  background-color: #6c757d;
+}
+
+/* =====================================================
+   5. Tables
+   ===================================================== */
 [data-theme="dark"] .table {
   color: WHITE;
   background-color: #202020;
-  --bs-table-bg: initial;
-  --bs-table-color: initial;
 }
 
-[data-theme="dark"] .tbody {
+[data-theme="dark"] .table tbody {
   color: WHITE;
+  background-color: #202020;
   background-image: none;
   border-color: WHITE;
+}
+
+[data-theme="dark"] .table tbody td {
+  color: WHITE;
+  background-color: #202020;
+  border-color: #555;
+}
+
+[data-theme="dark"] .table tbody td a {
+  color: #6ea8fe;
+}
+
+[data-theme="dark"] .table tbody td a:hover {
+  color: #9ec5fe;
 }
 
 [data-theme="dark"] .table .table-light th {
   color: WHITE;
   background-color: #202020;
   border-color: WHITE;
+}
+
+[data-theme="dark"] .table thead {
+  background-color: #2d2d2d;
 }
 
 [data-theme="dark"] .table tr {
@@ -77,6 +186,9 @@
   transition: background-color .3s;
 }
 
+/* =====================================================
+   6. Buttons
+   ===================================================== */
 [data-theme="dark"] .btn-primary {
   color: WHITE;
   background-color: #6c757d;
@@ -118,16 +230,130 @@
   transition: background-color .3s;
 }
 
-[data-theme="dark"] .btn-outline-secondary:focus, .btn-outline-secondary.focus {
+[data-theme="dark"] .btn-outline-secondary:focus,
+[data-theme="dark"] .btn-outline-secondary.focus {
   color: WHITE;
   background-color: #6c757d;
   border-color: #ccc;
 }
 
-[data-theme="dark"] .modal-content {
-  background-color: #222;
+[data-theme="dark"] .btn-info {
+  background-color: #0d6efd;
+  border-color: #0d6efd;
+  color: #fff;
 }
 
+[data-theme="dark"] .btn-info:hover {
+  background-color: #0b5ed7;
+  border-color: #0a58ca;
+  color: #fff;
+}
+
+/* Close (×) button – invert the SVG for dark backgrounds */
+[data-theme="dark"] .btn-close {
+  filter: invert(1) grayscale(100%) brightness(200%);
+}
+
+/* =====================================================
+   7. Modal structure
+   ===================================================== */
+[data-theme="dark"] .modal-content {
+  background-color: #2d2d2d;
+  color: #e0e0e0;
+  border-color: #555;
+}
+
+[data-theme="dark"] .modal-header {
+  border-bottom-color: #444 !important;
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .modal-title {
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] .modal-footer {
+  border-top-color: #444 !important;
+}
+
+[data-theme="dark"] .modal-body p,
+[data-theme="dark"] .modal-body h4,
+[data-theme="dark"] .modal-body h5 {
+  color: #e0e0e0;
+}
+
+/* =====================================================
+   8. Form controls
+   ===================================================== */
+[data-theme="dark"] .form-control {
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  border-color: #555;
+}
+
+[data-theme="dark"] .form-control:focus {
+  background-color: #444;
+  color: #e0e0e0;
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+[data-theme="dark"] .form-control::placeholder {
+  color: #888;
+}
+
+[data-theme="dark"] .form-control:disabled {
+  background-color: #2d2d2d;
+  color: #888;
+}
+
+[data-theme="dark"] .form-select {
+  background-color: #3a3a3a;
+  color: #e0e0e0;
+  border-color: #555;
+}
+
+[data-theme="dark"] .form-select:focus {
+  background-color: #444;
+  color: #e0e0e0;
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+/* Input-group addon (calendar icon, "Browse" text, etc.) */
+[data-theme="dark"] .input-group-text {
+  background-color: #444;
+  color: #e0e0e0;
+  border-color: #555;
+}
+
+/* Labels */
+[data-theme="dark"] .form-label,
+[data-theme="dark"] .form-check-label,
+[data-theme="dark"] label {
+  color: #e0e0e0;
+}
+
+/* Checkbox / radio */
+[data-theme="dark"] .form-check-input {
+  background-color: #3a3a3a;
+  border-color: #666;
+}
+
+[data-theme="dark"] .form-check-input:checked {
+  background-color: #667eea;
+  border-color: #667eea;
+}
+
+/* Helper text */
+[data-theme="dark"] .form-text,
+[data-theme="dark"] small.text-muted {
+  color: #aaa !important;
+}
+
+/* =====================================================
+   9. Pagination
+   ===================================================== */
 [data-theme="dark"] .page-link {
   color: WHITE;
   background-color: transparent;
@@ -139,11 +365,16 @@
   transition: background-color .3s;
 }
 
-[data-theme="dark"] .bs-tooltip-top .arrow::before, .bs-tooltip-auto[x-placement^="top"] .arrow::before {
+/* =====================================================
+   10. Tooltips (Bootstrap 5 + qTip2)
+   ===================================================== */
+[data-theme="dark"] .bs-tooltip-top .arrow::before,
+[data-theme="dark"] .bs-tooltip-auto[x-placement^="top"] .arrow::before {
   border-top-color: #444;
 }
 
-[data-theme="dark"] .bs-tooltip-bottom .arrow::before, .bs-tooltip-auto[x-placement^="bottom"] .arrow::before {
+[data-theme="dark"] .bs-tooltip-bottom .arrow::before,
+[data-theme="dark"] .bs-tooltip-auto[x-placement^="bottom"] .arrow::before {
   border-bottom-color: #444;
 }
 
@@ -151,6 +382,9 @@
   background-color: #444;
 }
 
+/* =====================================================
+   11. Font Awesome icons
+   ===================================================== */
 [data-theme="dark"] .fa-refresh {
   color: WHITE;
 }
@@ -159,27 +393,9 @@
   color: WHITE;
 }
 
-[data-theme="dark"] .dropdown-menu {
-  color: WHITE;
-  background-color: #202020;
-}
-
-[data-theme="dark"] .dropdown-item {
-  color: WHITE;
-}
-
-[data-theme="dark"] .navbar-light .navbar-nav .nav-link {
-    color: rgba(255, 255, 255, 0.55);
-}
-
-[data-theme="dark"] .dropdown-item:hover {
-  color: Black;
-}
-
-[data-theme="dark"] .dropdown-item:active {
-  color: Black;
-}
-
+/* =====================================================
+   12. Calendar rank-colour rows
+   ===================================================== */
 [data-theme="dark"] .bgcolorSun {
   background-color: #ff5050 !important;
 }
@@ -201,9 +417,376 @@
 }
 
 [data-theme="dark"] .bgcolormid {
-  background-color: #b31031 !important;
+  background-color: #b31030 !important;
 }
 
 [data-theme="dark"] .bgcolorhigh {
   background-color: #dc143c !important;
+}
+
+/* =====================================================
+   13. AI Analysis Panel
+   Class/structure-based – survives JS style mutation
+   (inline color values are normalised to rgb() by the
+   browser when JS sets element.style.display, breaking
+   [style*="color: #xxx"] selectors)
+   ===================================================== */
+
+/* ── Panel root ──────────────────────────────────── */
+[data-theme="dark"] #ai-analysis-panel {
+  background: #2d2d2d !important;
+  border-color: #555 !important;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5) !important;
+}
+
+/* ── Panel body / content area ───────────────────── */
+[data-theme="dark"] #ai-analysis-panel .panel-body,
+[data-theme="dark"] #ai-analysis-panel #analysis-content {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+}
+
+/* ── All headings in the content area ────────────── */
+[data-theme="dark"] #ai-analysis-panel #analysis-content h5,
+[data-theme="dark"] #ai-analysis-panel #analysis-content h6,
+[data-theme="dark"] #ai-analysis-panel h5,
+[data-theme="dark"] #ai-analysis-panel h6 {
+  color: #e0e0e0 !important;
+}
+
+/* ── Analysis Summary (all three display functions) ─
+   The outer wrapper div is a direct child of
+   .analysis-summary and carries background: #f8f9fa.
+   Its children are the preview/full text divs.        */
+[data-theme="dark"] #ai-analysis-panel .analysis-summary > div {
+  background: #3a3a3a !important;
+  color: #ccc !important;
+  border-left-color: #667eea !important;
+}
+
+/* Preview div, full div, and any static <p> inside */
+[data-theme="dark"] #ai-analysis-panel .analysis-summary > div > div,
+[data-theme="dark"] #ai-analysis-panel .analysis-summary > div > p,
+[data-theme="dark"] #ai-analysis-panel .analysis-summary p {
+  color: #ccc !important;
+  background: transparent !important;
+}
+
+/* summary-content class (displayRawAnalysis) */
+[data-theme="dark"] #ai-analysis-panel .summary-content {
+  background: #3a3a3a !important;
+  color: #ccc !important;
+  border-left-color: #667eea !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .summary-content > div,
+[data-theme="dark"] #ai-analysis-panel .summary-content > p {
+  color: #ccc !important;
+  background: transparent !important;
+}
+
+/* ── Expand / Collapse toggle button ─────────────── */
+[data-theme="dark"] #ai-analysis-panel button[onclick*="toggleContent"] {
+  background: #3a3a3a !important;
+  border-color: #666 !important;
+  color: #bbb !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel button[onclick*="toggleContent"]:hover {
+  background: #4a4a4a !important;
+  color: #fff !important;
+}
+
+/* ── Key Findings ────────────────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .key-findings li {
+  background: #2d4a2d !important;
+  border-left-color: #28a745 !important;
+  color: #a3d9a5 !important;
+}
+
+/* ── Security Concerns ───────────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .security-concerns li {
+  background: #4a2d2d !important;
+  border-left-color: #dc3545 !important;
+  color: #f5c2c7 !important;
+}
+
+/* ── Recommendations ─────────────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .recommendations li {
+  background: #2d3a4a !important;
+  border-left-color: #17a2b8 !important;
+  color: #9ecae1 !important;
+}
+
+/* ── Metric cards (Agent Summary header) ─────────── */
+[data-theme="dark"] #ai-analysis-panel .metric-card {
+  background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%) !important;
+  border-color: #555 !important;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4) !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .metric-card .metric-icon {
+  color: #9ecae1 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .metric-card .metric-value {
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .metric-card .metric-label {
+  color: #aaa !important;
+}
+
+/* ── Threat items ────────────────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .threat-item {
+  background: #3a3a3a !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .threat-item p {
+  color: #ccc !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .threat-item .evidence {
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .threat-item .evidence ul li {
+  color: #ccc !important;
+}
+
+/* ── Investigation Timeline ──────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .timeline-item .timeline-content h6 {
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .timeline-item .timeline-content p {
+  color: #aaa !important;
+}
+
+/* Timeline error-detail box (yellow warning bg) */
+[data-theme="dark"] #ai-analysis-panel [style*="background: #fff3cd"] {
+  background: #4a4020 !important;
+  border-color: #6b5a1e !important;
+  color: #e0e0e0 !important;
+}
+
+/* ── Analysis Metadata footer ────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .analysis-metadata {
+  border-top-color: #555 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .analysis-metadata small {
+  color: #999 !important;
+}
+
+/* ── Loading / Spinner state ─────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .loading-indicator p,
+[data-theme="dark"] #ai-analysis-panel .agent-loading p {
+  color: #aaa !important;
+}
+
+/* The light-gray "track" of the spinner */
+[data-theme="dark"] #ai-analysis-panel .agent-loading [style*="border: 3px solid #f3f3f3"] {
+  border-color: #555 !important;
+  border-top-color: #667eea !important;
+}
+
+/* ── No history empty state ──────────────────────── */
+[data-theme="dark"] #ai-analysis-panel [style*="text-align: center"] h6 {
+  color: #aaa !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel [style*="text-align: center"] p {
+  color: #777 !important;
+}
+
+/* ── Error / Quota / Auth messages ──────────────── */
+[data-theme="dark"] #ai-analysis-panel .error-message p,
+[data-theme="dark"] #ai-analysis-panel .quota-error-message p,
+[data-theme="dark"] #ai-analysis-panel .service-error-message p {
+  color: #ccc !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .error-details,
+[data-theme="dark"] #ai-analysis-panel .error-recommendations {
+  background: #3a3a3a !important;
+  border-color: #555 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .error-details ul li,
+[data-theme="dark"] #ai-analysis-panel .error-recommendations ul li {
+  color: #ccc !important;
+}
+
+/* ── No-threats alert ────────────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .no-threats .alert-success {
+  background-color: #1e4620 !important;
+  border-color: #2d6a2f !important;
+  color: #a3d9a5 !important;
+}
+
+/* ── Sigma generation section ────────────────────── */
+[data-theme="dark"] #ai-analysis-panel .sigma-generation-section {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%) !important;
+  border-color: #667eea !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .sigma-generation-section h6 {
+  color: #9ecae1 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .sigma-generation-section small {
+  color: #aaa !important;
+}
+
+/* ── Code / pre blocks ───────────────────────────── */
+[data-theme="dark"] #ai-analysis-panel pre,
+[data-theme="dark"] #ai-analysis-panel code {
+  background-color: #1a1a1a !important;
+  color: #e0e0e0 !important;
+  border-color: #555 !important;
+}
+
+/* ── Inline background overrides ─────────────────
+   These are set once via innerHTML and are NOT
+   subsequently mutated by JS, so attribute selectors
+   remain reliable here.                             */
+[data-theme="dark"] #ai-analysis-panel [style*="background: #f8f9fa"],
+[data-theme="dark"] #ai-analysis-panel [style*="background-color: #f8f9fa"] {
+  background: #3a3a3a !important;
+}
+
+/* Metric card light gradients */
+[data-theme="dark"] #ai-analysis-panel [style*="background: linear-gradient(135deg, #e3f2fd"],
+[data-theme="dark"] #ai-analysis-panel [style*="background: linear-gradient(135deg, #ffebee"],
+[data-theme="dark"] #ai-analysis-panel [style*="background: linear-gradient(135deg, #e8f5e8"] {
+  background: linear-gradient(135deg, #3a3a3a 0%, #2d2d2d 100%) !important;
+  border-color: #555 !important;
+}
+
+/* Error-state backgrounds */
+[data-theme="dark"] #ai-analysis-panel [style*="background: #fff5f5"],
+[data-theme="dark"] #ai-analysis-panel [style*="background-color: #fff5f5"],
+[data-theme="dark"] #ai-analysis-panel [style*="background: #ffeaea"],
+[data-theme="dark"] #ai-analysis-panel [style*="background-color: #ffeaea"] {
+  background: #4a3030 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel [style*="background: #e8f5e8"],
+[data-theme="dark"] #ai-analysis-panel [style*="background-color: #e8f5e8"] {
+  background: #2d4a2d !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel [style*="background: #e6f3ff"],
+[data-theme="dark"] #ai-analysis-panel [style*="background-color: #e6f3ff"] {
+  background: #2d3a4a !important;
+}
+
+/* =====================================================
+   14. Sigma Rules Modal (AI-generated rules panel)
+   ===================================================== */
+[data-theme="dark"] #sigma-rules-modal .modal-content {
+  background-color: #2d2d2d !important;
+  border-color: #555 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .modal-header {
+  border-bottom-color: #555 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .modal-body {
+  background-color: #2d2d2d !important;
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .modal-footer {
+  background-color: #2d2d2d !important;
+  border-top-color: #555 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .sigma-rules-container {
+  color: #e0e0e0;
+}
+
+[data-theme="dark"] #sigma-rules-modal .alert-success {
+  background-color: #1e4620 !important;
+  border-color: #2d6a2f !important;
+  color: #a3d9a5 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .alert-danger {
+  background-color: #5a1a1a !important;
+  border-color: #842029 !important;
+  color: #f5c2c7 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .card {
+  background-color: #3a3a3a !important;
+  border-color: #555 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .card-header {
+  background-color: #353535 !important;
+  border-bottom-color: #555 !important;
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .card-header strong {
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .card-body {
+  background-color: #3a3a3a !important;
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .card-text {
+  color: #aaa !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .card-text.text-muted {
+  color: #999 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .yaml-content {
+  background: #1a1a1a !important;
+  color: #d4d4d4 !important;
+  border: 1px solid #555 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .yaml-content pre {
+  color: #d4d4d4 !important;
+  background: transparent !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .badge.bg-info {
+  background-color: #0d6efd !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .badge.bg-secondary {
+  background-color: #6c757d !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .btn-outline-primary {
+  color: #6ea8fe !important;
+  border-color: #6ea8fe !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .btn-outline-primary:hover {
+  background-color: #0d6efd !important;
+  color: #fff !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .btn-secondary {
+  background-color: #5c636a !important;
+  border-color: #565e64 !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal .btn-primary {
+  background-color: #0d6efd !important;
+  border-color: #0d6efd !important;
+}
+
+[data-theme="dark"] #sigma-rules-modal p strong {
+  color: #e0e0e0 !important;
 }

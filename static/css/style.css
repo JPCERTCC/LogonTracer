@@ -95,3 +95,15 @@ table.floatThead-table {
   margin-left: 100%;
   margin-top: -22%;
 }
+
+/* For dropstart (left-side submenu) */
+.dropstart.drop-hover:hover > .dropdown-menu {
+  display: block !important;
+  position: absolute;
+  top: 0;
+  right: 100%;
+  left: auto;
+  margin-right: 0;
+  margin-left: 0;
+  margin-top: 0;
+}

@@ -23,4 +23,4 @@ settings:
 
   sigma:
     git_url: "https://github.com/SigmaHQ/sigma.git" # Sigma rules url
-    results: "sigma_results.csv" # Sigma scan result file
+    results: "sigma_results.json" # Sigma scan result file (JSON format)

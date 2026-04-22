@@ -1,5 +1,4 @@
 numpy
-py2neo>=2020.0.0
 evtx
 lxml
 scipy
@@ -12,6 +11,11 @@ pyyaml
 flask-sqlalchemy
 flask-login
 flask_wtf
+flask-limiter
 wtforms
 GitPython
-sigmatools
+pysigma>=0.11.0
+pysigma-backend-sqlite
+openai>=1.0.0
+aiohttp
+neo4j

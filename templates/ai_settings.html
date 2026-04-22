@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>AI Settings - LogonTracer</title>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.11.2/css/all.css" integrity="sha384-KA6wR/X5RY4zFAHpv/CnoG2UW1uogYfdnP67Uv7eULvTveboZJg0qUpmJZb5VqzN" crossorigin="anonymous">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-light bg-light p-1 shadow">
+        <a class="navbar-brand" href="{{ url_for('index') }}">
+            <img class="my_svg" src="{{ url_for('static', filename='images/logo_top.svg') }}" alt="LogonTracer" width="190">
+        </a>
+    </nav>
+
+    <div class="container mt-4">
+        <div class="row">
+            <div class="col-md-8 offset-md-2">
+                <div class="card">
+                    <div class="card-header">
+                        <h4><i class="fas fa-brain"></i> AI Analysis Settings</h4>
+                    </div>
+                    <div class="card-body">
+                        {% with messages = get_flashed_messages(with_categories=true) %}
+                            {% if messages %}
+                                {% for category, message in messages %}
+                                    <div class="alert alert-{{ 'success' if category == 'success' else 'danger' }} alert-dismissible fade show" role="alert">
+                                        {{ message }}
+                                        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                                    </div>
+                                {% endfor %}
+                            {% endif %}
+                        {% endwith %}
+
+                        <form method="POST">
+                            {{ form.hidden_tag() }}
+                            
+                            <div class="mb-3">
+                                <div class="form-check form-switch">
+                                    {{ form.ai_enabled(class="form-check-input", id="ai_enabled") }}
+                                    <label class="form-check-label" for="ai_enabled">
+                                        <strong>Enable AI Analysis</strong>
+                                    </label>
+                                </div>
+                                <small class="form-text text-muted">
+                                    When enabled, LogonTracer will use AI to analyze security patterns and provide intelligent insights.
+                                </small>
+                            </div>
+
+                            <div id="ai-config-section" style="display: '{{ 'block' if current_setting.ai_enabled else 'none' }}';">
+                                <hr>
+                                
+                                <div class="mb-3">
+                                    {{ form.openai_api_key.label(class="form-label") }}
+                                    {{ form.openai_api_key(class="form-control", placeholder="sk-proj-...", type="password") }}
+                                    <small class="form-text text-muted">
+                                        Your OpenAI API key. Get one at <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
+                                    </small>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.openai_model.label(class="form-label") }}
+                                            {{ form.openai_model(class="form-select") }}
+                                            <small class="form-text text-muted">
+                                                AI model to use for analysis. GPT-5 Mini is recommended for cost-effectiveness.
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.max_completion_tokens.label(class="form-label") }}
+                                            {{ form.max_completion_tokens(class="form-control", min="1000", max="8000") }}
+                                            <small class="form-text text-muted">
+                                                Maximum tokens for AI responses (1000-8000).
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="row">
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.response_language.label(class="form-label") }}
+                                            {{ form.response_language(class="form-control") }}
+                                            <small class="form-text text-muted">
+                                                Language for AI responses.
+                                            </small>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <div class="mb-3">
+                                            {{ form.agent_max_iterations.label(class="form-label") }}
+                                            {{ form.agent_max_iterations(class="form-control", min="1", max="20") }}
+                                            <small class="form-text text-muted">
+                                                Maximum investigation iterations for AI Agent (1-20).
+                                            </small>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="alert alert-info">
+                                    <i class="fas fa-info-circle"></i>
+                                    <strong>Current Status:</strong>
+                                    <div class="mt-2">
+                                        <span class="badge bg-{{ 'success' if current_setting.ai_enabled else 'secondary' }}">
+                                            AI Analysis: {{ 'Enabled' if current_setting.ai_enabled else 'Disabled' }}
+                                        </span>
+                                        {% if current_setting.ai_enabled and current_setting.openai_api_key %}
+                                            <span class="badge bg-success">API Key Configured</span>
+                                        {% elif current_setting.ai_enabled %}
+                                            <span class="badge bg-warning">API Key Required</span>
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                                <button type="button" class="btn btn-secondary me-md-2" onclick="window.history.back()">
+                                    <i class="fas fa-arrow-left"></i> Back
+                                </button>
+                                <button type="submit" class="btn btn-primary">
+                                    <i class="fas fa-save"></i> Save Settings
+                                </button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js" integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"></script>
+    <script>
+        // AI設定の表示/非表示制御
+        document.getElementById('ai_enabled').addEventListener('change', function() {
+            const configSection = document.getElementById('ai-config-section');
+            if (this.checked) {
+                configSection.style.display = 'block';
+            } else {
+                configSection.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>

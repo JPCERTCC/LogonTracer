@@ -1,3 +1,34 @@
+function getCsrfToken() {
+  return document.cookie.split(';')
+    .map(c => c.trim())
+    .find(c => c.startsWith('csrf_token='))
+    ?.split('=')[1] || '';
+}
+
+/**
+ * Escape a string for safe insertion into HTML context.
+ */
+function escapeHtml(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+/**
+ * Escape a string for safe insertion into a Cypher double-quoted string literal.
+ */
+function escapeCypher(str) {
+  if (str == null) return '';
+  return String(str)
+    .replace(/\\/g, '\\\\')
+    .replace(/"/g, '\\"')
+    .replace(/'/g, "\\'");
+}
+
 function buildGraph(graph, path, root) {
   var objidList = []
   var darkSwitch = document.getElementById("darkSwitch").checked;
@@ -153,6 +184,7 @@ function buildGraph(graph, path, root) {
           "nsid": path[idx].properties.sid,
           "nstatus": path[idx].properties.status,
           "nhostname": path[idx].properties.hostname,
+          "nrank": path[idx].properties.rank,
           "nsub": nsub,
           "ncategory": ncategory
         }
@@ -345,21 +377,23 @@ qtipNode
 This function generate the description text for each node.
 */
 function qtipNode(ndata) {
-  var qtext = 'Name: ' + ndata._private.data["nlabel"];
+  var label = escapeHtml(ndata._private.data["nlabel"]);
+  var ntype = escapeHtml(ndata._private.data["ntype"]);
+  var qtext = 'Name: ' + label;
   if (ndata._private.data["ntype"] == "User") {
-    qtext += '<br>Privilege: ' + ndata._private.data["nprivilege"];
-    qtext += '<br>SID: ' + ndata._private.data["nsid"];
-    qtext += '<br>Status: ' + ndata._private.data["nstatus"];
+    qtext += '<br>Privilege: ' + escapeHtml(ndata._private.data["nprivilege"]);
+    qtext += '<br>SID: ' + escapeHtml(ndata._private.data["nsid"]);
+    qtext += '<br>Status: ' + escapeHtml(ndata._private.data["nstatus"]);
   } else if (ndata._private.data["ntype"] == "Host") {
-    qtext += '<br>IP or Hostname: ' + ndata._private.data["nhostname"];
+    qtext += '<br>IP or Hostname: ' + escapeHtml(ndata._private.data["nhostname"]);
   } else if (ndata._private.data["ntype"] == "Policy") {
     qtext = "";
-    qtext += 'Date: ' + ndata._private.data["nlabel"];
-    qtext += '<br>Category: ' + ndata._private.data["ncategory"];
-    qtext += '<br>Subcategory: ' + ndata._private.data["nsub"];
+    qtext += 'Date: ' + label;
+    qtext += '<br>Category: ' + escapeHtml(ndata._private.data["ncategory"]);
+    qtext += '<br>Subcategory: ' + escapeHtml(ndata._private.data["nsub"]);
   }
   if (ndata._private.data["ntype"] != "Policy") {
-    qtext += '<br><button type="button" class="btn btn-primary btn-xs" onclick="createRankQuery(\'' + ndata._private.data["nlabel"] + '\',\'' + ndata._private.data["ntype"] + '\')">search</button>';
+    qtext += '<br><button type="button" class="btn btn-primary btn-xs" data-search-label="' + label + '" data-search-type="' + ntype + '" onclick="createRankQuery(this.dataset.searchLabel, this.dataset.searchType)">search</button>';
   }
   return qtext;
 }
@@ -555,19 +589,20 @@ function policyQuery() {
 }
 
 function createRankQuery(setStr, qType) {
+  var safeStr = escapeCypher(setStr);
   var dateStr = getDateRange();
   if (qType == "User") {
-    whereStr = 'user.user = "' + setStr + '" ';
+    whereStr = 'user.user = "' + safeStr + '" ';
   }
   if (qType == "Host") {
-    whereStr = 'ip.IP = "' + setStr + '" ';
+    whereStr = 'ip.IP = "' + safeStr + '" ';
   }
 
   if (qType != "Domain") {
     eidStr = getQueryID();
     queryStr = 'MATCH (user)-[event:Event]-(ip)  WHERE (' + whereStr + ') ' + eidStr + dateStr + ' RETURN user, event, ip';
   } else {
-    queryStr = 'MATCH (user)-[event:Group]-(ip) WHERE user.domain = "' + setStr + '" RETURN user, event, ip'
+    queryStr = 'MATCH (user)-[event:Group]-(ip) WHERE user.domain = "' + safeStr + '" RETURN user, event, ip'
   }
   //console.log(queryStr);
   executeQuery(queryStr, setStr);
@@ -583,7 +618,7 @@ function getQueryID() {
   var id4768Ch = document.getElementById("id4768").checked;
   var id4769Ch = document.getElementById("id4769").checked;
   var id4776Ch = document.getElementById("id4776").checked;
-  var countInt = document.getElementById("count-input").value;
+  var countInt = parseInt(document.getElementById("count-input").value, 10) || 0;
   var eidStr = "AND ("
   if (id4624Ch) {
     eidStr = eidStr + "event.id = 4624 OR ";
@@ -625,25 +660,27 @@ This function generates a neo4j query strings from search box and execute the qu
 function createQuery() {
   var selectVal = document.getElementById("InputSelect").value;
   var setStr = document.getElementById("query-input").value;
+  var safeStr = escapeCypher(setStr);
   var dateStr = getDateRange();
 
   if (selectVal == "Username") {
-    whereStr = 'user.user CONTAINS "' + setStr + '" ';
+    whereStr = 'user.user CONTAINS "' + safeStr + '" ';
   } else if (selectVal == "IPAddress") {
-    whereStr = 'ip.hostname CONTAINS "' + setStr + '" ';
+    whereStr = 'ip.hostname CONTAINS "' + safeStr + '" ';
   } else {
-    whereStr = 'ip.IP CONTAINS "' + setStr + '" ';
+    whereStr = 'ip.IP CONTAINS "' + safeStr + '" ';
   }
 
   for (i = 1; i <= currentNumber; i++) {
     if (document.getElementById("query-input" + i).value) {
       ruleStr = document.getElementById("InputRule" + i).value;
+      var safeInputI = escapeCypher(document.getElementById("query-input" + i).value);
       if (document.getElementById("InputSelect" + i).value == "Username") {
-        whereStr += ruleStr + ' user.user CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' user.user CONTAINS "' + safeInputI + '" ';
       } else if (document.getElementById("InputSelect" + i).value == "IPAddress") {
-        whereStr += ruleStr + ' ip.IP CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' ip.IP CONTAINS "' + safeInputI + '" ';
       } else {
-        whereStr += ruleStr + ' ip.hostname CONTAINS "' + document.getElementById("query-input" + i).value + '" ';
+        whereStr += ruleStr + ' ip.hostname CONTAINS "' + safeInputI + '" ';
       }
     }
   }
@@ -660,10 +697,11 @@ This function execute a neo4j query strings to search the shortest path to syste
 */
 function searchPath() {
   var setStr = document.getElementById("query-input").value;
+  var safeStr = escapeCypher(setStr);
   var dateStr = getDateRange();
   dateStr = dateStr.slice(5);
 
-  queryStr = 'MATCH (from:Username { user:"' + setStr + '" }), (to:Username { rights:"system"}), p = shortestPath((from)-[:Event*]-(to)) \
+  queryStr = 'MATCH (from:Username { user:"' + safeStr + '" }), (to:Username { rights:"system"}), p = shortestPath((from)-[:Event*]-(to)) \
               WITH p \
               MATCH (user:Username) WHERE user IN nodes(p) \
               MATCH (ip:IPAddress) WHERE ip IN nodes(p) \
@@ -712,6 +750,12 @@ function sendQuery(queryStr, root) {
             }
           }
           drawGraph(graph, rootNode);
+          
+          // Trigger AI Analysis
+          if (typeof aiAssistant !== 'undefined' && aiAssistant && aiAssistant.isEnabled) {
+            const queryType = getQueryTypeFromString(queryStr);
+            aiAssistant.analyzeQueryResults(queryType, queryStr, graph);
+          }
         }
       },
       onError: function(error) {
@@ -914,9 +958,9 @@ function pagerankQuery(queryStr, dataType, currentPage) {
       onCompleted: function() {
         session.close();
         for (i = 0; i < nodes.length; i++) {
-          html += '<tr><td>' + (currentPage * 10 + i + 1) + '</td><td><a onclick="createRankQuery(\'' + nodes[i][0] + '\', \'' + dataType + '\')">' + nodes[i][0] + '</a></td></tr>';
-          //console.log(nodes[i][0]);
-          //console.log(hosts[i][0]);
+          var safeNodeName = escapeHtml(nodes[i][0]);
+          var safeDataType = escapeHtml(dataType);
+          html += '<tr><td>' + (currentPage * 10 + i + 1) + '</td><td><a data-search-label="' + safeNodeName + '" data-search-type="' + safeDataType + '" onclick="createRankQuery(this.dataset.searchLabel, this.dataset.searchType)">' + safeNodeName + '</a></td></tr>';
         }
         html += '</tbody></table></div>';
 
@@ -1180,10 +1224,11 @@ function createTimeline(queryStr, tableType) {
 
         if (tableType == "all") {
           for (i = 0; i < users.length; i++) {
+            var safeUser = escapeHtml(users[i][0]);
             if (users[i][3] == "system") {
-              html += '<tr><td><a onclick="clickTimeline(\'' + users[i][0] + '\')"><font color="#ff7f50">' + users[i][0] + '</font></a></td>';
+              html += '<tr><td><a data-username="' + safeUser + '" onclick="clickTimeline(this.dataset.username)"><font color="#ff7f50">' + safeUser + '</font></a></td>';
             } else {
-              html += '<tr><td><a onclick="clickTimeline(\'' + users[i][0] + '\')">' + users[i][0] + '</a></td>';
+              html += '<tr><td><a data-username="' + safeUser + '" onclick="clickTimeline(this.dataset.username)">' + safeUser + '</a></td>';
             }
             rowdata = users[i][1].split(",");
             alerts = users[i][2].split(",");
@@ -1206,10 +1251,11 @@ function createTimeline(queryStr, tableType) {
 
         if (tableType == "search") {
           for (i = 0; i < users.length; i++) {
+            var safeUserS = escapeHtml(users[i][0]);
             if (users[i][3] == "system") {
-              html += '<tr><td rowspan = "5"><a onclick="clickTimeline(\'' + users[i][0] + '\')"><font color="#ff7f50">' + users[i][0] + '</font></a></td>';
+              html += '<tr><td rowspan = "5"><a data-username="' + safeUserS + '" onclick="clickTimeline(this.dataset.username)"><font color="#ff7f50">' + safeUserS + '</font></a></td>';
             } else {
-              html += '<tr><td rowspan = "5"><a onclick="clickTimeline(\'' + users[i][0] + '\')">' + users[i][0] + '</a></td>';
+              html += '<tr><td rowspan = "5"><a data-username="' + safeUserS + '" onclick="clickTimeline(this.dataset.username)">' + safeUserS + '</a></td>';
             }
 
             for (j = 4; j <= 8; j++) {
@@ -1592,6 +1638,7 @@ function file_upload() {
     xmlhttp.addEventListener("error", errorHandler, false);
     xmlhttp.addEventListener("abort", abortHandler, false);
     xmlhttp.open("POST", "upload", true);
+    xmlhttp.setRequestHeader('X-CSRFToken', getCsrfToken());
     xmlhttp.send(formData);
   }
 }
@@ -1638,6 +1685,7 @@ function load_eventlog() {
     xmlhttp.addEventListener("error", errorHandlerES, false);
     xmlhttp.addEventListener("abort", abortHandlerES, false);
     xmlhttp.open("POST", "esload", true);
+    xmlhttp.setRequestHeader('X-CSRFToken', getCsrfToken());
     xmlhttp.send(formData);
   }
 }
