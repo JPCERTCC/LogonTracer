@@ -3,8 +3,8 @@
 <head>
     <meta charset="utf-8">
     <title>AI Settings - LogonTracer</title>
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
-    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.11.2/css/all.css" integrity="sha384-KA6wR/X5RY4zFAHpv/CnoG2UW1uogYfdnP67Uv7eULvTveboZJg0qUpmJZb5VqzN" crossorigin="anonymous">
+    <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/bootstrap/5.3.7/css/bootstrap.min.css', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css') }}">
+    <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/fontawesome-free/5.11.2/css/all.css', 'https://use.fontawesome.com/releases/v5.11.2/css/all.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
 <body>
@@ -50,25 +50,84 @@
 
                             <div id="ai-config-section" style="display: '{{ 'block' if current_setting.ai_enabled else 'none' }}';">
                                 <hr>
-                                
+
                                 <div class="mb-3">
-                                    {{ form.openai_api_key.label(class="form-label") }}
-                                    {{ form.openai_api_key(class="form-control", placeholder="sk-proj-...", type="password") }}
+                                    {{ form.llm_provider.label(class="form-label") }}
+                                    {{ form.llm_provider(class="form-select", id="llm_provider") }}
                                     <small class="form-text text-muted">
-                                        Your OpenAI API key. Get one at <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
+                                        {% if offline_mode %}
+                                        Offline mode is enabled. LogonTracer will use the bundled local Ollama service.
+                                        {% else %}
+                                        Select OpenAI for cloud analysis or Ollama for a local LLM service.
+                                        {% endif %}
                                     </small>
+                                </div>
+                                
+                                {% if not offline_mode %}
+                                <div id="openai-settings-section">
+                                    <div class="mb-3">
+                                        {{ form.openai_api_key.label(class="form-label") }}
+                                        {{ form.openai_api_key(class="form-control", placeholder="sk-proj-...", type="password") }}
+                                        <small class="form-text text-muted">
+                                            Your OpenAI API key. Get one at <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
+                                        </small>
+                                    </div>
+
+                                    <div class="mb-3">
+                                        {{ form.openai_model.label(class="form-label") }}
+                                        {{ form.openai_model(class="form-select") }}
+                                        <small class="form-text text-muted">
+                                            OpenAI model to use for analysis. GPT-5 Mini is recommended for cost-effectiveness.
+                                        </small>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <div id="ollama-settings-section">
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                {{ form.llm_base_url.label(class="form-label") }}
+                                                {{ form.llm_base_url(class="form-control", placeholder="http://ollama:11434/v1") }}
+                                                <small class="form-text text-muted">
+                                                    Use http://ollama:11434/v1 when Ollama runs in the same Docker Compose network.
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                {{ form.ollama_model.label(class="form-label") }}
+                                                {{ form.ollama_model(class="form-control", placeholder="llama3.1:8b") }}
+                                                <small class="form-text text-muted">
+                                                    Pull this model in the Ollama container before running analysis.
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div class="row">
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                {{ form.ollama_context_length.label(class="form-label") }}
+                                                {{ form.ollama_context_length(class="form-control", min="4096", max="131072") }}
+                                                <small class="form-text text-muted">
+                                                    32768 or 65536 is recommended for agent investigations.
+                                                </small>
+                                            </div>
+                                        </div>
+                                        <div class="col-md-6">
+                                            <div class="mb-3">
+                                                {{ form.ollama_keep_alive.label(class="form-label") }}
+                                                {{ form.ollama_keep_alive(class="form-control", placeholder="30m") }}
+                                                <small class="form-text text-muted">
+                                                    Keeps the local model loaded between requests.
+                                                </small>
+                                            </div>
+                                        </div>
+                                    </div>
                                 </div>
 
                                 <div class="row">
-                                    <div class="col-md-6">
-                                        <div class="mb-3">
-                                            {{ form.openai_model.label(class="form-label") }}
-                                            {{ form.openai_model(class="form-select") }}
-                                            <small class="form-text text-muted">
-                                                AI model to use for analysis. GPT-5 Mini is recommended for cost-effectiveness.
-                                            </small>
-                                        </div>
-                                    </div>
                                     <div class="col-md-6">
                                         <div class="mb-3">
                                             {{ form.max_completion_tokens.label(class="form-label") }}
@@ -108,10 +167,13 @@
                                         <span class="badge bg-{{ 'success' if current_setting.ai_enabled else 'secondary' }}">
                                             AI Analysis: {{ 'Enabled' if current_setting.ai_enabled else 'Disabled' }}
                                         </span>
-                                        {% if current_setting.ai_enabled and current_setting.openai_api_key %}
+                                        <span class="badge bg-info">Provider: {{ current_setting.llm_provider|default('openai') }}</span>
+                                        {% if current_setting.ai_enabled and current_setting.llm_provider == 'ollama' %}
+                                            <span class="badge bg-success">Local LLM Configured</span>
+                                        {% elif current_setting.ai_enabled and current_setting.openai_api_key %}
                                             <span class="badge bg-success">API Key Configured</span>
                                         {% elif current_setting.ai_enabled %}
-                                            <span class="badge bg-warning">API Key Required</span>
+                                            <span class="badge bg-warning">Provider Settings Required</span>
                                         {% endif %}
                                     </div>
                                 </div>
@@ -132,7 +194,7 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js" integrity="sha384-ndDqU0Gzau9qJ1lfW4pNLlhNTkCfHzAVBReH9diLvGRem5+R9g2FzA8ZGN954O5Q" crossorigin="anonymous"></script>
+    <script src="{{ vendor_asset('/static/vendor/bootstrap/5.3.7/js/bootstrap.bundle.min.js', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.bundle.min.js') }}"></script>
     <script>
         // AI設定の表示/非表示制御
         document.getElementById('ai_enabled').addEventListener('change', function() {
@@ -143,6 +205,21 @@
                 configSection.style.display = 'none';
             }
         });
+
+        function updateProviderSections() {
+            const provider = document.getElementById('llm_provider').value;
+            const openaiSection = document.getElementById('openai-settings-section');
+            const ollamaSection = document.getElementById('ollama-settings-section');
+            if (openaiSection) {
+                openaiSection.style.display = provider === 'openai' ? 'block' : 'none';
+            }
+            if (ollamaSection) {
+                ollamaSection.style.display = provider === 'ollama' ? 'block' : 'none';
+            }
+        }
+
+        document.getElementById('llm_provider').addEventListener('change', updateProviderSections);
+        updateProviderSections();
     </script>
 </body>
 </html>

@@ -4,26 +4,26 @@
 <head>
   <meta charset="utf-8">
   <title>LogonTracer</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/qtip2/3.0.3/jquery.qtip.css" integrity="sha384-IhDxDC0t870ZP2YoMhnA+ZFS5i3mQTrb50kHR9Bq2cMHPXgSOqab3vzbQ7e8ABgx" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/css/bootstrap5-toggle.min.css" integrity="sha384-0lIa81VMKhT4lTphDk5USICv1KjOG1vgvk17vDiZGAw4RjRa47eHhKL/Xk+TJ2N+" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css" integrity="sha384-CmLV3WR+cw/TcN50vJSYAs2EAzhDD77tQvGcmoZ1KEzxtpl2K5xkrpFz9N2H9ClN" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.39.0/css/tempusdominus-bootstrap-4.min.css" integrity="sha512-3JRrEUwaCkFUBLK1N8HehwQgu8e23jTH4np5NHOmQOobuC4ROQxFwFgBLTnhcnQRMs84muMh0PnnwXlPq5MGjg==" crossorigin="anonymous" />
-  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.11.2/css/all.css" integrity="sha384-KA6wR/X5RY4zFAHpv/CnoG2UW1uogYfdnP67Uv7eULvTveboZJg0qUpmJZb5VqzN" crossorigin="anonymous">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/bootstrap/5.3.7/css/bootstrap.min.css', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/qtip2/3.0.3/jquery.qtip.css', 'https://cdnjs.cloudflare.com/ajax/libs/qtip2/3.0.3/jquery.qtip.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/bootstrap5-toggle/5.1.2/css/bootstrap5-toggle.min.css', 'https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/css/bootstrap5-toggle.min.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/font-awesome/4.2.0/css/font-awesome.min.css', 'https://maxcdn.bootstrapcdn.com/font-awesome/4.2.0/css/font-awesome.min.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/tempusdominus-bootstrap-4/5.39.0/css/tempusdominus-bootstrap-4.min.css', 'https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.39.0/css/tempusdominus-bootstrap-4.min.css') }}" />
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/fontawesome-free/5.11.2/css/all.css', 'https://use.fontawesome.com/releases/v5.11.2/css/all.css') }}">
   <link rel="stylesheet" href="static/css/style.css">
   <link rel="stylesheet" href="static/css/dark-mode.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/qtip2/3.0.3/jquery.qtip.js" integrity="sha384-62LfCSpLMb4R5mEA5vOzY6oP+HKrwBqtlJvnD40wNIpcXawPrlOKtZIRmOsKPcJz" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/js/bootstrap5-toggle.jquery.min.js" integrity="sha384-1B+pGsGQhuc6J3yvEqAHys/XCGuY3SN/trNbr1zMw6UFqp+aa5/r1TSBMmvA+QGa" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js" integrity="sha384-7qAoOXltbVP82dhxHAUje59V5r2YsVfBafyUDxEdApLPmcdhBPg1DKg1ERo0BZlK" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/cytoscape@3.33.1/dist/cytoscape.min.js" integrity="sha384-lXrzMjLDk3q9l0I/kjqjMcDgfFnHvWTDeWP3DmMqoeOq49/qa8drmlP3OBWN9dQ3" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/cytoscape-qtip@2.8.0/cytoscape-qtip.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js" integrity="sha384-KIix3a0qkeD2RPwPvpkJ+Knc91vkmDI+i2c7phIO+EfV3dpfDXIGSqQjpIaJXlR9" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.39.0/js/tempusdominus-bootstrap-4.min.js" integrity="sha512-k6/Bkb8Fxf/c1Tkyl39yJwcOZ1P4cRrJu77p83zJjN2Z55prbFHxPs9vN7q3l3+tSMGPDdoH51AEU8Vgo1cgAA==" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js"></script>
+  <script src="{{ vendor_asset('/static/vendor/jquery/3.7.1/jquery.min.js', 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/qtip2/3.0.3/jquery.qtip.js', 'https://cdnjs.cloudflare.com/ajax/libs/qtip2/3.0.3/jquery.qtip.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/bootstrap5-toggle/5.1.2/js/bootstrap5-toggle.jquery.min.js', 'https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/js/bootstrap5-toggle.jquery.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/popper/2.11.8/umd/popper.min.js', 'https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/bootstrap/5.3.7/js/bootstrap.min.js', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/cytoscape/3.33.1/cytoscape.min.js', 'https://cdn.jsdelivr.net/npm/cytoscape@3.33.1/dist/cytoscape.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/cytoscape-qtip/2.8.0/cytoscape-qtip.min.js', 'https://cdn.jsdelivr.net/npm/cytoscape-qtip@2.8.0/cytoscape-qtip.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/moment/2.30.1/moment.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/moment.js/2.30.1/moment.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/tempusdominus-bootstrap-4/5.39.0/js/tempusdominus-bootstrap-4.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/tempusdominus-bootstrap-4/5.39.0/js/tempusdominus-bootstrap-4.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/desvg/1.0.2/desvg.min.js', 'https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js') }}"></script>
   <!-- Neo4j JavaScript Driver -->
-  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.4.11/lib/browser/neo4j-web.min.js" integrity="sha384-M7IgiSpzRjF1qJu8pYaYwoDwXif/XBFUlabbZLNDtqXE7kPugcTx7QRyZqveSoBZ" crossorigin="anonymous"></script>
+  <script src="{{ vendor_asset('/static/vendor/neo4j-driver/4.4.11/neo4j-web.min.js', 'https://cdn.jsdelivr.net/npm/neo4j-driver@4.4.11/lib/browser/neo4j-web.min.js') }}"></script>
   <script src="static/js/ai-security-assistant.js"></script>
   <script src="static/js/script.js"></script>
 </head>

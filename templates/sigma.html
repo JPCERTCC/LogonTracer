@@ -4,24 +4,24 @@
 <head>
   <meta charset="utf-8">
   <title>LogonTracer - Sigma Detection Results</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/css/bootstrap5-toggle.min.css" integrity="sha384-0lIa81VMKhT4lTphDk5USICv1KjOG1vgvk17vDiZGAw4RjRa47eHhKL/Xk+TJ2N+" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.11.2/css/all.css" integrity="sha384-KA6wR/X5RY4zFAHpv/CnoG2UW1uogYfdnP67Uv7eULvTveboZJg0qUpmJZb5VqzN" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.min.css">
-  <link rel="stylesheet" href="https://cdn.datatables.net/buttons/3.0.2/css/buttons.bootstrap5.min.css">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/bootstrap/5.3.7/css/bootstrap.min.css', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/bootstrap5-toggle/5.1.2/css/bootstrap5-toggle.min.css', 'https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/css/bootstrap5-toggle.min.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/fontawesome-free/5.11.2/css/all.css', 'https://use.fontawesome.com/releases/v5.11.2/css/all.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/datatables/2.0.8/css/dataTables.bootstrap5.min.css', 'https://cdn.datatables.net/2.0.8/css/dataTables.bootstrap5.min.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/datatables-buttons/3.0.2/css/buttons.bootstrap5.min.css', 'https://cdn.datatables.net/buttons/3.0.2/css/buttons.bootstrap5.min.css') }}">
   <link rel="stylesheet" href="static/css/style.css">
   <link rel="stylesheet" href="static/css/dark-mode.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/js/bootstrap5-toggle.jquery.min.js" integrity="sha384-1B+pGsGQhuc6J3yvEqAHys/XCGuY3SN/trNbr1zMw6UFqp+aa5/r1TSBMmvA+QGa" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js" integrity="sha384-7qAoOXltbVP82dhxHAUje59V5r2YsVfBafyUDxEdApLPmcdhBPg1DKg1ERo0BZlK" crossorigin="anonymous"></script>
-  <script src="https://cdn.datatables.net/2.0.8/js/dataTables.min.js"></script>
-  <script src="https://cdn.datatables.net/2.0.8/js/dataTables.bootstrap5.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/3.0.2/js/dataTables.buttons.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/3.0.2/js/buttons.bootstrap5.min.js"></script>
-  <script src="https://cdn.datatables.net/buttons/3.0.2/js/buttons.html5.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js"></script>
+  <script src="{{ vendor_asset('/static/vendor/jquery/3.7.1/jquery.min.js', 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/bootstrap5-toggle/5.1.2/js/bootstrap5-toggle.jquery.min.js', 'https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/js/bootstrap5-toggle.jquery.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/popper/2.11.8/umd/popper.min.js', 'https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/bootstrap/5.3.7/js/bootstrap.min.js', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/datatables/2.0.8/js/dataTables.min.js', 'https://cdn.datatables.net/2.0.8/js/dataTables.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/datatables/2.0.8/js/dataTables.bootstrap5.min.js', 'https://cdn.datatables.net/2.0.8/js/dataTables.bootstrap5.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/datatables-buttons/3.0.2/js/dataTables.buttons.min.js', 'https://cdn.datatables.net/buttons/3.0.2/js/dataTables.buttons.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/datatables-buttons/3.0.2/js/buttons.bootstrap5.min.js', 'https://cdn.datatables.net/buttons/3.0.2/js/buttons.bootstrap5.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/datatables-buttons/3.0.2/js/buttons.html5.min.js', 'https://cdn.datatables.net/buttons/3.0.2/js/buttons.html5.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/jszip/3.10.1/jszip.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/desvg/1.0.2/desvg.min.js', 'https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js') }}"></script>
   <style>
     .level-critical { background-color: #dc3545 !important; color: white; }
     .level-high { background-color: #fd7e14 !important; color: white; }
@@ -1056,7 +1056,7 @@
           valueHtml = '<a href="#" class="graph-link" onclick="openGraphView(\'IPAddress\', \'' + escapeHtml(value) + '\'); return false;" title="View in Graph">' + escapedValue + '</a>';
         }
         
-        eventDataHtml += '<tr><td><strong>' + key + '</strong></td><td>' + valueHtml + '</td></tr>';
+        eventDataHtml += '<tr><td><strong>' + escapeHtml(key) + '</strong></td><td>' + valueHtml + '</td></tr>';
       }
       
       eventDataHtml += '</tbody></table>';

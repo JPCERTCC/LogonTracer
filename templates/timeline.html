@@ -4,20 +4,20 @@
 <head>
   <meta charset="utf-8">
   <title>LogonTracer</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css" integrity="sha384-LN+7fdVzj6u52u30Kp6M/trliBMCMKTyK833zpbD+pXdCLuTusPj697FH4R/5mcr" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/css/bootstrap5-toggle.min.css" integrity="sha384-0lIa81VMKhT4lTphDk5USICv1KjOG1vgvk17vDiZGAw4RjRa47eHhKL/Xk+TJ2N+" crossorigin="anonymous">
-  <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.11.2/css/all.css" integrity="sha384-KA6wR/X5RY4zFAHpv/CnoG2UW1uogYfdnP67Uv7eULvTveboZJg0qUpmJZb5VqzN" crossorigin="anonymous">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/bootstrap/5.3.7/css/bootstrap.min.css', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/bootstrap5-toggle/5.1.2/css/bootstrap5-toggle.min.css', 'https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/css/bootstrap5-toggle.min.css') }}">
+  <link rel="stylesheet" href="{{ vendor_asset('/static/vendor/fontawesome-free/5.11.2/css/all.css', 'https://use.fontawesome.com/releases/v5.11.2/css/all.css') }}">
   <link rel="stylesheet" href="static/css/style.css">
   <link rel="stylesheet" href="static/css/dark-mode.css">
-  <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js" integrity="sha384-1H217gwSVyLSIfaLxHbE7dRb3v4mYCKbpQvzx0cegeju1MVsGrX5xXxAvs/HgeFs" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.js" integrity="sha384-iU8HYtnGQ8Cy4zl7gbNMOhsDTTKX02BTXptVP/vqAWIaTfM7isw76iyZCsjL2eVi" crossorigin="anonymous"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/floatthead/2.2.5/jquery.floatThead.min.js" integrity="sha384-BQqEWrCh10Qb7ueE/zu0T0v7noV1yb/D8uS2xOOuq2+70Zn0XI9Vi3m+SrD1xSNZ" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/js/bootstrap5-toggle.jquery.min.js" integrity="sha384-1B+pGsGQhuc6J3yvEqAHys/XCGuY3SN/trNbr1zMw6UFqp+aa5/r1TSBMmvA+QGa" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js" integrity="sha384-I7E8VVD/ismYTF4hNIPjVp/Zjvgyol6VFvRkX/vR+Vc4jQkC+hVqc2pM8ODewa9r" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js" integrity="sha384-7qAoOXltbVP82dhxHAUje59V5r2YsVfBafyUDxEdApLPmcdhBPg1DKg1ERo0BZlK" crossorigin="anonymous"></script>
-  <script src="https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js"></script>
+  <script src="{{ vendor_asset('/static/vendor/jquery/3.7.1/jquery.min.js', 'https://ajax.googleapis.com/ajax/libs/jquery/3.7.1/jquery.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/chart.js/4.5.0/chart.umd.js', 'https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.5.0/chart.umd.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/floatthead/2.2.5/jquery.floatThead.min.js', 'https://cdnjs.cloudflare.com/ajax/libs/floatthead/2.2.5/jquery.floatThead.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/bootstrap5-toggle/5.1.2/js/bootstrap5-toggle.jquery.min.js', 'https://cdn.jsdelivr.net/npm/bootstrap5-toggle@5.1.2/js/bootstrap5-toggle.jquery.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/popper/2.11.8/umd/popper.min.js', 'https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.8/dist/umd/popper.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/bootstrap/5.3.7/js/bootstrap.min.js', 'https://cdn.jsdelivr.net/npm/bootstrap@5.3.7/dist/js/bootstrap.min.js') }}"></script>
+  <script src="{{ vendor_asset('/static/vendor/desvg/1.0.2/desvg.min.js', 'https://cdn.jsdelivr.net/npm/desvg@1.0.2/desvg.min.js') }}"></script>
   <!-- Neo4j JavaScript Driver -->
-  <script src="https://cdn.jsdelivr.net/npm/neo4j-driver@4.4.11/lib/browser/neo4j-web.min.js" integrity="sha384-M7IgiSpzRjF1qJu8pYaYwoDwXif/XBFUlabbZLNDtqXE7kPugcTx7QRyZqveSoBZ" crossorigin="anonymous"></script>
+  <script src="{{ vendor_asset('/static/vendor/neo4j-driver/4.4.11/neo4j-web.min.js', 'https://cdn.jsdelivr.net/npm/neo4j-driver@4.4.11/lib/browser/neo4j-web.min.js') }}"></script>
   <script src="static/js/script.js"></script>
 </head>
 

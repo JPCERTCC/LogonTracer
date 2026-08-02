@@ -8,6 +8,8 @@
 import os
 import re
 import sys
+import copy
+import asyncio
 import argparse
 import datetime
 import secrets
@@ -568,6 +570,18 @@ else:
 with open(config_path, 'r') as config_open:
     config_data = yaml.safe_load(config_open)["settings"]
 
+
+def _config_int(section, key, env_name, default):
+    value = os.environ.get(env_name, config_data.get(section, {}).get(key, default))
+    try:
+        parsed_value = int(value)
+        if parsed_value <= 0:
+            return default
+        return parsed_value
+    except (TypeError, ValueError):
+        return default
+
+
 # neo4j password
 NEO4J_PASSWORD = config_data["neo4j"]["NEO4J_PASSWORD"]
 # neo4j user name
@@ -602,10 +616,16 @@ default_password = config_data["logontracer"]["default_password"]
 database_name = config_data["logontracer"]["database_name"]
 # Default neo4j database name
 CASE_NAME = config_data["logontracer"]["default_case"]
+# LogonTracer and Neo4j credential session timeout
+SESSION_TIMEOUT_HOURS = _config_int("logontracer", "SESSION_TIMEOUT_HOURS", "LOGONTRACER_SESSION_TIMEOUT_HOURS", 6)
+SESSION_TTL = datetime.timedelta(hours=SESSION_TIMEOUT_HOURS)
 # Sigma rules url
 SIGMA_URL = config_data["sigma"]["git_url"]
 # Sigma scan result file
 SIGMA_RESULTS_FILE = config_data["sigma"]["results"]
+# Offline mode: no runtime access to GitHub/CDNs/OpenAI. Intended for pre-built
+# Docker images used in closed networks.
+OFFLINE_MODE = os.environ.get("LOGONTRACER_OFFLINE", "").lower() in ("1", "true", "yes", "on")
 
 if args.user:
     NEO4J_USER = args.user
@@ -650,8 +670,15 @@ if args.case:
 app.config["SESSION_COOKIE_SECURE"] = USE_HTTPS
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
+app.config["PERMANENT_SESSION_LIFETIME"] = SESSION_TTL
+app.config["REMEMBER_COOKIE_DURATION"] = SESSION_TTL
+app.config["SESSION_REFRESH_EACH_REQUEST"] = True
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///" + database_name
+try:
+    app.config["MAX_CONTENT_LENGTH"] = int(os.environ.get("LOGONTRACER_MAX_UPLOAD_MB", "2048")) * 1024 * 1024
+except ValueError:
+    app.config["MAX_CONTENT_LENGTH"] = 2048 * 1024 * 1024
 
 # Persist SECRET_KEY across restarts
 _secret_key_file = os.path.join(FPATH, '.secret_key')
@@ -665,7 +692,7 @@ else:
     os.chmod(_secret_key_file, 0o600)
 app.config["SECRET_KEY"] = _secret_key
 
-app.permanent_session_lifetime = datetime.timedelta(minutes=60)
+app.permanent_session_lifetime = SESSION_TTL
 
 # Initialize SQLAlchemy
 db = SQLAlchemy()
@@ -674,11 +701,253 @@ db.init_app(app)
 # Server-side credential cache (opaque token in session, credentials in memory)
 _cred_cache = {}
 _cred_cache_lock = threading.Lock()
+_hitl_cache = {}
+_hitl_cache_lock = threading.Lock()
+_agent_job_cache = {}
+_agent_job_cache_lock = threading.Lock()
+CREDENTIAL_CACHE_TTL = SESSION_TTL
+HITL_SESSION_TTL = SESSION_TTL
+AGENT_JOB_TTL = SESSION_TTL
+HITL_MAX_CONTEXT_CHARS = 4000
+HITL_MAX_TEXT_CHARS = 4000
+HITL_MAX_HISTORY_STEPS = 50
+try:
+    AI_MAX_JSON_BYTES = int(os.environ.get("LOGONTRACER_AI_MAX_JSON_MB", "16")) * 1024 * 1024
+except ValueError:
+    AI_MAX_JSON_BYTES = 16 * 1024 * 1024
+
+
+def _bounded_text(value, max_chars=HITL_MAX_TEXT_CHARS):
+    """Return a bounded string for AI prompt inputs."""
+    if value is None:
+        return ""
+    text = str(value)
+    if len(text) > max_chars:
+        return text[:max_chars]
+    return text
+
+
+def _json_request_too_large(data=None, max_bytes=AI_MAX_JSON_BYTES):
+    """Protect AI endpoints from unbounded JSON bodies without affecting uploads."""
+    if max_bytes <= 0:
+        return False
+
+    if request.content_length and request.content_length > max_bytes:
+        return True
+    if data is None:
+        return False
+
+    try:
+        return len(json.dumps(data, ensure_ascii=False).encode("utf-8")) > max_bytes
+    except (TypeError, ValueError):
+        return True
+
+
+def _sanitize_hitl_feedback(feedback):
+    """Keep only expected Analyst feedback fields and enforce small bounds."""
+    if not isinstance(feedback, dict):
+        return None
+
+    verdict = feedback.get("verdict", "unknown")
+    if verdict not in {"malicious", "benign", "unknown"}:
+        verdict = "unknown"
+
+    next_step_decision = feedback.get("next_step_decision", "")
+    if next_step_decision not in {"accept", "override", "end", ""}:
+        next_step_decision = ""
+
+    try:
+        iteration = int(feedback.get("iteration", 0) or 0)
+    except (TypeError, ValueError):
+        iteration = 0
+
+    return {
+        "iteration": iteration,
+        "verdict": verdict,
+        "verdict_label": verdict,
+        "analyst_prompt": _bounded_text(feedback.get("analyst_prompt")),
+        "llm_next_step": _bounded_text(feedback.get("llm_next_step")),
+        "next_step_decision": next_step_decision,
+        "accepted_next_step": bool(feedback.get("accepted_next_step")),
+        "custom_instruction": _bounded_text(feedback.get("custom_instruction")),
+        "reviewed_at": _bounded_text(feedback.get("reviewed_at"), 80)
+    }
+
+
+def _hitl_owner_key():
+    """Scope HITL sessions to the authenticated UI user and selected case."""
+    return f"{session.get('username', '')}:{session.get('case', CASE_NAME)}"
+
+
+def _cleanup_hitl_sessions():
+    now = utc_now()
+    expired_ids = [
+        session_id
+        for session_id, entry in _hitl_cache.items()
+        if entry.get("expires", now) < now
+    ]
+    for session_id in expired_ids:
+        _hitl_cache.pop(session_id, None)
+
+
+def _create_hitl_session(initial_context):
+    session_id = secrets.token_urlsafe(32)
+    now = utc_now()
+    _hitl_cache[session_id] = {
+        "owner": _hitl_owner_key(),
+        "case": session.get("case", CASE_NAME),
+        "context": _bounded_text(initial_context, HITL_MAX_CONTEXT_CHARS),
+        "iteration": 0,
+        "investigation_history": [],
+        "discovered_threats": [],
+        "analyst_feedback": [],
+        "max_iterations": None,
+        "created": now,
+        "expires": now + HITL_SESSION_TTL
+    }
+    return session_id, _hitl_cache[session_id]
+
+
+def _get_hitl_session(session_id):
+    if not session_id:
+        return None
+
+    with _hitl_cache_lock:
+        _cleanup_hitl_sessions()
+        entry = _hitl_cache.get(session_id)
+        if not entry or entry.get("owner") != _hitl_owner_key():
+            return None
+        entry["expires"] = utc_now() + HITL_SESSION_TTL
+        return entry
+
+
+def _drop_hitl_session(session_id):
+    if session_id:
+        with _hitl_cache_lock:
+            _hitl_cache.pop(session_id, None)
+
+
+def _drop_hitl_sessions_for_owner(owner):
+    if not owner:
+        return
+    with _hitl_cache_lock:
+        stale_ids = [
+            session_id
+            for session_id, entry in _hitl_cache.items()
+            if entry.get("owner") == owner
+        ]
+        for session_id in stale_ids:
+            _hitl_cache.pop(session_id, None)
+
+
+def _cleanup_agent_jobs():
+    now = utc_now()
+    expired_ids = [
+        job_id
+        for job_id, entry in _agent_job_cache.items()
+        if entry.get("expires", now) < now
+    ]
+    for job_id in expired_ids:
+        _agent_job_cache.pop(job_id, None)
+
+
+def _create_agent_job(owner, initial_context):
+    job_id = secrets.token_urlsafe(32)
+    now = utc_now()
+    with _agent_job_cache_lock:
+        _cleanup_agent_jobs()
+        _agent_job_cache[job_id] = {
+            "owner": owner,
+            "status": "running",
+            "context": _bounded_text(initial_context, HITL_MAX_CONTEXT_CHARS),
+            "iterations_run": 0,
+            "max_iterations": None,
+            "threats_discovered": 0,
+            "investigation_history": [],
+            "discovered_threats": [],
+            "final_report": None,
+            "error": None,
+            "created": now,
+            "updated": now,
+            "expires": now + AGENT_JOB_TTL
+        }
+    return job_id
+
+
+def _update_agent_job(job_id, **updates):
+    with _agent_job_cache_lock:
+        entry = _agent_job_cache.get(job_id)
+        if not entry:
+            return
+        entry.update(copy.deepcopy(updates))
+        entry["updated"] = utc_now()
+        entry["expires"] = utc_now() + AGENT_JOB_TTL
+
+
+def _get_agent_job(job_id):
+    if not job_id:
+        return None
+
+    with _agent_job_cache_lock:
+        _cleanup_agent_jobs()
+        entry = _agent_job_cache.get(job_id)
+        if not entry or entry.get("owner") != _hitl_owner_key():
+            return None
+        entry["expires"] = utc_now() + AGENT_JOB_TTL
+        return copy.deepcopy(entry)
+
+
+def _agent_job_response(job_id, entry):
+    status = entry.get("status", "running")
+    return {
+        "success": entry.get("success", status != "failed"),
+        "job_id": job_id,
+        "status": status,
+        "investigation_completed": status == "completed",
+        "iterations_run": entry.get("iterations_run", 0),
+        "max_iterations": entry.get("max_iterations"),
+        "threats_discovered": entry.get("threats_discovered", 0),
+        "investigation_history": entry.get("investigation_history", []),
+        "discovered_threats": entry.get("discovered_threats", []),
+        "final_report": entry.get("final_report"),
+        "error": entry.get("error")
+    }
+
+
+def _run_agent_job(job_id, initial_context, neo4j_uri, neo4j_user, neo4j_password, database):
+    """Run an autonomous agent outside the request thread and publish step snapshots."""
+    from intelligence.agent_engine import LLMDetectionAgent
+
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        with app.app_context():
+            agent = LLMDetectionAgent(neo4j_uri, neo4j_user, neo4j_password, database)
+            _update_agent_job(job_id, max_iterations=agent.max_iterations)
+
+            def publish_progress(snapshot):
+                _update_agent_job(job_id, **snapshot)
+
+            result = loop.run_until_complete(
+                agent.run_autonomous_detection(initial_context, publish_progress)
+            )
+            _update_agent_job(
+                job_id,
+                **result,
+                status="completed" if result.get("success") else "failed"
+            )
+    except Exception as e:
+        logger.error(f"Background agent detection error: {str(e)}")
+        _update_agent_job(job_id, status="failed", success=False, error=str(e))
+    finally:
+        loop.close()
+
 
 def store_neo4j_creds(username, password):
     """Store Neo4j credentials server-side; save only opaque key in session."""
     cache_key = secrets.token_urlsafe(32)
-    expires = utc_now() + datetime.timedelta(minutes=60)
+    expires = utc_now() + CREDENTIAL_CACHE_TTL
     with _cred_cache_lock:
         _cred_cache[cache_key] = {"username": username, "password": password, "expires": expires}
     session["neo4j_cache_key"] = cache_key
@@ -695,18 +964,31 @@ def get_neo4j_creds():
         if entry["expires"] < utc_now():
             _cred_cache.pop(cache_key, None)
             return None, None
+        entry["expires"] = utc_now() + CREDENTIAL_CACHE_TTL
         return entry["username"], entry["password"]
 
 def invalidate_neo4j_creds():
     """Remove credentials from server-side cache on logout."""
+    hitl_owner = _hitl_owner_key()
     cache_key = session.get("neo4j_cache_key")
     if cache_key:
         with _cred_cache_lock:
             _cred_cache.pop(cache_key, None)
         session.pop("neo4j_cache_key", None)
+    _drop_hitl_sessions_for_owner(hitl_owner)
 
 # Initialize CSRF protection
 csrf = CSRFProtect(app)
+
+@app.context_processor
+def inject_template_helpers():
+    def vendor_asset(local_path, cdn_url):
+        return local_path if OFFLINE_MODE else cdn_url
+
+    return {
+        "offline_mode": OFFLINE_MODE,
+        "vendor_asset": vendor_asset,
+    }
 
 @app.after_request
 def set_csrf_cookie(response):
@@ -722,20 +1004,28 @@ def set_security_headers(response):
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     if USE_HTTPS:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
-    # Content-Security-Policy: allow inline scripts (required for current templates),
-    # CDN resources (Bootstrap, jQuery, Cytoscape, Chart.js, DataTables, Font Awesome, etc.),
-    # and Neo4j bolt connections via connect-src
-    _cdn = (
-        "https://cdn.jsdelivr.net "
-        "https://cdnjs.cloudflare.com "
-        "https://ajax.googleapis.com "
-        "https://cdn.datatables.net "
-        "https://maxcdn.bootstrapcdn.com "
-        "https://use.fontawesome.com"
-    )
+    # Content-Security-Policy: allow inline scripts (required for current templates)
+    # and Neo4j bolt connections via connect-src. CDN origins are disabled in
+    # offline mode because all frontend dependencies are served from static/vendor.
+    # NOTE: 'unsafe-eval' is intentionally NOT included. None of the bundled
+    # frontend libraries (jQuery, cytoscape, moment, neo4j-driver, DataTables,
+    # bootstrap) require eval()/new Function() for normal operation, so blocking
+    # it removes a common XSS escalation path. 'unsafe-inline' is still required
+    # because the templates rely on inline <script> blocks and onclick handlers;
+    # removing it needs a full nonce-based refactor (tracked separately).
+    _cdn = ""
+    if not OFFLINE_MODE:
+        _cdn = (
+            "https://cdn.jsdelivr.net "
+            "https://cdnjs.cloudflare.com "
+            "https://ajax.googleapis.com "
+            "https://cdn.datatables.net "
+            "https://maxcdn.bootstrapcdn.com "
+            "https://use.fontawesome.com"
+        )
     response.headers['Content-Security-Policy'] = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' " + _cdn + "; "
+        "script-src 'self' 'unsafe-inline' " + _cdn + "; "
         "style-src 'self' 'unsafe-inline' " + _cdn + "; "
         "img-src 'self' data: blob:; "
         "font-src 'self' data: " + _cdn + "; "
@@ -811,8 +1101,27 @@ class RegistrationForm(FlaskForm):
 class CaseForm(FlaskForm):
     case = StringField('Case', validators=[DataRequired()])
 
+
+def _env_int(name, default):
+    try:
+        return int(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
+def _env_float(name, default):
+    try:
+        return float(os.environ.get(name, str(default)))
+    except ValueError:
+        return default
+
+
 class AISettingForm(FlaskForm):
     ai_enabled = BooleanField('Enable AI Analysis')
+    llm_provider = SelectField('LLM Provider',
+                              choices=[('openai', 'OpenAI'),
+                                     ('ollama', 'Ollama (Local LLM)')],
+                              default=os.environ.get('LOGONTRACER_LLM_PROVIDER', 'openai').lower())
     openai_api_key = StringField('OpenAI API Key', validators=[Optional()])
     openai_model = SelectField('OpenAI Model', 
                               choices=[('gpt-5', 'GPT-5'),
@@ -822,9 +1131,13 @@ class AISettingForm(FlaskForm):
                                      ('gpt-5.4', 'GPT-5.4'),
                                      ('gpt-5.4-mini', 'GPT-5.4 Mini'),],
                               default='gpt-5-mini')
-    max_completion_tokens = IntegerField('Max Completion Tokens', default=8000, validators=[Optional()])
-    temperature = FloatField('Temperature', default=1, validators=[Optional()])
-    agent_max_iterations = IntegerField('Agent Max Iterations', default=10, validators=[Optional()])
+    llm_base_url = StringField('Ollama Base URL', default=os.environ.get('OLLAMA_BASE_URL', 'http://ollama:11434/v1'), validators=[Optional()])
+    ollama_model = StringField('Ollama Model', default=os.environ.get('OLLAMA_MODEL', 'gpt-oss:20b'), validators=[Optional()])
+    ollama_context_length = IntegerField('Ollama Context Length', default=_env_int('OLLAMA_CONTEXT_LENGTH', 32768), validators=[Optional()])
+    ollama_keep_alive = StringField('Ollama Keep Alive', default=os.environ.get('OLLAMA_KEEP_ALIVE', '30m'), validators=[Optional()])
+    max_completion_tokens = IntegerField('Max Completion Tokens', default=_env_int('LOGONTRACER_MAX_COMPLETION_TOKENS', 8000), validators=[Optional()])
+    temperature = FloatField('Temperature', default=_env_float('LOGONTRACER_TEMPERATURE', 0), validators=[Optional()])
+    agent_max_iterations = IntegerField('Agent Max Iterations', default=_env_int('LOGONTRACER_AGENT_MAX_ITERATIONS', 10), validators=[Optional()])
     response_language = SelectField('Response Language',
                                   choices=[('en', 'English'),
                                          ('ja', '日本語 (Japanese)'),
@@ -834,18 +1147,53 @@ class AISettingForm(FlaskForm):
 class AISetting(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     ai_enabled = db.Column(db.Boolean, default=True)  # default Enable
+    llm_provider = db.Column(db.String(20), default=os.environ.get('LOGONTRACER_LLM_PROVIDER', 'openai').lower())
     openai_api_key = db.Column(db.String(255), nullable=True)
     openai_model = db.Column(db.String(50), default='gpt-5-mini')
-    max_completion_tokens = db.Column(db.Integer, default=8000)
-    temperature = db.Column(db.Float, default=1)
-    agent_max_iterations = db.Column(db.Integer, default=10)
+    llm_base_url = db.Column(db.String(255), default=os.environ.get('OLLAMA_BASE_URL', 'http://ollama:11434/v1'))
+    ollama_model = db.Column(db.String(100), default=os.environ.get('OLLAMA_MODEL', 'gpt-oss:20b'))
+    ollama_context_length = db.Column(db.Integer, default=_env_int('OLLAMA_CONTEXT_LENGTH', 32768))
+    ollama_keep_alive = db.Column(db.String(20), default=os.environ.get('OLLAMA_KEEP_ALIVE', '30m'))
+    max_completion_tokens = db.Column(db.Integer, default=lambda: _env_int('LOGONTRACER_MAX_COMPLETION_TOKENS', 8000))
+    temperature = db.Column(db.Float, default=lambda: _env_float('LOGONTRACER_TEMPERATURE', 0))
+    agent_max_iterations = db.Column(db.Integer, default=lambda: _env_int('LOGONTRACER_AGENT_MAX_ITERATIONS', 10))
     response_language = db.Column(db.String(10), default='en')  # Language for AI responses
     created_at = db.Column(db.DateTime, default=utc_now_naive)
     updated_at = db.Column(db.DateTime, default=utc_now_naive, onupdate=utc_now_naive)
 
+
+def _ensure_ai_setting_schema():
+    """Add local LLM settings columns for existing SQLite databases."""
+    try:
+        from sqlalchemy import inspect, text
+
+        inspector = inspect(db.engine)
+        table_names = inspector.get_table_names()
+        if 'ai_setting' not in table_names:
+            return
+
+        existing_columns = {column['name'] for column in inspector.get_columns('ai_setting')}
+        column_defs = {
+            'llm_provider': "VARCHAR(20) DEFAULT 'openai'",
+            'llm_base_url': "VARCHAR(255) DEFAULT 'http://ollama:11434/v1'",
+            'ollama_model': "VARCHAR(100) DEFAULT 'gpt-oss:20b'",
+            'ollama_context_length': "INTEGER DEFAULT 32768",
+            'ollama_keep_alive': "VARCHAR(20) DEFAULT '30m'"
+        }
+
+        for column_name, column_type in column_defs.items():
+            if column_name not in existing_columns:
+                db.session.execute(text(f"ALTER TABLE ai_setting ADD COLUMN {column_name} {column_type}"))
+
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.warning(f"Failed to ensure AI setting schema: {str(e)}")
+
 # Initialize database tables and default user
 with app.app_context():
     db.create_all()
+    _ensure_ai_setting_schema()
     
     user_query = User.query.filter_by(username=default_user).first()
     if user_query is None:
@@ -1504,6 +1852,19 @@ def sigma_view():
 
 
 # Neo4j API endpoints
+def _browser_neo4j_server():
+    """Return a Neo4j host name reachable from the user's browser."""
+    configured_host = os.environ.get("LOGONTRACER_BROWSER_NEO4J_SERVER")
+    if configured_host:
+        return configured_host
+
+    forwarded_host = request.headers.get("X-Forwarded-Host")
+    browser_host = forwarded_host or request.host or NEO4J_SERVER
+    if browser_host.startswith("[") and "]" in browser_host:
+        return browser_host[1:browser_host.index("]")]
+    return browser_host.split(":", 1)[0]
+
+
 @app.route('/api/neo4j/credentials')
 @login_required(role="ANY")
 def neo4j_credentials():
@@ -1512,7 +1873,7 @@ def neo4j_credentials():
     if _u is None:
         return jsonify({"error": "Session expired"}), 401
     return jsonify({
-        "server": NEO4J_SERVER,
+        "server": _browser_neo4j_server(),
         "port": WS_PORT,
         "username": _u,
         "password": _p,
@@ -2077,15 +2438,26 @@ def favicon():
 
 # AI Analysis API Endpoints
 @app.route("/api/analyze-security-pattern", methods=["POST"])
+@limiter.limit("20 per minute; 120 per hour")
 @login_required(role="ANY")
 def analyze_security_pattern():
     """AI-powered security pattern analysis"""
     try:
         from intelligence.analysis_engine import SecurityAnalysisEngine
-        
+        if _json_request_too_large():
+            return jsonify({
+                "success": False,
+                "error": f"AI analysis payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB"
+            }), 413
+
         data = request.get_json()
         if not data:
             return jsonify({"success": False, "error": "No data provided"}), 400
+        if _json_request_too_large(data):
+            return jsonify({
+                "success": False,
+                "error": f"AI analysis payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB"
+            }), 413
         
         query_type = data.get('query_type', 'general_analysis')
         analysis_data = data.get('analysis_data', {})
@@ -2142,36 +2514,45 @@ def ai_status():
 
 # LLM Agent API Endpoints
 @app.route("/api/ai/agent-detect", methods=["POST"])
+@limiter.limit("5 per minute; 30 per hour")
 @login_required(role="ANY")
 def ai_agent_detect():
-    """Run autonomous threat detection using LLM Agent"""
+    """Start autonomous threat detection and return a progress job id."""
     try:
-        from intelligence.agent_engine import LLMDetectionAgent
-        
-        data = request.get_json()
-        initial_context = data.get("context", "Detect suspicious logon behavior in Active Directory")
+        if _json_request_too_large():
+            return jsonify({"success": False, "error": f"AI agent payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB"}), 413
+        data = request.get_json(silent=True) or {}
+        if _json_request_too_large(data):
+            return jsonify({"success": False, "error": f"AI agent payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB"}), 413
+        initial_context = _bounded_text(
+            data.get("context", "Detect suspicious logon behavior in Active Directory"),
+            HITL_MAX_CONTEXT_CHARS
+        )
 
         _agent_user, _agent_pass = get_neo4j_creds()
         if _agent_user is None:
             return jsonify({"success": False, "error": "Session expired. Please log in again."}), 401
 
-        # Create agent instance
         neo4j_uri = f"bolt://{NEO4J_SERVER}:{WS_PORT}"
-        agent = LLMDetectionAgent(neo4j_uri, _agent_user, _agent_pass, session.get('case', CASE_NAME))
-        
-        # Run autonomous detection
-        import asyncio
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-        try:
-            result = loop.run_until_complete(
-                agent.run_autonomous_detection(initial_context)
-            )
-        finally:
-            loop.close()
-        
-        return jsonify(result)
+        database = session.get('case', CASE_NAME)
+        job_id = _create_agent_job(_hitl_owner_key(), initial_context)
+        worker = threading.Thread(
+            target=_run_agent_job,
+            args=(job_id, initial_context, neo4j_uri, _agent_user, _agent_pass, database),
+            daemon=True
+        )
+        worker.start()
+
+        return jsonify({
+            "success": True,
+            "job_id": job_id,
+            "status": "running",
+            "investigation_completed": False,
+            "iterations_run": 0,
+            "threats_discovered": 0,
+            "investigation_history": [],
+            "discovered_threats": []
+        }), 202
         
     except Exception as e:
         logger.error(f"Agent detection error: {str(e)}")
@@ -2181,6 +2562,180 @@ def ai_agent_detect():
             'investigation_completed': False,
             'threats_discovered': 0
         }), 500
+
+
+@app.route("/api/ai/agent-detect/<job_id>", methods=["GET"])
+@limiter.limit("120 per minute")
+@login_required(role="ANY")
+def ai_agent_detect_progress(job_id):
+    """Return the latest autonomous detection snapshot for incremental UI updates."""
+    entry = _get_agent_job(_bounded_text(job_id, 128))
+    if not entry:
+        return jsonify({"success": False, "error": "Invalid or expired agent job."}), 404
+    return jsonify(_agent_job_response(job_id, entry))
+
+
+@app.route("/api/ai/agent-step", methods=["POST"])
+@limiter.limit("20 per minute; 120 per hour")
+@login_required(role="ANY")
+def ai_agent_step():
+    """Run one analyst-in-the-loop LLM Agent investigation step"""
+    try:
+        from intelligence.agent_engine import LLMDetectionAgent
+
+        if _json_request_too_large():
+            return jsonify({"success": False, "error": f"AI agent payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB"}), 413
+        data = request.get_json(silent=True) or {}
+        if _json_request_too_large(data):
+            return jsonify({"success": False, "error": f"AI agent payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB"}), 413
+        hitl_session_id = _bounded_text(data.get("hitl_session_id"), 128)
+        raw_context = data.get("context") if "context" in data else None
+        incoming_context = _bounded_text(raw_context, HITL_MAX_CONTEXT_CHARS) if raw_context is not None else ""
+        incoming_feedback = _sanitize_hitl_feedback(data.get("analyst_feedback"))
+
+        _agent_user, _agent_pass = get_neo4j_creds()
+        if _agent_user is None:
+            return jsonify({"success": False, "error": "Session expired. Please log in again."}), 401
+
+        with _hitl_cache_lock:
+            _cleanup_hitl_sessions()
+            if hitl_session_id:
+                hitl_entry = _hitl_cache.get(hitl_session_id)
+                if not hitl_entry or hitl_entry.get("owner") != _hitl_owner_key():
+                    return jsonify({"success": False, "error": "Invalid or expired HITL session."}), 404
+                hitl_entry["expires"] = utc_now() + HITL_SESSION_TTL
+            else:
+                initial_context = incoming_context or "Detect suspicious logon behavior in Active Directory"
+                hitl_session_id, hitl_entry = _create_hitl_session(initial_context)
+
+            current_analyst_feedback = [incoming_feedback] if incoming_feedback else []
+            step_context = ""
+
+            if incoming_feedback:
+                hitl_entry["analyst_feedback"].append(incoming_feedback)
+                hitl_entry["analyst_feedback"] = hitl_entry["analyst_feedback"][-HITL_MAX_HISTORY_STEPS:]
+
+            if incoming_context:
+                step_context = incoming_context
+                if not incoming_feedback or incoming_feedback.get("next_step_decision") != "override":
+                    hitl_entry["context"] = incoming_context
+
+            investigation_context = step_context or hitl_entry["context"]
+            iteration = int(hitl_entry.get("iteration", 0) or 0)
+            investigation_history = list(hitl_entry.get("investigation_history", []))[-HITL_MAX_HISTORY_STEPS:]
+            discovered_threats = list(hitl_entry.get("discovered_threats", []))[-HITL_MAX_HISTORY_STEPS:]
+            analyst_feedback = list(hitl_entry.get("analyst_feedback", []))[-HITL_MAX_HISTORY_STEPS:]
+
+        neo4j_uri = f"bolt://{NEO4J_SERVER}:{WS_PORT}"
+        agent = LLMDetectionAgent(neo4j_uri, _agent_user, _agent_pass, session.get('case', CASE_NAME))
+        agent.investigation_history = investigation_history
+        agent.discovered_threats = discovered_threats
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                agent.run_detection_step(
+                    investigation_context,
+                    iteration,
+                    analyst_feedback,
+                    current_analyst_feedback
+                )
+            )
+        finally:
+            loop.close()
+
+        result["hitl_session_id"] = hitl_session_id
+        result["analyst_feedback"] = analyst_feedback
+
+        with _hitl_cache_lock:
+            hitl_entry = _hitl_cache.get(hitl_session_id)
+            if hitl_entry and hitl_entry.get("owner") == _hitl_owner_key():
+                hitl_entry["investigation_history"] = result.get("investigation_history", [])[-HITL_MAX_HISTORY_STEPS:]
+                hitl_entry["discovered_threats"] = result.get("discovered_threats", [])[-HITL_MAX_HISTORY_STEPS:]
+                hitl_entry["analyst_feedback"] = analyst_feedback[-HITL_MAX_HISTORY_STEPS:]
+                hitl_entry["iteration"] = int(result.get("next_iteration", len(hitl_entry["investigation_history"])) or 0)
+                hitl_entry["max_iterations"] = result.get("max_iterations")
+                hitl_entry["expires"] = utc_now() + HITL_SESSION_TTL
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Agent HITL step error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'analyst_in_loop': True
+        }), 500
+
+
+@app.route("/api/ai/agent-finalize", methods=["POST"])
+@limiter.limit("10 per minute; 60 per hour")
+@login_required(role="ANY")
+def ai_agent_finalize():
+    """Generate a final report for an analyst-in-the-loop investigation"""
+    try:
+        from intelligence.agent_engine import LLMDetectionAgent
+
+        if _json_request_too_large():
+            return jsonify({"success": False, "error": f"AI finalize payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB"}), 413
+        data = request.get_json(silent=True) or {}
+        if _json_request_too_large(data):
+            return jsonify({"success": False, "error": f"AI finalize payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB"}), 413
+        hitl_session_id = _bounded_text(data.get("hitl_session_id"), 128)
+        incoming_feedback = _sanitize_hitl_feedback(data.get("analyst_feedback"))
+        completion_reason = _bounded_text(data.get("completion_reason", "analyst_requested_stop"), 80)
+        if completion_reason not in {"analyst_requested_stop", "max_iterations_reached", "completed"}:
+            completion_reason = "analyst_requested_stop"
+
+        _agent_user, _agent_pass = get_neo4j_creds()
+        if _agent_user is None:
+            return jsonify({"success": False, "error": "Session expired. Please log in again."}), 401
+        if not hitl_session_id:
+            return jsonify({"success": False, "error": "Missing HITL session id."}), 400
+
+        with _hitl_cache_lock:
+            _cleanup_hitl_sessions()
+            hitl_entry = _hitl_cache.get(hitl_session_id)
+            if not hitl_entry or hitl_entry.get("owner") != _hitl_owner_key():
+                return jsonify({"success": False, "error": "Invalid or expired HITL session."}), 404
+
+            if incoming_feedback:
+                hitl_entry["analyst_feedback"].append(incoming_feedback)
+                hitl_entry["analyst_feedback"] = hitl_entry["analyst_feedback"][-HITL_MAX_HISTORY_STEPS:]
+
+            investigation_history = list(hitl_entry.get("investigation_history", []))[-HITL_MAX_HISTORY_STEPS:]
+            discovered_threats = list(hitl_entry.get("discovered_threats", []))[-HITL_MAX_HISTORY_STEPS:]
+            analyst_feedback = list(hitl_entry.get("analyst_feedback", []))[-HITL_MAX_HISTORY_STEPS:]
+
+        neo4j_uri = f"bolt://{NEO4J_SERVER}:{WS_PORT}"
+        agent = LLMDetectionAgent(neo4j_uri, _agent_user, _agent_pass, session.get('case', CASE_NAME))
+        agent.investigation_history = investigation_history
+        agent.discovered_threats = discovered_threats
+
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
+            result = loop.run_until_complete(
+                agent.generate_final_report_from_state(analyst_feedback, completion_reason)
+            )
+        finally:
+            loop.close()
+
+        result["hitl_session_id"] = hitl_session_id
+        _drop_hitl_session(hitl_session_id)
+
+        return jsonify(result)
+
+    except Exception as e:
+        logger.error(f"Agent HITL finalize error: {str(e)}")
+        return jsonify({
+            'success': False,
+            'error': str(e),
+            'analyst_in_loop': True,
+            'investigation_completed': False
+        }), 500
+
 
 @app.route("/api/ai/agent-status", methods=["GET"])
 @login_required(role="ANY")
@@ -2200,7 +2755,9 @@ def ai_agent_status():
         return jsonify({
             'success': True,
             'max_iterations': agent.max_iterations,
-            'model': agent.config.model if agent.is_enabled else None
+            'provider': agent.config.provider if agent.is_enabled else None,
+            'model': agent.config.model if agent.is_enabled else None,
+            'base_url': agent.config.base_url if agent.is_enabled and agent.config.provider == 'ollama' else None
         })
         
     except Exception as e:
@@ -2212,13 +2769,20 @@ def ai_agent_status():
 
 
 @app.route("/api/ai/generate-sigma-rules", methods=["POST"])
+@limiter.limit("10 per minute; 60 per hour")
 @login_required(role="ANY")
 def ai_generate_sigma_rules():
     """Generate Sigma rules from AI Analysis results"""
     try:
-        from intelligence.openai_client import OpenAIClient
+        from intelligence.llm_client_factory import create_llm_client
         from intelligence.llm_config import get_llm_config, validate_config
-        
+        if _json_request_too_large():
+            return jsonify({
+                'success': False,
+                'message': f'AI Sigma generation payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB',
+                'sigma_rules': []
+            }), 413
+
         data = request.get_json()
         
         if not data:
@@ -2227,6 +2791,12 @@ def ai_generate_sigma_rules():
                 'message': 'No analysis result provided',
                 'sigma_rules': []
             }), 400
+        if _json_request_too_large(data):
+            return jsonify({
+                'success': False,
+                'message': f'AI Sigma generation payload exceeds {AI_MAX_JSON_BYTES // 1024 // 1024} MB',
+                'sigma_rules': []
+            }), 413
         
         analysis_result = data.get('analysis_result', {})
         
@@ -2252,18 +2822,24 @@ def ai_generate_sigma_rules():
                 'sigma_rules': []
             }), 400
         
-        # Initialize OpenAI client using proper config loading
+        # Initialize configured LLM client
         from intelligence.llm_config import get_llm_config, validate_config
         
         config = get_llm_config()
         if not validate_config(config):
             return jsonify({
                 'success': False,
-                'message': 'AI Analysis is not enabled. Please configure API key.',
+                'message': 'AI Analysis is not enabled. Please configure OpenAI or Ollama settings.',
                 'sigma_rules': []
             }), 400
         
-        client = OpenAIClient(config)
+        client = create_llm_client(config)
+        if client is None:
+            return jsonify({
+                'success': False,
+                'message': f'Unsupported LLM provider: {config.provider}',
+                'sigma_rules': []
+            }), 400
         
         # Generate Sigma rules (async)
         async def generate():
@@ -2778,6 +3354,16 @@ def delete_db_access_role(driver, username, dbname):
 
 # git clone or pull from url
 def git_clone_pull(url, download_path):
+    if OFFLINE_MODE:
+        if os.path.exists(download_path):
+            logger.info("[+] Offline mode: use local repository {0}.".format(download_path))
+        else:
+            logger.error("[!] Offline mode: local repository {0} was not found.".format(download_path))
+        return
+    if not url:
+        logger.error("[!] Git repository URL is empty for {0}.".format(download_path))
+        return
+
     import git
     
     if os.path.exists(download_path):
@@ -4746,19 +5332,37 @@ def parse_es(case):
 def ai_settings():
     """AI Settings page"""
     form = AISettingForm()
+    if OFFLINE_MODE:
+        form.llm_provider.choices = [('ollama', 'Ollama (Local LLM)')]
     
     # Get current settings
     current_setting = AISetting.query.first()
     if not current_setting:
-        current_setting = AISetting()
+        current_setting = AISetting(
+            llm_provider='ollama' if OFFLINE_MODE else os.environ.get('LOGONTRACER_LLM_PROVIDER', 'openai').lower(),
+            llm_base_url=os.environ.get('OLLAMA_BASE_URL', 'http://ollama:11434/v1'),
+            ollama_model=os.environ.get('OLLAMA_MODEL', 'gpt-oss:20b'),
+            ollama_context_length=_env_int('OLLAMA_CONTEXT_LENGTH', 32768),
+            ollama_keep_alive=os.environ.get('OLLAMA_KEEP_ALIVE', '30m'),
+            max_completion_tokens=_env_int('LOGONTRACER_MAX_COMPLETION_TOKENS', 8000),
+            temperature=_env_float('LOGONTRACER_TEMPERATURE', 0),
+            agent_max_iterations=_env_int('LOGONTRACER_AGENT_MAX_ITERATIONS', 10)
+        )
         db.session.add(current_setting)
         db.session.commit()
     
     if request.method == 'GET':
         # Populate form with current settings
         form.ai_enabled.data = current_setting.ai_enabled
+        form.llm_provider.data = getattr(current_setting, 'llm_provider', 'openai')
+        if OFFLINE_MODE:
+            form.llm_provider.data = 'ollama'
         form.openai_api_key.data = current_setting.openai_api_key
         form.openai_model.data = current_setting.openai_model
+        form.llm_base_url.data = getattr(current_setting, 'llm_base_url', 'http://ollama:11434/v1')
+        form.ollama_model.data = getattr(current_setting, 'ollama_model', 'gpt-oss:20b')
+        form.ollama_context_length.data = getattr(current_setting, 'ollama_context_length', 32768)
+        form.ollama_keep_alive.data = getattr(current_setting, 'ollama_keep_alive', '30m')
         form.max_completion_tokens.data = current_setting.max_completion_tokens
         form.temperature.data = current_setting.temperature
         form.agent_max_iterations.data = current_setting.agent_max_iterations
@@ -4767,8 +5371,13 @@ def ai_settings():
     if form.validate_on_submit():
         # Update settings from form
         current_setting.ai_enabled = form.ai_enabled.data
-        current_setting.openai_api_key = form.openai_api_key.data
+        current_setting.llm_provider = 'ollama' if OFFLINE_MODE else form.llm_provider.data
+        current_setting.openai_api_key = None if OFFLINE_MODE else form.openai_api_key.data
         current_setting.openai_model = form.openai_model.data
+        current_setting.llm_base_url = form.llm_base_url.data
+        current_setting.ollama_model = form.ollama_model.data
+        current_setting.ollama_context_length = form.ollama_context_length.data
+        current_setting.ollama_keep_alive = form.ollama_keep_alive.data
         current_setting.max_completion_tokens = form.max_completion_tokens.data
         current_setting.temperature = form.temperature.data
         current_setting.agent_max_iterations = form.agent_max_iterations.data
@@ -4784,7 +5393,7 @@ def ai_settings():
             
         return redirect(url_for('ai_settings'))
     
-    return render_template('ai_settings.html', form=form, current_setting=current_setting)
+    return render_template('ai_settings.html', form=form, current_setting=current_setting, offline_mode=OFFLINE_MODE)
 
 def main():
     if not has_neo4j:

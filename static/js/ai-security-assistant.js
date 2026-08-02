@@ -5,6 +5,8 @@ class AISecurityAssistant {
         this.isEnabled = false;
         this.analysisPanel = null;
         this.agentRunning = false;
+        this.currentAgentJobId = null;
+        this.hitlSession = null;
 
         // Initialize panel after ensuring DOM is ready
         this.initializePanel();
@@ -18,6 +20,16 @@ class AISecurityAssistant {
             .map(c => c.trim())
             .find(c => c.startsWith('csrf_token='))
             ?.split('=')[1] || '';
+    }
+
+    escapeHtml(value) {
+        if (value === null || value === undefined) return '';
+        return String(value)
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#39;');
     }
 
     initializePanel() {
@@ -94,7 +106,7 @@ class AISecurityAssistant {
                             style="border: none; background: none; font-size: 20px; cursor: pointer; color: white; opacity: 0.8;"
                             onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='0.8'">&times;</button>
                 </h5>
-                <small style="opacity: 0.9; font-size: 12px;">Powered by OpenAI</small>
+                <small style="opacity: 0.9; font-size: 12px;">Powered by configured LLM provider</small>
             </div>
             <div class="panel-body" id="analysis-content" style="padding: 15px; height: calc(100% - 80px); overflow-y: auto;">
                 <div class="loading-indicator" style="text-align: center; padding: 20px;">
@@ -576,6 +588,60 @@ class AISecurityAssistant {
         return patterns;
     }
 
+    isInternalFreeformFallbackText(value) {
+        const text = String(value || '');
+        return text.includes('Analysis provided in free-form text') ||
+            text.includes('Review the full analysis for security concerns') ||
+            text.includes('Refer to the detailed analysis for recommendations') ||
+            text.includes('Unable to connect to the local Ollama service') ||
+            text.includes('Local LLM service is unreachable') ||
+            text.includes('Automated threat detection is temporarily offline') ||
+            text.includes('Verify the Ollama container is running') ||
+            text.includes('Check the configured Ollama base URL') ||
+            text.includes('Pull the selected model before running analysis') ||
+            text.includes('Review LogonTracer and Ollama container logs');
+    }
+
+    filterInternalFreeformFallbackItems(items) {
+        return Array.isArray(items)
+            ? items.filter(item => !this.isInternalFreeformFallbackText(item))
+            : [];
+    }
+
+    sanitizeAnalysisForDisplay(analysis) {
+        if (!analysis || typeof analysis !== 'object' || Array.isArray(analysis)) {
+            return analysis;
+        }
+
+        return {
+            ...analysis,
+            key_findings: this.filterInternalFreeformFallbackItems(analysis.key_findings),
+            security_concerns: this.filterInternalFreeformFallbackItems(analysis.security_concerns),
+            recommendations: this.filterInternalFreeformFallbackItems(analysis.recommendations)
+        };
+    }
+
+    isInternalFreeformFallbackStep(step) {
+        const analysis = step?.analysis || {};
+        const internalDiagnostic = [
+            step?.error,
+            analysis.error_message,
+            analysis.summary,
+            ...(Array.isArray(analysis.key_findings) ? analysis.key_findings : []),
+            ...(Array.isArray(analysis.security_concerns) ? analysis.security_concerns : []),
+            ...(Array.isArray(analysis.recommendations) ? analysis.recommendations : [])
+        ].some(value => this.isInternalFreeformFallbackText(value));
+
+        return internalDiagnostic &&
+            (step?.focus === 'Query Generation' ||
+             this.isInternalFreeformFallbackText(analysis.summary) ||
+             this.isInternalFreeformFallbackText(analysis.error_message));
+    }
+
+    getVisibleErrorText(value, fallback = '') {
+        return this.isInternalFreeformFallbackText(value) ? fallback : String(value || fallback);
+    }
+
     displayAnalysis(analysis) {
         const content = document.getElementById('analysis-content');
         
@@ -611,7 +677,12 @@ class AISecurityAssistant {
         // Check if this is a quota exceeded error
         const isQuotaError = parsedAnalysis.summary && parsedAnalysis.summary.includes('quota exceeded');
         const isAuthError = parsedAnalysis.summary && parsedAnalysis.summary.includes('authentication failed');
-        const isConnectionError = parsedAnalysis.summary && parsedAnalysis.summary.includes('connect to OpenAI');
+        const isConnectionError = parsedAnalysis.summary && (
+            parsedAnalysis.summary.includes('connect to OpenAI') ||
+            parsedAnalysis.summary.includes('connect to the local Ollama service')
+        );
+        const isInternalLocalLlmError = parsedAnalysis.summary &&
+            parsedAnalysis.summary.includes('connect to the local Ollama service');
         const isTimeoutError = parsedAnalysis.summary && parsedAnalysis.summary.includes('timed out');
         
         if (isQuotaError) {
@@ -619,12 +690,17 @@ class AISecurityAssistant {
             return;
         }
         
+        if (isInternalLocalLlmError) {
+            this.displayError('AI analysis could not be completed. Review the LogonTracer server logs for details.');
+            return;
+        }
+
         if (isAuthError || isConnectionError || isTimeoutError) {
             this.displayServiceError(parsedAnalysis);
             return;
         }
         
-        this.displayFormattedAnalysis(parsedAnalysis);
+        this.displayFormattedAnalysis(this.sanitizeAnalysisForDisplay(parsedAnalysis));
         this.updateHistoryButtonVisibility();
     }
 
@@ -633,6 +709,8 @@ class AISecurityAssistant {
         const collapsibleId = 'raw-analysis-' + Date.now();
         const isLongText = rawText.length > 500;
         const displayText = isLongText ? rawText.substring(0, 500) + '...' : rawText;
+        const safeDisplayText = this.escapeHtml(displayText);
+        const safeFullText = this.escapeHtml(this.formatJSON(rawText));
         
         content.innerHTML = `
             <div class="analysis-result">
@@ -645,8 +723,8 @@ class AISecurityAssistant {
                         </button>` : ''}
                     </h6>
                     <div class="summary-content" style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #667eea;">
-                        <div id="${collapsibleId}-preview" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px; font-family: monospace; white-space: pre-wrap; ${isLongText ? '' : 'display: none;'}">${displayText}</div>
-                        <div id="${collapsibleId}-full" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; ${isLongText ? 'display: none;' : ''}">${this.formatJSON(rawText)}</div>
+                        <div id="${collapsibleId}-preview" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px; font-family: monospace; white-space: pre-wrap; ${isLongText ? '' : 'display: none;'}">${safeDisplayText}</div>
+                        <div id="${collapsibleId}-full" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px; font-family: monospace; white-space: pre-wrap; max-height: 400px; overflow-y: auto; ${isLongText ? 'display: none;' : ''}">${safeFullText}</div>
                     </div>
                 </div>
             </div>
@@ -660,13 +738,20 @@ class AISecurityAssistant {
         const riskIcon = this.getRiskIcon(analysis.risk_level);
         const summaryCollapsibleId = 'summary-' + Date.now();
         const isLongSummary = analysis.summary && analysis.summary.length > 300;
+        const safeRiskLevel = this.escapeHtml(analysis.risk_level || 'Unknown');
+        const safeSummary = this.escapeHtml(analysis.summary || '');
+        const safeSummaryPreview = this.escapeHtml((analysis.summary || '').substring(0, 300));
+        const safeFindings = Array.isArray(analysis.key_findings) ? analysis.key_findings.map(finding => this.escapeHtml(finding)) : [];
+        const safeConcerns = Array.isArray(analysis.security_concerns) ? analysis.security_concerns.map(concern => this.escapeHtml(concern)) : [];
+        const safeRecommendations = Array.isArray(analysis.recommendations) ? analysis.recommendations.map(rec => this.escapeHtml(rec)) : [];
+        const metadata = analysis.analysis_metadata || {};
         
         content.innerHTML = `
             <div class="analysis-result">
                 <div class="risk-assessment" style="margin-bottom: 20px;">
                     <div class="risk-badge" style="background: ${riskColor}; color: white; padding: 10px 15px; border-radius: 6px; display: flex; align-items: center; font-weight: 600;">
                         <i class="${riskIcon}" style="margin-right: 8px;"></i>
-                        ${analysis.risk_level} Risk Level
+                        ${safeRiskLevel} Risk Level
                     </div>
                 </div>
                 
@@ -680,20 +765,20 @@ class AISecurityAssistant {
                     </h6>
                     <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #667eea;">
                         ${isLongSummary ? `
-                            <div id="${summaryCollapsibleId}-preview" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px;">${analysis.summary.substring(0, 300)}...</div>
-                            <div id="${summaryCollapsibleId}-full" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px; display: none;">${analysis.summary}</div>
-                        ` : `<p style="margin: 0; line-height: 1.6; color: #555; font-size: 14px;">${analysis.summary}</p>`}
+                            <div id="${summaryCollapsibleId}-preview" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px;">${safeSummaryPreview}...</div>
+                            <div id="${summaryCollapsibleId}-full" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px; display: none;">${safeSummary}</div>
+                        ` : `<p style="margin: 0; line-height: 1.6; color: #555; font-size: 14px;">${safeSummary}</p>`}
                     </div>
                 </div>
 
-                ${analysis.key_findings && analysis.key_findings.length > 0 ? `
+                ${safeFindings.length > 0 ? `
                 <div class="key-findings" style="margin-bottom: 20px;">
                     <h6 style="margin-bottom: 10px; color: #333; font-weight: 600; display: flex; align-items: center;">
                         <i class="fas fa-search" style="margin-right: 8px; color: #28a745;"></i>
                         Key Findings
                     </h6>
                     <ul style="margin: 0; padding-left: 0; list-style: none;">
-                        ${analysis.key_findings.map(finding => 
+                        ${safeFindings.map(finding =>
                             `<li style="margin-bottom: 8px; padding: 8px 12px; background: #e8f5e8; border-radius: 4px; font-size: 14px; border-left: 3px solid #28a745;">
                                 <i class="fas fa-check-circle" style="margin-right: 8px; color: #28a745;"></i>${finding}
                             </li>`
@@ -702,14 +787,14 @@ class AISecurityAssistant {
                 </div>
                 ` : ''}
 
-                ${analysis.security_concerns && analysis.security_concerns.length > 0 ? `
+                ${safeConcerns.length > 0 ? `
                 <div class="security-concerns" style="margin-bottom: 20px;">
                     <h6 style="margin-bottom: 10px; color: #dc3545; font-weight: 600; display: flex; align-items: center;">
                         <i class="fas fa-exclamation-triangle" style="margin-right: 8px; color: #dc3545;"></i>
                         Security Concerns
                     </h6>
                     <ul style="margin: 0; padding-left: 0; list-style: none;">
-                        ${analysis.security_concerns.map(concern => 
+                        ${safeConcerns.map(concern =>
                             `<li style="margin-bottom: 8px; padding: 8px 12px; background: #ffeaea; border-radius: 4px; font-size: 14px; border-left: 3px solid #dc3545;">
                                 <i class="fas fa-times-circle" style="margin-right: 8px; color: #dc3545;"></i>${concern}
                             </li>`
@@ -724,7 +809,7 @@ class AISecurityAssistant {
                         Recommendations
                     </h6>
                     <ul style="margin: 0; padding-left: 0; list-style: none;">
-                        ${analysis.recommendations.map(rec => 
+                        ${safeRecommendations.map(rec =>
                             `<li style="margin-bottom: 8px; padding: 8px 12px; background: #e6f3ff; border-radius: 4px; font-size: 14px; border-left: 3px solid #17a2b8;">
                                 <i class="fas fa-arrow-right" style="margin-right: 8px; color: #17a2b8;"></i>${rec}
                             </li>`
@@ -732,10 +817,10 @@ class AISecurityAssistant {
                     </ul>
                 </div>
 
-                ${analysis.analysis_metadata ? `
+	                ${analysis.analysis_metadata ? `
                 <div class="analysis-metadata" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
                     <small style="color: #6c757d; font-size: 11px;">
-                        Analysis by ${analysis.analysis_metadata.model} • Query: ${analysis.analysis_metadata.query_type}
+                        Analysis by ${this.escapeHtml(metadata.model || '')} • Query: ${this.escapeHtml(metadata.query_type || '')}
                     </small>
                 </div>
                 ` : ''}
@@ -816,6 +901,10 @@ class AISecurityAssistant {
         }
         
         this.showPanel();
+        if (this.currentAnalysis.investigation_history || this.currentAnalysis.final_report) {
+            this.displayAgentResults(this.currentAnalysis);
+            return;
+        }
         this.displayAnalysis(this.currentAnalysis);
         this.updateHistoryButtonVisibility();
     }
@@ -872,12 +961,15 @@ class AISecurityAssistant {
     }
 
     displayError(message) {
+        if (this.analysisPanel && this.analysisPanel.style.display === 'none') {
+            this.showPanel();
+        }
         const content = document.getElementById('analysis-content');
         content.innerHTML = `
             <div class="error-message" style="text-align: center; padding: 30px 20px;">
                 <i class="fas fa-exclamation-triangle" style="font-size: 32px; color: #dc3545; margin-bottom: 15px;"></i>
                 <h6 style="color: #dc3545; margin-bottom: 10px;">Analysis Failed</h6>
-                <p style="margin: 0; color: #6c757d; font-size: 14px; line-height: 1.5;">${message}</p>
+                <p style="margin: 0; color: #6c757d; font-size: 14px; line-height: 1.5;">${this.escapeHtml(message)}</p>
                 <button onclick="hideAIPanel()" style="margin-top: 15px; padding: 8px 16px; background: #dc3545; color: white; border: none; border-radius: 4px; cursor: pointer; font-size: 14px;">
                     Close
                 </button>
@@ -890,9 +982,9 @@ class AISecurityAssistant {
         content.innerHTML = `
             <div class="quota-error-message" style="text-align: center; padding: 20px;">
                 <i class="fas fa-credit-card" style="font-size: 48px; color: #ff6b6b; margin-bottom: 20px;"></i>
-                <h5 style="color: #ff6b6b; margin-bottom: 15px;">OpenAI API Quota Exceeded</h5>
+                <h5 style="color: #ff6b6b; margin-bottom: 15px;">LLM API Quota Exceeded</h5>
                 <p style="color: #666; margin-bottom: 20px; font-size: 14px; line-height: 1.5;">
-                    Your OpenAI API usage has exceeded the current plan limits. 
+                    Your configured LLM API usage has exceeded the current plan limits. 
                     AI-powered analysis is temporarily unavailable.
                 </p>
                 
@@ -902,7 +994,7 @@ class AISecurityAssistant {
                         What you can do:
                     </h6>
                     <ul style="margin: 0; padding-left: 20px; color: #666; font-size: 13px;">
-                        ${analysis.recommendations.map(rec => `<li style="margin-bottom: 5px;">${rec}</li>`).join('')}
+	                        ${(Array.isArray(analysis.recommendations) ? analysis.recommendations : []).map(rec => `<li style="margin-bottom: 5px;">${this.escapeHtml(rec)}</li>`).join('')}
                     </ul>
                 </div>
                 
@@ -945,12 +1037,12 @@ class AISecurityAssistant {
             <div class="service-error-message" style="text-align: center; padding: 20px;">
                 <i class="${errorIcon}" style="font-size: 32px; color: ${errorColor}; margin-bottom: 15px;"></i>
                 <h6 style="color: ${errorColor}; margin-bottom: 10px;">${errorTitle}</h6>
-                <p style="margin: 0; color: #6c757d; font-size: 14px; line-height: 1.5; margin-bottom: 20px;">${analysis.summary}</p>
+                <p style="margin: 0; color: #6c757d; font-size: 14px; line-height: 1.5; margin-bottom: 20px;">${this.escapeHtml(analysis.summary || '')}</p>
                 
                 <div class="error-recommendations" style="background: #f8f9fa; border-radius: 6px; padding: 15px; margin: 15px 0; text-align: left;">
                     <h6 style="color: #495057; margin-bottom: 10px;">Recommended Actions:</h6>
                     <ul style="margin: 0; padding-left: 20px; color: #666; font-size: 13px;">
-                        ${analysis.recommendations.map(rec => `<li style="margin-bottom: 5px;">${rec}</li>`).join('')}
+                        ${(Array.isArray(analysis.recommendations) ? analysis.recommendations : []).map(rec => `<li style="margin-bottom: 5px;">${this.escapeHtml(rec)}</li>`).join('')}
                     </ul>
                 </div>
                 
@@ -1120,7 +1212,68 @@ class AISecurityAssistant {
     }
 
     // AI Agent Detection
-    async runAgentDetection(initialContext = "Detect suspicious logon behavior in Active Directory") {
+    runAgentDetection(initialContext = "Detect suspicious logon behavior in Active Directory", options = {}) {
+        if (!options.startImmediately) {
+            this.showAgentStartOptions(initialContext);
+            return;
+        }
+
+        return this.runAutonomousAgentDetection(initialContext);
+    }
+
+    showAgentStartOptions(initialContext = "Detect suspicious logon behavior in Active Directory") {
+        if (!this.isEnabled) {
+            this.displayError('AI Agent is disabled. Please enable it in settings.');
+            return;
+        }
+
+        if (this.agentRunning) {
+            this.displayError('AI Agent is already running. Please wait for the current investigation step to complete.');
+            return;
+        }
+
+        this.showPanel();
+        const content = document.getElementById('analysis-content');
+        content.innerHTML = `
+            <div class="agent-start-options">
+                <h5 style="color: #667eea; margin-bottom: 14px;">
+                    <i class="fas fa-robot" style="margin-right: 8px;"></i>AI Agent Investigation
+                </h5>
+                <div style="margin-bottom: 14px;">
+                    <label for="agent-initial-context" style="display: block; font-weight: 600; color: #495057; margin-bottom: 6px;">Investigation context</label>
+                    <textarea id="agent-initial-context" rows="4" style="width: 100%; border: 1px solid #ced4da; border-radius: 6px; padding: 10px; font-size: 13px; resize: vertical;">${this.escapeHtml(initialContext)}</textarea>
+                </div>
+                <label style="display: flex; align-items: flex-start; gap: 10px; padding: 12px; border: 1px solid #d8dee9; border-radius: 6px; background: #f8f9fa; margin-bottom: 16px; cursor: pointer;">
+                    <input type="checkbox" id="agent-hitl-enabled" style="margin-top: 3px;">
+                    <span>
+                        <strong style="display: block; color: #333;">Enable Analyst-in-the-loop</strong>
+                        <small style="color: #6c757d;">Review every investigation step, approve or override the next investigation step, and decide when to end.</small>
+                    </span>
+                </label>
+                <div style="display: flex; gap: 10px; justify-content: flex-end; flex-wrap: wrap;">
+                    <button class="btn btn-outline-secondary" onclick="hideAIPanel()">Cancel</button>
+                    <button class="btn btn-primary" onclick="aiAssistant.startAgentDetectionFromOptions()" style="background: #667eea; border-color: #667eea;">
+                        <i class="fas fa-play" style="margin-right: 6px;"></i>Start
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    startAgentDetectionFromOptions() {
+        const contextInput = document.getElementById('agent-initial-context');
+        const hitlInput = document.getElementById('agent-hitl-enabled');
+        const initialContext = (contextInput?.value || 'Detect suspicious logon behavior in Active Directory').trim();
+        const analystInLoop = Boolean(hitlInput?.checked);
+
+        if (analystInLoop) {
+            this.startHitlDetection(initialContext);
+        } else {
+            this.runAgentDetection(initialContext, { startImmediately: true });
+        }
+    }
+
+    async runAutonomousAgentDetection(initialContext = "Detect suspicious logon behavior in Active Directory") {
         // Run autonomous threat detection using AI Agent
         if (!this.isEnabled) {
             this.displayError('AI Agent is disabled. Please enable it in settings.');
@@ -1145,7 +1298,8 @@ class AISecurityAssistant {
                     'X-CSRFToken': this.getCsrfToken(),
                 },
                 body: JSON.stringify({
-                    context: initialContext
+                    context: initialContext,
+                    analyst_in_loop: false
                 })
             });
             
@@ -1159,16 +1313,507 @@ class AISecurityAssistant {
                 this.displayError(`Agent Detection Error: ${result.error}`);
                 return;
             }
-            
-            // Display agent results
-            this.displayAgentResults(result);
+
+            if (!result.job_id) {
+                throw new Error('Agent progress job id was not returned.');
+            }
+
+            this.currentAgentJobId = result.job_id;
+            await this.pollAutonomousAgentProgress(result.job_id);
             
         } catch (error) {
             console.error('Error running AI agent detection:', error);
             this.displayError(`Failed to run AI agent detection: ${error.message}`);
         } finally {
             this.agentRunning = false;
+            this.currentAgentJobId = null;
         }
+    }
+
+    async pollAutonomousAgentProgress(jobId) {
+        while (this.agentRunning && this.currentAgentJobId === jobId) {
+            const response = await fetch(`/api/ai/agent-detect/${encodeURIComponent(jobId)}`);
+            if (!response.ok) {
+                throw new Error(`Progress request failed with status ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.success === false || result.status === 'failed') {
+                throw new Error(result.error || 'AI agent investigation failed.');
+            }
+
+            if (result.status === 'completed') {
+                this.currentAnalysis = result;
+                this.displayAgentResults(result);
+                return;
+            }
+
+            this.displayAgentProgress(result);
+            await new Promise(resolve => setTimeout(resolve, 2000));
+        }
+    }
+
+    async startHitlDetection(initialContext = "Detect suspicious logon behavior in Active Directory") {
+        if (!this.isEnabled) {
+            this.displayError('AI Agent is disabled. Please enable it in settings.');
+            return;
+        }
+
+        if (this.agentRunning) {
+            this.displayError('AI Agent is already running. Please wait for the current investigation step to complete.');
+            return;
+        }
+
+        this.hitlSession = {
+            id: null,
+            context: initialContext,
+            iteration: 0,
+            investigation_history: [],
+            discovered_threats: [],
+            analyst_feedback: [],
+            max_iterations: null,
+            pending_step: null,
+            proposed_next_context: initialContext
+        };
+
+        await this.runHitlStep();
+    }
+
+    async runHitlStep(nextContext = null, analystFeedback = null) {
+        if (!this.hitlSession) return;
+
+        if (this.hitlSession.max_iterations !== null && this.hitlSession.iteration >= this.hitlSession.max_iterations) {
+            await this.finalizeHitlInvestigation('max_iterations_reached');
+            return;
+        }
+
+        this.agentRunning = true;
+        this.showPanel();
+        this.showHitlLoading();
+
+        try {
+            const response = await fetch('/api/ai/agent-step', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    hitl_session_id: this.hitlSession.id,
+                    context: nextContext || this.hitlSession.context,
+                    analyst_feedback: analystFeedback
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            this.hitlSession.id = result.hitl_session_id || this.hitlSession.id;
+            if (result.success === false) {
+                this.displayError(`Analyst-in-the-loop Error: ${result.error}`);
+                return;
+            }
+
+            this.hitlSession.investigation_history = result.investigation_history || [];
+            this.hitlSession.discovered_threats = result.discovered_threats || [];
+            this.hitlSession.iteration = result.next_iteration ?? this.hitlSession.investigation_history.length;
+            this.hitlSession.max_iterations = result.max_iterations ?? this.hitlSession.max_iterations;
+            this.hitlSession.pending_step = result.step;
+            this.hitlSession.proposed_next_context = result.next_investigation_context || this.hitlSession.context;
+
+            this.displayHitlStepReview(result);
+        } catch (error) {
+            console.error('Error running HITL AI agent step:', error);
+            this.displayError(`Failed to run analyst-in-the-loop step: ${error.message}`);
+        } finally {
+            this.agentRunning = false;
+        }
+    }
+
+    showHitlLoading() {
+        const content = document.getElementById('analysis-content');
+        content.innerHTML = `
+            <div class="agent-loading" style="text-align: center; padding: 40px 20px;">
+                <div class="agent-spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 54px; height: 54px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <h5 style="color: #667eea; margin-bottom: 12px;">Analyst-in-the-loop Investigation</h5>
+                <p style="margin: 0; color: #667eea; font-size: 15px; font-weight: 500;">Running one investigation step...</p>
+                <p style="margin: 10px 0 0 0; color: #999; font-size: 13px;">The agent will pause for Analyst review after this step.</p>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+    }
+
+    extractCypherQuery(text) {
+        if (!text) return '';
+        const value = String(text).trim();
+        const matchIndex = value.search(/\b(MATCH|WITH)\b/i);
+        return matchIndex >= 0 ? value.substring(matchIndex).trim() : value;
+    }
+
+    describeCypherIntent(cypherQuery) {
+        const query = String(cypherQuery || '').toLowerCase();
+        if (!query) return '';
+
+        if (query.includes('u.rights') && query.includes('system')) {
+            return 'The next step will review privileged or system-rights accounts to identify possible privilege escalation or high-impact account misuse.';
+        }
+        if (query.includes('e.id=4769') || query.includes('e.id = 4769')) {
+            return 'The next step will review Kerberos service ticket activity to look for Kerberoasting exposure or unusual service access patterns.';
+        }
+        if (query.includes('e.id=4768') || query.includes('e.id = 4768')) {
+            return 'The next step will review Kerberos TGT activity to look for weak encryption or AS-REP roasting related indicators.';
+        }
+        if (query.includes('e.id=4776') || query.includes('e.id = 4776') || query.includes('microsoft_authentication_package_v1_0')) {
+            return 'The next step will review NTLM authentication activity to look for credential reuse, pass-the-hash style movement, or suspicious spread.';
+        }
+        if (query.includes('logintype=10') || query.includes('logintype = 10')) {
+            return 'The next step will review RDP logons to look for remote interactive movement across hosts.';
+        }
+        if (query.includes('logintype=3') || query.includes('logintype = 3')) {
+            return 'The next step will review network logons to look for lateral movement or broad remote access patterns.';
+        }
+        if (query.includes('logintype in [9,8]') || query.includes('logintype in [8,9]')) {
+            return 'The next step will review NewCredentials or NetworkCleartext logons to look for credential misuse.';
+        }
+        if (query.includes('i.hostname') && query.includes('dc')) {
+            return 'The next step will review access to domain-controller-like hosts to identify unusual authentication to critical infrastructure.';
+        }
+
+        return '';
+    }
+
+    getNextStepDetails(result) {
+        const step = result.step || {};
+        const analysis = step.analysis || {};
+        const rawContext = result.next_investigation_context || analysis.next_investigation_context || '';
+        const explicitQuery = analysis.next_cypher_query || analysis.next_investigation_query || '';
+        const cypherQuery = this.extractCypherQuery(explicitQuery || rawContext);
+        const rawText = String(rawContext || '').trim();
+        const matchIndex = rawText.search(/\b(MATCH|WITH)\b/i);
+        const explanationFromContext = matchIndex > 0 ? rawText.substring(0, matchIndex).trim() : '';
+        const explanation = analysis.next_investigation_explanation ||
+            analysis.next_step_description ||
+            analysis.next_investigation_rationale ||
+            explanationFromContext ||
+            this.describeCypherIntent(cypherQuery) ||
+            'The agent will continue with the next distinct investigation target to improve coverage.';
+        const executableContext = cypherQuery || rawContext || explanation;
+
+        return {
+            explanation,
+            cypherQuery,
+            context: executableContext
+        };
+    }
+
+    displayHitlStepReview(result) {
+        const content = document.getElementById('analysis-content');
+        const step = result.step || {};
+        const analysis = step.analysis || {};
+        const queryGeneration = step.query_generation || {};
+        const noResults = (Number(step.results_count || 0) === 0) && !step.error;
+        if (noResults) {
+            this.displayHitlNoResultStep(result);
+            return;
+        }
+
+        const evidence = Array.isArray(analysis.evidence) ? analysis.evidence : [];
+        const recommendations = this.filterInternalFreeformFallbackItems(analysis.recommendations);
+        const nextStep = this.getNextStepDetails(result);
+        const completeText = result.investigation_complete ? '<span style="color: #198754; font-weight: 600;">AI agent suggests completion</span>' : '<span style="color: #667eea; font-weight: 600;">AI agent suggests continuing</span>';
+        const severity = analysis.severity || 'unknown';
+        const threatDetected = analysis.threat_detected ? 'Threat detected' : 'No threat detected';
+        const analysisDetails = this.getVisibleErrorText(
+            analysis.threat_description || analysis.error_message,
+            'No detailed analysis returned.'
+        );
+
+        content.innerHTML = `
+            <div class="hitl-review">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px;">
+                    <h5 style="color: #667eea; margin: 0;">
+                        <i class="fas fa-user-check" style="margin-right: 8px;"></i>Analyst Review: Step ${this.escapeHtml(step.iteration || result.iteration)}
+                    </h5>
+                    <span style="font-size: 12px; color: #6c757d;">${this.escapeHtml(this.hitlSession?.iteration || 0)} / ${this.escapeHtml(result.max_iterations || '?')}</span>
+                </div>
+
+                <div style="border-left: 4px solid #667eea; background: #f8f9fa; padding: 12px; border-radius: 0 6px 6px 0; margin-bottom: 14px;">
+                    <div style="font-weight: 600; color: #333; margin-bottom: 6px;">${this.escapeHtml(step.focus || 'General analysis')}</div>
+                    <div style="font-size: 13px; color: #555; margin-bottom: 8px;">${this.escapeHtml(queryGeneration.expected_findings || '')}</div>
+                    <div style="font-size: 12px; color: #6c757d; margin-top: 8px;">Results: ${this.escapeHtml(step.results_count || 0)} ${step.error && !this.isInternalFreeformFallbackText(step.error) ? ` | Error: ${this.escapeHtml(step.error)}` : ''}</div>
+                    <details style="margin-top: 8px;">
+                        <summary style="cursor: pointer; color: #667eea; font-size: 12px;">Show executed Cypher query</summary>
+                        <pre style="white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; font-size: 12px; margin: 8px 0 0 0;">${this.escapeHtml(step.query || '')}</pre>
+                    </details>
+                </div>
+
+                <div style="margin-bottom: 14px;">
+                    <h6 style="color: #495057; margin-bottom: 8px;"><i class="fas fa-search" style="margin-right: 6px;"></i>AI Agent Analysis</h6>
+                    <div style="background: #fff; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px;">
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 8px;">
+                            <span class="badge" style="background: ${analysis.threat_detected ? '#dc3545' : '#198754'};">${this.escapeHtml(threatDetected)}</span>
+                            <span class="badge" style="background: ${this.getThreatSeverityColor(severity)};">${this.escapeHtml(severity)}</span>
+                            <span style="font-size: 12px;">${completeText}</span>
+                        </div>
+                        <p style="font-size: 13px; color: #555; margin: 0 0 8px 0; line-height: 1.5;">${this.escapeHtml(analysisDetails)}</p>
+                        ${evidence.length > 0 ? `
+                            <div style="font-size: 13px; margin-top: 8px;">
+                                <strong>Evidence</strong>
+                                <ul style="margin: 6px 0 0 18px; padding: 0;">${evidence.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>
+                            </div>
+                        ` : ''}
+                        ${recommendations.length > 0 ? `
+                            <div style="font-size: 13px; margin-top: 8px;">
+                                <strong>Recommendations</strong>
+                                <ul style="margin: 6px 0 0 18px; padding: 0;">${recommendations.map(item => `<li>${this.escapeHtml(item)}</li>`).join('')}</ul>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+
+                <div style="border: 1px solid #d8dee9; border-radius: 6px; padding: 12px; background: #f8f9fa; margin-bottom: 14px;">
+                    <div style="font-weight: 600; color: #333; margin-bottom: 8px;">Analyst verdict</div>
+                    <div style="display: flex; gap: 12px; flex-wrap: wrap; margin-bottom: 10px;">
+                        <label><input type="radio" name="hitl-verdict" value="malicious"> malicious</label>
+                        <label><input type="radio" name="hitl-verdict" value="benign"> benign</label>
+                        <label><input type="radio" name="hitl-verdict" value="unknown" checked> unknown</label>
+                    </div>
+                    <textarea id="hitl-analyst-prompt" rows="3" placeholder="Prompt to AI agent: explain why, add context, or specify what evidence matters next." style="width: 100%; border: 1px solid #ced4da; border-radius: 6px; padding: 9px; font-size: 12px; resize: vertical;"></textarea>
+                </div>
+
+                <div style="border: 1px solid #d8dee9; border-radius: 6px; padding: 12px; background: #fff; margin-bottom: 14px;">
+                    <h6 style="color: #495057; margin-bottom: 8px;"><i class="fas fa-route" style="margin-right: 6px;"></i>Proposed Next Step</h6>
+                    <p style="font-size: 13px; color: #555; line-height: 1.5; margin: 0 0 10px 0;">${this.escapeHtml(nextStep.explanation)}</p>
+                    <textarea id="hitl-next-context" style="display: none;">${this.escapeHtml(nextStep.context)}</textarea>
+                    <details style="margin-bottom: 12px;">
+                        <summary style="cursor: pointer; color: #667eea; font-size: 12px;">Show proposed Cypher query</summary>
+                        <pre style="white-space: pre-wrap; word-break: break-word; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; font-size: 12px; margin: 8px 0 0 0;">${this.escapeHtml(nextStep.cypherQuery || nextStep.context)}</pre>
+                    </details>
+
+                    <div style="display: grid; gap: 10px;">
+                        <button class="btn btn-primary" onclick="aiAssistant.submitHitlDecision('accept')" style="background: #667eea; border-color: #667eea; text-align: left; padding: 12px;">
+                            <strong><i class="fas fa-check" style="margin-right: 6px;"></i>Approve proposed next step</strong>
+                            <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 3px;">Use the AI agent proposal and continue the investigation.</span>
+                        </button>
+                        <div style="border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; background: #f8f9fa;">
+                            <label for="hitl-custom-instruction" style="display: block; font-weight: 600; color: #495057; margin-bottom: 6px;">Reject proposed step and instruct AI agent</label>
+                            <textarea id="hitl-custom-instruction" rows="3" placeholder="Describe what the AI agent should investigate instead." style="width: 100%; border: 1px solid #ced4da; border-radius: 6px; padding: 9px; font-size: 12px; resize: vertical; margin-bottom: 8px;"></textarea>
+                            <button class="btn btn-outline-secondary" onclick="aiAssistant.submitHitlDecision('override')" style="width: 100%; text-align: left;">
+                                <strong><i class="fas fa-pen" style="margin-right: 6px;"></i>Run my instruction instead</strong>
+                            </button>
+                        </div>
+                        <button class="btn btn-outline-danger" onclick="aiAssistant.submitHitlDecision('end')" style="text-align: left; padding: 10px;">
+                            <strong><i class="fas fa-stop" style="margin-right: 6px;"></i>End investigation</strong>
+                            <span style="display: block; font-size: 12px; margin-top: 3px;">Stop now and generate the final report.</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    displayHitlNoResultStep(result) {
+        const content = document.getElementById('analysis-content');
+        const step = result.step || {};
+        const queryGeneration = step.query_generation || {};
+        const nextStep = this.getNextStepDetails(result);
+
+        content.innerHTML = `
+            <div class="hitl-review">
+                <div style="display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 14px;">
+                    <h5 style="color: #198754; margin: 0;">
+                        <i class="fas fa-check-circle" style="margin-right: 8px;"></i>No Suspicious Activity: Step ${this.escapeHtml(step.iteration || result.iteration)}
+                    </h5>
+                    <span style="font-size: 12px; color: #6c757d;">${this.escapeHtml(this.hitlSession?.iteration || 0)} / ${this.escapeHtml(result.max_iterations || '?')}</span>
+                </div>
+
+                <div style="border-left: 4px solid #198754; background: #f0fff4; padding: 12px; border-radius: 0 6px 6px 0; margin-bottom: 14px;">
+                    <div style="font-weight: 600; color: #245c37; margin-bottom: 6px;">${this.escapeHtml(step.focus || 'General analysis')}</div>
+                    <p style="font-size: 13px; color: #3f6b4c; margin: 0 0 8px 0; line-height: 1.5;">The database query returned 0 records, so this specific check did not find suspicious activity. Analyst verdict is skipped for this step.</p>
+                    <div style="font-size: 12px; color: #3f6b4c;">Results: 0</div>
+                    ${queryGeneration.expected_findings ? `<div style="font-size: 12px; color: #6c757d; margin-top: 8px;">Checked for: ${this.escapeHtml(queryGeneration.expected_findings)}</div>` : ''}
+                    <details style="margin-top: 8px;">
+                        <summary style="cursor: pointer; color: #198754; font-size: 12px;">Show executed Cypher query</summary>
+                        <pre style="white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid #cfe9d8; border-radius: 4px; padding: 8px; font-size: 12px; margin: 8px 0 0 0;">${this.escapeHtml(step.query || '')}</pre>
+                    </details>
+                </div>
+
+                <div style="border: 1px solid #d8dee9; border-radius: 6px; padding: 12px; background: #fff; margin-bottom: 14px;">
+                    <h6 style="color: #495057; margin-bottom: 8px;"><i class="fas fa-route" style="margin-right: 6px;"></i>Next Step</h6>
+                    <p style="font-size: 13px; color: #555; line-height: 1.5; margin: 0 0 10px 0;">${this.escapeHtml(nextStep.explanation)}</p>
+                    <textarea id="hitl-next-context" style="display: none;">${this.escapeHtml(nextStep.context)}</textarea>
+                    <details style="margin-bottom: 12px;">
+                        <summary style="cursor: pointer; color: #667eea; font-size: 12px;">Show proposed Cypher query</summary>
+                        <pre style="white-space: pre-wrap; word-break: break-word; background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 4px; padding: 8px; font-size: 12px; margin: 8px 0 0 0;">${this.escapeHtml(nextStep.cypherQuery || nextStep.context)}</pre>
+                    </details>
+
+                    <div style="display: grid; gap: 10px;">
+                        <button class="btn btn-primary" onclick="aiAssistant.submitHitlNoResultDecision('continue')" style="background: #667eea; border-color: #667eea; text-align: left; padding: 12px;">
+                            <strong><i class="fas fa-forward" style="margin-right: 6px;"></i>Continue with next step</strong>
+                            <span style="display: block; font-size: 12px; opacity: 0.9; margin-top: 3px;">Use the AI agent proposal and continue the investigation.</span>
+                        </button>
+                        <div style="border: 1px solid #dee2e6; border-radius: 6px; padding: 10px; background: #f8f9fa;">
+                            <label for="hitl-no-result-custom-instruction" style="display: block; font-weight: 600; color: #495057; margin-bottom: 6px;">Instruct AI agent instead</label>
+                            <textarea id="hitl-no-result-custom-instruction" rows="3" placeholder="Describe what the AI agent should investigate next." style="width: 100%; border: 1px solid #ced4da; border-radius: 6px; padding: 9px; font-size: 12px; resize: vertical; margin-bottom: 8px;"></textarea>
+                            <button class="btn btn-outline-secondary" onclick="aiAssistant.submitHitlNoResultDecision('override')" style="width: 100%; text-align: left;">
+                                <strong><i class="fas fa-pen" style="margin-right: 6px;"></i>Run my instruction instead</strong>
+                            </button>
+                        </div>
+                        <button class="btn btn-outline-danger" onclick="aiAssistant.submitHitlNoResultDecision('end')" style="text-align: left; padding: 10px;">
+                            <strong><i class="fas fa-stop" style="margin-right: 6px;"></i>End investigation</strong>
+                            <span style="display: block; font-size: 12px; margin-top: 3px;">Stop now and generate the final report.</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    async submitHitlNoResultDecision(decision) {
+        if (!this.hitlSession || !this.hitlSession.pending_step) return;
+
+        if (decision === 'end') {
+            await this.finalizeHitlInvestigation('analyst_requested_stop');
+            return;
+        }
+
+        const proposedNext = (document.getElementById('hitl-next-context')?.value || '').trim();
+        const customInstruction = (document.getElementById('hitl-no-result-custom-instruction')?.value || '').trim();
+
+        if (decision === 'override' && !customInstruction) {
+            alert('Please provide a free-form investigation instruction before overriding the proposed next step.');
+            return;
+        }
+
+        const feedback = {
+            iteration: this.hitlSession.pending_step.iteration,
+            verdict: 'unknown',
+            verdict_label: 'unknown',
+            analyst_prompt: '',
+            llm_next_step: proposedNext,
+            next_step_decision: decision === 'override' ? 'override' : 'accept',
+            accepted_next_step: decision !== 'override',
+            custom_instruction: decision === 'override' ? customInstruction : '',
+            reviewed_at: new Date().toISOString()
+        };
+
+        this.hitlSession.analyst_feedback.push(feedback);
+
+        const stepContext = decision === 'override' ? customInstruction : (proposedNext || this.hitlSession.context);
+        if (decision !== 'override') {
+            this.hitlSession.context = stepContext;
+        }
+        await this.runHitlStep(stepContext, feedback);
+    }
+
+    async submitHitlDecision(decision) {
+        if (!this.hitlSession || !this.hitlSession.pending_step) return;
+
+        const verdictInput = document.querySelector('input[name="hitl-verdict"]:checked');
+        const verdict = verdictInput?.value || 'unknown';
+        const verdictLabels = {
+            malicious: 'malicious',
+            benign: 'benign',
+            unknown: 'unknown'
+        };
+        const analystPrompt = (document.getElementById('hitl-analyst-prompt')?.value || '').trim();
+        const proposedNext = (document.getElementById('hitl-next-context')?.value || '').trim();
+        const customInstruction = (document.getElementById('hitl-custom-instruction')?.value || '').trim();
+
+        if (decision === 'override' && !customInstruction) {
+            alert('Please provide a free-form investigation instruction before rejecting the proposed next step.');
+            return;
+        }
+
+        const feedback = {
+            iteration: this.hitlSession.pending_step.iteration,
+            verdict: verdict,
+            verdict_label: verdictLabels[verdict],
+            analyst_prompt: analystPrompt,
+            llm_next_step: proposedNext,
+            next_step_decision: decision,
+            accepted_next_step: decision === 'accept',
+            custom_instruction: decision === 'override' ? customInstruction : '',
+            reviewed_at: new Date().toISOString()
+        };
+
+        this.hitlSession.analyst_feedback.push(feedback);
+
+        if (decision === 'end') {
+            await this.finalizeHitlInvestigation('analyst_requested_stop', feedback);
+            return;
+        }
+
+        const stepContext = decision === 'override' ? customInstruction : (proposedNext || this.hitlSession.context);
+        if (decision !== 'override') {
+            this.hitlSession.context = stepContext;
+        }
+        await this.runHitlStep(stepContext, feedback);
+    }
+
+    async finalizeHitlInvestigation(completionReason = 'analyst_requested_stop', analystFeedback = null) {
+        if (!this.hitlSession) return;
+
+        this.agentRunning = true;
+        this.showPanel();
+        this.showHitlFinalizing();
+
+        try {
+            const response = await fetch('/api/ai/agent-finalize', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': this.getCsrfToken(),
+                },
+                body: JSON.stringify({
+                    hitl_session_id: this.hitlSession.id,
+                    analyst_feedback: analystFeedback,
+                    completion_reason: completionReason
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const result = await response.json();
+            if (result.success === false) {
+                this.displayError(`Finalize Error: ${result.error}`);
+                return;
+            }
+
+            this.displayAgentResults(result);
+            this.hitlSession = null;
+        } catch (error) {
+            console.error('Error finalizing HITL AI agent investigation:', error);
+            this.displayError(`Failed to finalize analyst-in-the-loop investigation: ${error.message}`);
+        } finally {
+            this.agentRunning = false;
+        }
+    }
+
+    showHitlFinalizing() {
+        const content = document.getElementById('analysis-content');
+        content.innerHTML = `
+            <div class="agent-loading" style="text-align: center; padding: 40px 20px;">
+                <div class="agent-spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 54px; height: 54px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
+                <h5 style="color: #667eea; margin-bottom: 12px;">Generating Final Report</h5>
+                <p style="margin: 0; color: #667eea; font-size: 15px; font-weight: 500;">Incorporating Analyst feedback...</p>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
     }
 
     showAgentLoading() {
@@ -1176,9 +1821,73 @@ class AISecurityAssistant {
         content.innerHTML = `
             <div class="agent-loading" style="text-align: center; padding: 40px 20px;">
                 <div class="agent-spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 60px; height: 60px; animation: spin 1s linear infinite; margin: 0 auto 20px;"></div>
-                <h5 style="color: #667eea; margin-bottom: 15px;">🤖 AI Agent Investigation</h5>
+                <h5 style="color: #667eea; margin-bottom: 15px;"><i class="fas fa-robot" style="margin-right: 8px;"></i>AI Agent Investigation</h5>
                 <p style="margin: 0; color: #667eea; font-size: 16px; font-weight: 500;">Autonomous threat detection in progress...</p>
                 <p style="margin: 10px 0 0 0; color: #999; font-size: 14px;">The agent is generating queries, analyzing data, and hunting for threats.</p>
+            </div>
+            <style>
+                @keyframes spin {
+                    0% { transform: rotate(0deg); }
+                    100% { transform: rotate(360deg); }
+                }
+            </style>
+        `;
+    }
+
+    displayAgentProgress(result) {
+        const content = document.getElementById('analysis-content');
+        const investigationHistory = (result.investigation_history || [])
+            .filter(step => !this.isInternalFreeformFallbackStep(step));
+        const maxIterations = result.max_iterations || '?';
+        const statusText = result.status === 'finalizing'
+            ? 'Generating the final investigation report...'
+            : 'Investigation is continuing with the next step...';
+
+        const timelineHtml = investigationHistory.length > 0
+            ? investigationHistory.map((step, index) => {
+                const hasError = Boolean(step.analysis?.error);
+                const threatDetected = Boolean(step.analysis?.threat_detected);
+                const iconColor = hasError ? '#ffc107' : (threatDetected ? '#dc3545' : '#28a745');
+                const icon = hasError ? 'fas fa-exclamation-triangle' : (threatDetected ? 'fas fa-exclamation-circle' : 'fas fa-check-circle');
+                const visibleErrorText = this.getVisibleErrorText(step.error);
+                const resultText = hasError
+                    ? 'Query failed'
+                    : `Query returned ${this.escapeHtml(step.results_count || 0)} results`;
+                const verdictText = hasError
+                    ? (visibleErrorText || 'Query error recorded in server logs')
+                    : (threatDetected ? 'Threat detected' : 'No threat detected');
+
+                return `
+                    <div style="margin-bottom: 14px; padding-left: 28px; position: relative;">
+                        <div style="position: absolute; left: 0; top: 2px; width: 18px; height: 18px; border-radius: 50%; background: ${iconColor}; display: flex; align-items: center; justify-content: center;">
+                            <i class="${icon}" style="color: white; font-size: 10px;"></i>
+                        </div>
+                        <div style="font-size: 13px; color: #495057; font-weight: 600;">Step ${index + 1}: ${this.escapeHtml(step.focus || 'General analysis')}</div>
+                        <div style="font-size: 12px; color: #6c757d; margin-top: 3px;">${resultText} - ${this.escapeHtml(verdictText)}</div>
+                    </div>
+                `;
+            }).join('')
+            : '<p style="font-size: 13px; color: #6c757d; margin: 0;">Preparing the first investigation step...</p>';
+
+        content.innerHTML = `
+            <div class="agent-progress">
+                <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 14px;">
+                    <div class="agent-spinner" style="border: 3px solid #f3f3f3; border-top: 3px solid #667eea; border-radius: 50%; width: 32px; height: 32px; animation: spin 1s linear infinite; flex: 0 0 auto;"></div>
+                    <div>
+                        <h5 style="color: #667eea; margin: 0 0 4px 0;"><i class="fas fa-robot" style="margin-right: 8px;"></i>AI Agent Investigation</h5>
+                        <div style="font-size: 13px; color: #6c757d;">${this.escapeHtml(statusText)}</div>
+                    </div>
+                </div>
+                <div style="background: #f8f9fa; border: 1px solid #dee2e6; border-radius: 6px; padding: 12px; margin-bottom: 14px;">
+                    <div style="display: flex; justify-content: space-between; gap: 10px; font-size: 13px; color: #495057;">
+                        <strong>Completed steps</strong>
+                        <span>${investigationHistory.length} / ${this.escapeHtml(maxIterations)}</span>
+                    </div>
+                    <div style="font-size: 12px; color: #6c757d; margin-top: 5px;">Threats found: ${this.escapeHtml(result.threats_discovered || 0)}</div>
+                </div>
+                <div style="border-top: 1px solid #dee2e6; padding-top: 12px;">
+                    ${timelineHtml}
+                </div>
             </div>
             <style>
                 @keyframes spin {
@@ -1192,9 +1901,13 @@ class AISecurityAssistant {
     displayAgentResults(result) {
         const content = document.getElementById('analysis-content');
         
-        const investigationHistory = result.investigation_history || [];
+        const investigationHistory = (result.investigation_history || [])
+            .filter(step => !this.isInternalFreeformFallbackStep(step));
         const discoveredThreats = result.discovered_threats || [];
         const finalReport = result.final_report || {};
+        const analystFeedback = result.analyst_feedback || [];
+        const safeFinalSummary = this.escapeHtml(finalReport.analysis_summary || '');
+        const safeFinalSummaryPreview = this.escapeHtml((finalReport.analysis_summary || '').substring(0, 300));
         
         let html = `
             <div class="agent-results">
@@ -1208,7 +1921,7 @@ class AISecurityAssistant {
                                 <div class="metric-icon" style="color: #1976d2; font-size: 24px; margin-bottom: 8px;">
                                     <i class="fas fa-list-ol"></i>
                                 </div>
-                                <div class="metric-value" style="font-size: 28px; font-weight: bold; color: #1976d2; margin-bottom: 5px;">${result.iterations_run || 0}</div>
+                                <div class="metric-value" style="font-size: 28px; font-weight: bold; color: #1976d2; margin-bottom: 5px;">${investigationHistory.length}</div>
                                 <div class="metric-label" style="font-size: 13px; color: #555; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px;">Investigation Steps</div>
                             </div>
                         </div>
@@ -1224,6 +1937,30 @@ class AISecurityAssistant {
                     </div>
                 </div>
         `;
+
+        if (result.analyst_in_loop) {
+            html += `
+                <div class="hitl-summary mb-4" style="background: #f8f9fa; border: 1px solid #d8dee9; border-radius: 6px; padding: 12px;">
+                    <h6 style="margin: 0 0 8px 0; color: #495057;">
+                        <i class="fas fa-user-check" style="margin-right: 6px;"></i>
+                        Analysis Summary
+                    </h6>
+                    <div style="font-size: 13px; color: #555;">
+                        Reviews: ${analystFeedback.length} | Completion: ${this.escapeHtml(result.completion_reason || 'completed')}
+                    </div>
+                    ${analystFeedback.length > 0 ? `
+                        <div style="margin-top: 8px; display: flex; flex-direction: column; gap: 6px;">
+                            ${analystFeedback.map(item => `
+                                <div style="font-size: 12px; border-left: 3px solid #667eea; padding-left: 8px;">
+                                    Step ${this.escapeHtml(item.iteration)}: <strong>${this.escapeHtml(item.verdict_label || item.verdict)}</strong>
+                                    ${item.next_step_decision ? ` | Next: ${this.escapeHtml(item.next_step_decision)}` : ''}
+                                </div>
+                            `).join('')}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
 
         // Add Generate Sigma Rules button for High/Critical risk levels (placed prominently after summary metrics)
         const riskLevel = finalReport.overall_risk_level || result.risk_level || 'low';
@@ -1265,9 +2002,9 @@ class AISecurityAssistant {
                     </h6>
                     <div style="background: #f8f9fa; padding: 12px; border-radius: 4px; border-left: 4px solid #667eea;">
                         ${isLongSummary ? `
-                            <div id="${summaryCollapsibleId}-preview" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px;">${finalReport.analysis_summary.substring(0, 300)}...</div>
-                            <div id="${summaryCollapsibleId}-full" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px; display: none;">${finalReport.analysis_summary}</div>
-                        ` : `<p style="margin: 0; line-height: 1.6; color: #555; font-size: 14px;">${finalReport.analysis_summary}</p>`}
+	                            <div id="${summaryCollapsibleId}-preview" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px;">${safeFinalSummaryPreview}...</div>
+	                            <div id="${summaryCollapsibleId}-full" style="margin: 0; line-height: 1.6; color: #555; font-size: 14px; display: none;">${safeFinalSummary}</div>
+	                        ` : `<p style="margin: 0; line-height: 1.6; color: #555; font-size: 14px;">${safeFinalSummary}</p>`}
                     </div>
                 </div>
             `;
@@ -1284,20 +2021,24 @@ class AISecurityAssistant {
             
             discoveredThreats.forEach((threat, index) => {
                 const severityColor = this.getThreatSeverityColor(threat.severity);
+                const safeThreatType = this.escapeHtml(threat.threat_type || 'Unknown');
+                const safeSeverity = this.escapeHtml(threat.severity || 'Unknown');
+                const safeDescription = this.escapeHtml(threat.description || 'No description available');
+                const safeEvidence = Array.isArray(threat.evidence) ? threat.evidence.map(e => this.escapeHtml(e)) : [];
                 html += `
                     <div class="threat-item mb-3" style="border-left: 4px solid ${severityColor}; background: #f8f9fa; padding: 15px; border-radius: 0 6px 6px 0;">
                         <div class="threat-header">
                             <h6 style="margin: 0; color: ${severityColor};">
-                                Threat #${index + 1}: ${threat.threat_type || 'Unknown'}
-                                <span class="badge" style="background-color: ${severityColor}; margin-left: 10px;">${threat.severity || 'Unknown'}</span>
+                                Threat #${index + 1}: ${safeThreatType}
+                                <span class="badge" style="background-color: ${severityColor}; margin-left: 10px;">${safeSeverity}</span>
                             </h6>
                         </div>
-                        <p style="margin: 10px 0; color: #555;">${threat.description || 'No description available'}</p>
-                        ${threat.evidence && threat.evidence.length > 0 ? `
+                        <p style="margin: 10px 0; color: #555;">${safeDescription}</p>
+                        ${safeEvidence.length > 0 ? `
                             <div class="evidence">
                                 <strong>Evidence:</strong>
                                 <ul style="margin: 5px 0 0 20px;">
-                                    ${threat.evidence.map(e => `<li>${e}</li>`).join('')}
+                                    ${safeEvidence.map(e => `<li>${e}</li>`).join('')}
                                 </ul>
                             </div>
                         ` : ''}
@@ -1328,6 +2069,8 @@ class AISecurityAssistant {
             
             investigationHistory.forEach((step, index) => {
                 const hasError = step.analysis?.error || false;
+                const visibleErrorText = this.getVisibleErrorText(step.error);
+                const showErrorDetails = hasError && visibleErrorText;
                 const threatDetected = step.analysis?.threat_detected || false;
                 
                 let iconColor, icon, statusText;
@@ -1335,7 +2078,7 @@ class AISecurityAssistant {
                 if (hasError) {
                     iconColor = '#ffc107';
                     icon = 'fas fa-exclamation-triangle';
-                    statusText = `Query Error: ${step.error || 'Unknown error'}`;
+                    statusText = visibleErrorText ? `Query Error: ${visibleErrorText}` : 'Query Error';
                 } else if (threatDetected) {
                     iconColor = '#dc3545';
                     icon = 'fas fa-exclamation-circle';
@@ -1351,15 +2094,15 @@ class AISecurityAssistant {
                         <div class="timeline-icon" style="position: absolute; left: 0; top: 0; width: 20px; height: 20px; border-radius: 50%; background: ${iconColor}; display: flex; align-items: center; justify-content: center;">
                             <i class="${icon}" style="color: white; font-size: 12px;"></i>
                         </div>
-                        <div class="timeline-content">
-                            <h6 style="margin: 0 0 5px 0; color: #495057;">Step ${index + 1}: ${step.focus}</h6>
-                            <p style="margin: 0; font-size: 14px; color: #6c757d;">
-                                ${hasError ? `Query failed with error` : `Query returned ${step.results_count} results`}
-                                <span style="color: ${iconColor}; font-weight: bold;"> - ${statusText}</span>
+	                        <div class="timeline-content">
+	                            <h6 style="margin: 0 0 5px 0; color: #495057;">Step ${index + 1}: ${this.escapeHtml(step.focus || 'General analysis')}</h6>
+	                            <p style="margin: 0; font-size: 14px; color: #6c757d;">
+	                                ${hasError ? `Query failed with error` : `Query returned ${this.escapeHtml(step.results_count || 0)} results`}
+	                                <span style="color: ${iconColor}; font-weight: bold;"> - ${this.escapeHtml(statusText)}</span>
                             </p>
-                            ${hasError ? `
+                            ${showErrorDetails ? `
                                 <div style="margin-top: 8px; padding: 8px; background: #fff3cd; border: 1px solid #ffeaa7; border-radius: 4px; font-size: 12px;">
-                                    <strong>Error Details:</strong> ${step.error || 'Unknown error occurred'}
+                                    <strong>Error Details:</strong> ${this.escapeHtml(visibleErrorText)}
                                 </div>
                             ` : ''}
                         </div>
@@ -1470,7 +2213,7 @@ class AISecurityAssistant {
             <div class="sigma-rules-container">
                 <div class="alert alert-success mb-4">
                     <i class="fas fa-check-circle"></i> 
-                    ${result.message || `Generated ${sigmaRules.length} Sigma rule(s)`}
+	                    ${this.escapeHtml(result.message || `Generated ${sigmaRules.length} Sigma rule(s)`)}
                 </div>
         `;
         
@@ -1486,19 +2229,19 @@ class AISecurityAssistant {
                 <div class="card mb-3" style="border-left: 4px solid ${threatColor};">
                     <div class="card-header d-flex justify-content-between align-items-center" style="background: #f8f9fa;">
                         <div>
-                            <strong>${rule.rule_name || `Rule ${index + 1}`}</strong>
-                            <span class="badge bg-info ms-2">${rule.threat_type || 'Unknown'}</span>
+	                            <strong>${this.escapeHtml(rule.rule_name || `Rule ${index + 1}`)}</strong>
+	                            <span class="badge bg-info ms-2">${this.escapeHtml(rule.threat_type || 'Unknown')}</span>
                         </div>
                         <button class="btn btn-sm btn-outline-primary" onclick="aiAssistant.downloadSigmaRule(${index})">
                             <i class="fas fa-download"></i> Download
                         </button>
                     </div>
                     <div class="card-body">
-                        <p class="card-text text-muted mb-3">${rule.description || 'No description'}</p>
+	                        <p class="card-text text-muted mb-3">${this.escapeHtml(rule.description || 'No description')}</p>
                         ${rule.target_event_ids && rule.target_event_ids.length > 0 ? `
                             <p class="mb-2">
                                 <strong>Target Event IDs:</strong> 
-                                ${rule.target_event_ids.map(id => `<span class="badge bg-secondary me-1">${id}</span>`).join('')}
+	                                ${rule.target_event_ids.map(id => `<span class="badge bg-secondary me-1">${this.escapeHtml(id)}</span>`).join('')}
                             </p>
                         ` : ''}
                         <div class="yaml-content" style="background: #1e1e1e; color: #d4d4d4; padding: 15px; border-radius: 4px; overflow-x: auto; font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace; font-size: 12px; max-height: 400px; overflow-y: auto;">
@@ -1551,7 +2294,7 @@ class AISecurityAssistant {
         
         document.getElementById('sigma-rules-content').innerHTML = `
             <div class="alert alert-danger">
-                <i class="fas fa-exclamation-circle"></i> ${message}
+	                <i class="fas fa-exclamation-circle"></i> ${this.escapeHtml(message)}
             </div>
         `;
         

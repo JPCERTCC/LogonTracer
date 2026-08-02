@@ -6,6 +6,7 @@ settings:
     default_user: "neo4j" # LogonTracer default login name
     default_password: "password" # LogonTracer default login password
     default_case: "neo4j" # Default neo4j database name
+    SESSION_TIMEOUT_HOURS: 6 # LogonTracer login and Neo4j credential session timeout
     SESSION_COOKIE_SECURE: False # When using HTTPS, it is necessary to relay a web server such as nginx.
 
   neo4j:

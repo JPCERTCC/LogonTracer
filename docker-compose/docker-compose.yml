@@ -30,7 +30,12 @@ services:
 
   logontracer:
     container_name: logontracer
-    build: ./LogonTracer/build
+    build:
+      context: ..
+      dockerfile: docker-compose/LogonTracer/build/Dockerfile
+      args:
+        FETCH_SIGMA_RULES: ${FETCH_SIGMA_RULES:-false}
+        SIGMA_REPO: ${SIGMA_REPO:-https://github.com/SigmaHQ/sigma.git}
     image: logontracer:latest
     depends_on:
       - neo4j
@@ -40,7 +45,7 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - LTHOSTNAME=localhost
+      - LTHOSTNAME=neo4j
     networks:
       - neo4j-network
 

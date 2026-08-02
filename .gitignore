@@ -10,7 +10,6 @@ upload
 *.csv
 *.json
 *.pkl
-sigma
 *test*
 .DS_Store
 

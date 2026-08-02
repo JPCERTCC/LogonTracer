@@ -682,6 +682,68 @@
   background: #2d3a4a !important;
 }
 
+/* ── Agent / HITL forms and review cards ─────────── */
+[data-theme="dark"] #ai-analysis-panel .agent-start-options,
+[data-theme="dark"] #ai-analysis-panel .hitl-review {
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .agent-start-options label,
+[data-theme="dark"] #ai-analysis-panel .agent-start-options strong,
+[data-theme="dark"] #ai-analysis-panel .agent-start-options small,
+[data-theme="dark"] #ai-analysis-panel .hitl-review label,
+[data-theme="dark"] #ai-analysis-panel .hitl-review strong,
+[data-theme="dark"] #ai-analysis-panel .hitl-review small,
+[data-theme="dark"] #ai-analysis-panel .hitl-review p,
+[data-theme="dark"] #ai-analysis-panel .hitl-review li,
+[data-theme="dark"] #ai-analysis-panel .hitl-review div,
+[data-theme="dark"] #ai-analysis-panel .hitl-review span:not(.badge) {
+  color: #e0e0e0 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel .agent-start-options [style*="color: #495057"],
+[data-theme="dark"] #ai-analysis-panel .agent-start-options [style*="color: #333"],
+[data-theme="dark"] #ai-analysis-panel .agent-start-options [style*="color: #6c757d"],
+[data-theme="dark"] #ai-analysis-panel .hitl-review [style*="color: #495057"],
+[data-theme="dark"] #ai-analysis-panel .hitl-review [style*="color: #333"],
+[data-theme="dark"] #ai-analysis-panel .hitl-review [style*="color: #555"],
+[data-theme="dark"] #ai-analysis-panel .hitl-review [style*="color: #6c757d"],
+[data-theme="dark"] #ai-analysis-panel .hitl-review [style*="color: #999"] {
+  color: #d6d6d6 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel [style*="background: #fff;"],
+[data-theme="dark"] #ai-analysis-panel [style*="background-color: #fff;"] {
+  background: #333 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel [style*="border: 1px solid #d8dee9"],
+[data-theme="dark"] #ai-analysis-panel [style*="border: 1px solid #dee2e6"],
+[data-theme="dark"] #ai-analysis-panel [style*="border: 1px solid #ced4da"] {
+  border-color: #555 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel textarea,
+[data-theme="dark"] #ai-analysis-panel input[type="text"] {
+  background-color: #242424 !important;
+  color: #e0e0e0 !important;
+  border-color: #666 !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel textarea::placeholder,
+[data-theme="dark"] #ai-analysis-panel input[type="text"]::placeholder {
+  color: #9a9a9a !important;
+}
+
+[data-theme="dark"] #ai-analysis-panel input[type="checkbox"],
+[data-theme="dark"] #ai-analysis-panel input[type="radio"] {
+  accent-color: #667eea;
+}
+
+[data-theme="dark"] #ai-analysis-panel details summary {
+  color: #9ec5fe !important;
+}
+
 /* =====================================================
    14. Sigma Rules Modal (AI-generated rules panel)
    ===================================================== */

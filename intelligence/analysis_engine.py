@@ -4,7 +4,7 @@ AI Analysis Engine for LogonTracer
 import logging
 from typing import Dict, Any, List
 from .llm_config import get_llm_config, validate_config
-from .openai_client import OpenAIClient
+from .llm_client_factory import create_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -15,10 +15,8 @@ class SecurityAnalysisEngine:
         self.is_enabled = validate_config(self.config)
         
         if self.is_enabled:
-            if self.config.provider == 'openai':
-                self.client = OpenAIClient(self.config)
-            else:
-                logger.warning(f"Unsupported LLM provider: {self.config.provider}")
+            self.client = create_llm_client(self.config)
+            if self.client is None:
                 self.is_enabled = False
         else:
             logger.warning("AI analysis disabled: Invalid configuration")
@@ -71,10 +69,10 @@ class SecurityAnalysisEngine:
         return {
             "risk_level": "Unknown",
             "summary": "AI analysis is currently disabled. Check configuration.",
-            "key_findings": ["AI analysis requires valid OpenAI API key"],
+            "key_findings": ["AI analysis requires a valid LLM provider configuration"],
             "security_concerns": ["Unable to perform automated AI analysis"],
             "mitre_tactics": [],
-            "recommendations": ["Configure OpenAI API key to enable AI analysis"]
+            "recommendations": ["Configure OpenAI or Ollama settings to enable AI analysis"]
         }
     
     def _create_error_response(self, error_message: str) -> Dict[str, Any]:
@@ -94,5 +92,6 @@ class SecurityAnalysisEngine:
             "enabled": self.is_enabled,
             "provider": self.config.provider if self.is_enabled else None,
             "model": self.config.model if self.is_enabled else None,
-            "api_key_configured": bool(self.config.api_key) if self.is_enabled else False
+            "api_key_configured": bool(self.config.api_key) if self.is_enabled else False,
+            "base_url": self.config.base_url if self.is_enabled and self.config.provider == "ollama" else None
         }

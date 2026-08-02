@@ -6,6 +6,7 @@ import json
 import openai
 import asyncio
 import logging
+import re
 from datetime import datetime
 from neo4j import GraphDatabase
 from .llm_config import LLMConfig
@@ -18,16 +19,33 @@ class OpenAIClient:
     def __init__(self, config: LLMConfig):
         self.config = config
         self.client = openai.OpenAI(api_key=config.api_key)
-        
+
+        self._init_session_logging()
+
+    def _init_session_logging(self):
+        """Initialize shared LLM interaction logging state."""
         # Initialize logging directory
         self.log_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'logs', 'llm_interactions')
         os.makedirs(self.log_dir, exist_ok=True)
-        
+
         # Session variables
         self.session_id = None
         self.session_log_path = None
         self.session_interactions = []
         self.session_start_time = None
+
+    def _get_max_completion_tokens(self, query_type: str = "") -> int:
+        """Use a larger completion budget for final reports to avoid truncated JSON."""
+        base_tokens = self.config.max_completion_tokens or self.config.max_tokens or 4096
+        if query_type == "agent_final_report":
+            return max(base_tokens, self.config.final_report_max_completion_tokens or 4096)
+        return base_tokens
+
+    def _get_reasoning_effort(self, query_type: str = "") -> str:
+        """Use deeper reasoning only for final report synthesis."""
+        if query_type == "agent_final_report":
+            return "high"
+        return "low"
         
     def start_session(self, session_id: str):
         """Start a new AI analysis session"""
@@ -85,10 +103,14 @@ class OpenAIClient:
                 f.write("=" * 80 + "\n")
                 f.write(f"Session ID: {self.session_id}\n")
                 f.write(f"Start Time: {self.session_start_time.strftime('%Y-%m-%d %H:%M:%S') if self.session_start_time else 'Unknown'}\n")
+                f.write(f"Provider: {self.config.provider}\n")
                 f.write(f"Model: {self.config.model}\n")
+                if self.config.base_url:
+                    f.write(f"Base URL: {self.config.base_url}\n")
                 f.write(f"Language: {self.config.response_language or 'en'}\n")
                 f.write(f"Temperature: {self.config.temperature}\n")
                 f.write(f"Max Completion Tokens: {self.config.max_completion_tokens}\n")
+                f.write(f"Final Report Max Completion Tokens: {self.config.final_report_max_completion_tokens}\n")
                 f.write(f"Total Interactions: {len(self.session_interactions)}\n")
                 f.write("\n")
                 
@@ -160,15 +182,15 @@ class OpenAIClient:
                 ],
                 #temperature=self.config.temperature, # for GPT-4
                 #max_tokens=self.config.max_tokens, # for GPT-4
-                reasoning_effort="low", # for GPT-5
-                max_completion_tokens=self.config.max_completion_tokens, # for GPT-5
+                reasoning_effort=self._get_reasoning_effort(query_type), # for GPT-5
+                max_completion_tokens=self._get_max_completion_tokens(query_type), # for GPT-5
                 timeout=self.config.timeout
             )
             
-            content = response.choices[0].message.content
+            content = response.choices[0].message.content or ""
             
             # Parse the response first
-            parsed_response = self._parse_analysis_response(content)
+            parsed_response = self._parse_security_response(query_type, content)
             
             # Log the interaction (excluding large datasets)
             self._log_llm_interaction(query_type, prompt, system_prompt, content, parsed_response, analysis_data)
@@ -767,6 +789,202 @@ You MUST strictly adhere to this JSON format in your response.
                 'message': f'Parse error: {str(e)}',
                 'sigma_rules': []
             }
+
+    def _parse_security_response(self, query_type: str, content: str) -> Dict[str, Any]:
+        """Parse generic and agent-specific analysis responses."""
+        if query_type and query_type.startswith("agent_"):
+            agent_response = self._parse_agent_response(query_type, content or "")
+            if agent_response:
+                return agent_response
+
+            return {
+                "error": True,
+                "error_message": "Failed to parse agent response as JSON",
+                "raw_response_preview": (content or "")[:500]
+            }
+
+        return self._parse_analysis_response(content or "")
+
+    def _parse_agent_response(self, query_type: str, content: str) -> Optional[Dict[str, Any]]:
+        """Parse agent JSON, with limited recovery for truncated local LLM output."""
+        json_str = self._extract_json_candidate(content)
+        if not json_str:
+            return None
+
+        try:
+            parsed = json.loads(json_str)
+            if isinstance(parsed, dict):
+                return self._normalize_agent_response(query_type, parsed)
+        except json.JSONDecodeError:
+            logger.warning("Failed to parse agent JSON response; trying partial recovery")
+
+        return self._recover_partial_agent_response(query_type, json_str)
+
+    def _extract_json_candidate(self, content: str) -> str:
+        """Return the likely JSON object from markdown, prose, or truncated output."""
+        text = (content or "").strip()
+        if text.startswith("```"):
+            text = re.sub(r"^```(?:json)?\s*", "", text, flags=re.IGNORECASE)
+            text = re.sub(r"\s*```$", "", text)
+
+        start_idx = text.find("{")
+        if start_idx == -1:
+            return ""
+
+        end_idx = text.rfind("}")
+        if end_idx > start_idx:
+            return text[start_idx:end_idx + 1]
+        return text[start_idx:]
+
+    def _normalize_agent_response(self, query_type: str, response: Dict[str, Any]) -> Dict[str, Any]:
+        """Fill harmless defaults for complete agent JSON responses."""
+        if query_type in {"agent_query_generation", "agent_query_generation_with_errors"}:
+            response.setdefault("investigation_focus", "General investigation")
+            response.setdefault("expected_findings", "")
+            if not isinstance(response.get("threat_indicators"), list):
+                response["threat_indicators"] = []
+            return response
+
+        if query_type == "agent_result_analysis":
+            response.setdefault("threat_description", "")
+            response.setdefault("next_investigation_explanation", "")
+            response.setdefault("next_investigation_context", "")
+            if not isinstance(response.get("recommendations"), list):
+                response["recommendations"] = []
+            return response
+
+        if query_type == "agent_final_report":
+            if "analysis_summary" not in response and "summary" in response:
+                response["analysis_summary"] = response.get("summary", "")
+            if "overall_risk_level" not in response and "risk_level" in response:
+                response["overall_risk_level"] = str(response.get("risk_level", "unknown")).lower()
+            response.setdefault("threats_summary", {
+                "total_threats": 0,
+                "critical_threats": 0,
+                "threat_types": []
+            })
+            response.setdefault("recommendations", {
+                "immediate": [],
+                "short_term": [],
+                "long_term": []
+            })
+            response.setdefault("detection_rules", [])
+            return response
+
+        return response
+
+    def _recover_partial_agent_response(self, query_type: str, content: str) -> Optional[Dict[str, Any]]:
+        """Recover control fields from a truncated agent JSON object."""
+        if query_type in {"agent_query_generation", "agent_query_generation_with_errors"}:
+            cypher_query = self._extract_json_string_field(content, "cypher_query")
+            if not cypher_query:
+                return None
+            return {
+                "partial_recovery": True,
+                "cypher_query": cypher_query,
+                "investigation_focus": self._extract_json_string_field(content, "investigation_focus") or "General investigation",
+                "expected_findings": self._extract_json_string_field(content, "expected_findings") or "Recovered from partial LLM response.",
+                "threat_indicators": self._extract_json_string_list(content, "threat_indicators")
+            }
+
+        if query_type == "agent_result_analysis":
+            if not all(
+                self._has_json_field(content, field)
+                for field in ["threat_detected", "threat_type", "severity", "threat_description"]
+            ):
+                return None
+
+            threat_detected = self._extract_json_bool_field(content, "threat_detected")
+            threat_type = self._extract_json_string_field(content, "threat_type")
+            severity = self._extract_json_string_field(content, "severity")
+            threat_description = self._extract_json_string_field(content, "threat_description")
+            if threat_detected is None or not threat_type or not severity or not threat_description:
+                return None
+
+            threat_type = (threat_type or "none").lower()
+            severity = (severity or "low").lower()
+
+            return {
+                "partial_recovery": True,
+                "threat_detected": bool(threat_detected),
+                "threat_type": threat_type,
+                "severity": severity,
+                "threat_description": threat_description,
+                "evidence": self._extract_json_string_list(content, "evidence")[:5],
+                "investigation_complete": self._extract_json_bool_field(content, "investigation_complete") or False,
+                "next_investigation_explanation": self._extract_json_string_field(content, "next_investigation_explanation") or (
+                    "Continue with a distinct investigation target because this response was truncated."
+                ),
+                "next_investigation_context": self._extract_json_string_field(content, "next_investigation_context") or "",
+                "recommendations": self._extract_json_string_list(content, "recommendations")[:3]
+            }
+
+        if query_type == "agent_final_report":
+            summary = (
+                self._extract_json_string_field(content, "analysis_summary") or
+                self._extract_json_string_field(content, "summary")
+            )
+            risk_level = (
+                self._extract_json_string_field(content, "overall_risk_level") or
+                self._extract_json_string_field(content, "risk_level")
+            )
+            if not summary and not risk_level:
+                return None
+            return {
+                "partial_recovery": True,
+                "analysis_summary": summary or "The final report response was truncated.",
+                "overall_risk_level": (risk_level or "unknown").lower(),
+                "threats_summary": {
+                    "total_threats": 0,
+                    "critical_threats": 0,
+                    "threat_types": []
+                },
+                "recommendations": {
+                    "immediate": [],
+                    "short_term": [],
+                    "long_term": []
+                },
+                "detection_rules": []
+            }
+
+        return None
+
+    def _has_json_field(self, content: str, field: str) -> bool:
+        return bool(re.search(rf'"{re.escape(field)}"\s*:', content or "", re.DOTALL))
+
+    def _extract_json_string_field(self, content: str, field: str) -> str:
+        pattern = rf'"{re.escape(field)}"\s*:\s*"((?:\\.|[^"\\])*)'
+        match = re.search(pattern, content or "", re.DOTALL)
+        if not match:
+            return ""
+        raw_value = match.group(1)
+        try:
+            return json.loads(f'"{raw_value}"')
+        except json.JSONDecodeError:
+            return raw_value
+
+    def _extract_json_bool_field(self, content: str, field: str) -> Optional[bool]:
+        pattern = rf'"{re.escape(field)}"\s*:\s*(true|false)'
+        match = re.search(pattern, content or "", re.IGNORECASE)
+        if not match:
+            return None
+        return match.group(1).lower() == "true"
+
+    def _extract_json_string_list(self, content: str, field: str) -> list:
+        field_match = re.search(rf'"{re.escape(field)}"\s*:\s*\[', content or "", re.DOTALL)
+        if not field_match:
+            return []
+
+        list_start = field_match.end()
+        list_end = content.find("]", list_start)
+        list_body = content[list_start:list_end if list_end != -1 else len(content)]
+        values = []
+        for raw_value in re.findall(r'"((?:\\.|[^"\\])*)"', list_body):
+            try:
+                values.append(json.loads(f'"{raw_value}"'))
+            except json.JSONDecodeError:
+                values.append(raw_value)
+        return values
     
     def _build_security_prompt(self, query_type: str, data: Dict[str, Any]) -> str:
         """Build security analysis prompt based on query type and data"""
@@ -892,6 +1110,9 @@ You MUST strictly adhere to this JSON format in your response.
         context = data.get('investigation_context', '')
         previous_queries = data.get('previous_queries', [])
         discovered_threats = data.get('discovered_threats', [])
+        analyst_feedback = data.get('analyst_feedback', [])
+        current_analyst_instruction = data.get('current_analyst_instruction', '')
+        force_current_analyst_instruction = bool(data.get('force_current_analyst_instruction'))
 
         return f"""
         You are an expert cybersecurity analyst with deep knowledge of Windows Active Directory authentication patterns and Neo4j Cypher.
@@ -904,8 +1125,26 @@ You MUST strictly adhere to this JSON format in your response.
         THREATS DISCOVERED SO FAR:
         {json.dumps(discovered_threats, indent=2) if discovered_threats else 'None discovered yet'}
 
+        CURRENT ANALYST NEXT-STEP INSTRUCTION:
+        {current_analyst_instruction if current_analyst_instruction else 'None for this step'}
+
+        CURRENT INSTRUCTION MODE:
+        {'MANDATORY - generate a Cypher query that directly satisfies the current analyst instruction in this response.' if force_current_analyst_instruction else 'Not active'}
+
+        ANALYST-IN-THE-LOOP FEEDBACK HISTORY:
+        {json.dumps(analyst_feedback, indent=2, ensure_ascii=False) if analyst_feedback else 'None yet'}
+
+        FEEDBACK HANDLING RULES
+        - Treat analyst verdicts as high-priority supervision: malicious, benign, unknown.
+        - If the analyst marked a finding benign, avoid pursuing the same hypothesis unless new corroborating evidence appears.
+        - If the analyst marked a finding malicious, prioritize corroboration, scope expansion, and containment-relevant evidence.
+        - If CURRENT INSTRUCTION MODE is MANDATORY, the current analyst instruction overrides PRIORITY TARGETS, novelty preferences, and the generic TASK. Generate the query for that instruction now.
+        - In MANDATORY mode, preserve analyst-specified users, hosts, IPs, event IDs, relationship types, filters, and investigation intent unless they are unsafe or impossible under the schema.
+        - Do not defer the current analyst instruction to a future next step. The JSON you return is the query that will be executed immediately.
+        - Historical free-form next-step instructions are audit context only. Do not repeat or continue them unless they are present as CURRENT ANALYST NEXT-STEP INSTRUCTION.
+
         TASK
-        Generate a Cypher query to investigate the highest-value suspicious pattern with minimal risk of query failure AND guaranteed novelty vs previous queries.
+        If CURRENT INSTRUCTION MODE is MANDATORY, generate the safest Cypher query that directly satisfies CURRENT ANALYST NEXT-STEP INSTRUCTION. Otherwise, generate a Cypher query to investigate the highest-value suspicious pattern with minimal risk of query failure AND guaranteed novelty vs previous queries.
 
         CYPHER SCHEMA (use ONLY these)
         Node Labels: Username, IPAddress, Domain, Date, Deletetime
@@ -993,6 +1232,9 @@ You MUST strictly adhere to this JSON format in your response.
         recent_errors = data.get('recent_errors', [])
         retry_attempt = data.get('retry_attempt', 0)
         iteration = data.get('iteration', 0)
+        analyst_feedback = data.get('analyst_feedback', [])
+        current_analyst_instruction = data.get('current_analyst_instruction', '')
+        force_current_analyst_instruction = bool(data.get('force_current_analyst_instruction'))
         
         error_feedback = ""
         if recent_errors:
@@ -1026,10 +1268,28 @@ You MUST strictly adhere to this JSON format in your response.
         THREATS DISCOVERED SO FAR:
         {json.dumps(discovered_threats, indent=2) if discovered_threats else 'None discovered yet'}
 
+        CURRENT ANALYST NEXT-STEP INSTRUCTION:
+        {current_analyst_instruction if current_analyst_instruction else 'None for this step'}
+
+        CURRENT INSTRUCTION MODE:
+        {'MANDATORY - generate a corrected Cypher query that directly satisfies the current analyst instruction in this response.' if force_current_analyst_instruction else 'Not active'}
+
+        ANALYST-IN-THE-LOOP FEEDBACK HISTORY:
+        {json.dumps(analyst_feedback, indent=2, ensure_ascii=False) if analyst_feedback else 'None yet'}
+
+        FEEDBACK HANDLING RULES
+        - Treat analyst verdicts as high-priority supervision: malicious, benign, unknown.
+        - If the analyst marked a finding benign, avoid pursuing the same hypothesis unless new corroborating evidence appears.
+        - If the analyst marked a finding malicious, prioritize corroboration, scope expansion, and containment-relevant evidence.
+        - If CURRENT INSTRUCTION MODE is MANDATORY, the current analyst instruction overrides PRIORITY TARGETS, novelty preferences, retry ladder preferences, and the generic TASK. Generate the corrected query for that instruction now.
+        - In MANDATORY mode, preserve analyst-specified users, hosts, IPs, event IDs, relationship types, filters, and investigation intent unless they are unsafe or impossible under the schema.
+        - Do not defer the current analyst instruction to a future next step. The JSON you return is the query that will be executed immediately.
+        - Historical free-form next-step instructions are audit context only. Do not repeat or continue them unless they are present as CURRENT ANALYST NEXT-STEP INSTRUCTION.
+
         {error_feedback}
 
         TASK
-        Generate a corrected Cypher query to investigate the next most important security concern with minimal risk of failure AND guaranteed novelty vs previous queries.
+        If CURRENT INSTRUCTION MODE is MANDATORY, generate the safest corrected Cypher query that directly satisfies CURRENT ANALYST NEXT-STEP INSTRUCTION. Otherwise, generate a corrected Cypher query to investigate the next most important security concern with minimal risk of failure AND guaranteed novelty vs previous queries.
 
         CYPHER SCHEMA VALIDATION (use ONLY these)
         Node Labels: Username, IPAddress, Domain, Date, Deletetime
@@ -1113,6 +1373,7 @@ You MUST strictly adhere to this JSON format in your response.
         results_count = data.get('results_count', 0)
         current_iteration = data.get('iteration', 0)
         max_iterations = data.get('max_iterations', self.config.agent_max_iterations or 10)
+        analyst_feedback = data.get('analyst_feedback', [])
         
         return f"""
         You are analyzing the results of a cybersecurity investigation query.
@@ -1127,8 +1388,18 @@ You MUST strictly adhere to this JSON format in your response.
         SAMPLE RESULTS (first 1000):
         {json.dumps(results[:1000], indent=2)}
 
+        ANALYST-IN-THE-LOOP FEEDBACK FROM PREVIOUS STEPS:
+        {json.dumps(analyst_feedback, indent=2, ensure_ascii=False) if analyst_feedback else 'None yet'}
+
+        FEEDBACK HANDLING RULES
+        - Treat analyst verdicts as high-priority supervision: malicious, benign, unknown.
+        - Use benign feedback to reduce false positives and avoid restating the same claim as suspicious.
+        - Use malicious feedback to sharpen evidence, scope affected users/hosts, and choose a useful next step.
+        - Use unknown feedback to propose a clarifying next step with concrete evidence fields.
+
         TASK: Analyze these Neo4j query results for security threats and determine next investigation steps. 
         Important data notes:
+        - If Query Results is 0, this step found no anomaly. Set threat_detected=false, threat_type="none", severity="low", briefly state that no records matched, and only propose the next distinct investigation step.
         - Windows defaults may omit Event 4625. Do NOT treat the absence of 4625 as benign; rely on other evidence (4776, 4624:3/10, 4768/4769, group changes).
         - Ambiguous values (e.g., LogonType=0, authname='-') alone must NOT drive severity.
 
@@ -1215,7 +1486,8 @@ You MUST strictly adhere to this JSON format in your response.
             "Event.id=4769 — servicename='TERMSRV/win7_64jp_01' — ticketencryptiontype='RC4'"
         ],
         "investigation_complete": true/false,
-        "next_investigation_context": "If false: propose the single most useful next Neo4j Cypher to run, inline (no backticks). Use exact labels/properties from this schema and a minimal MATCH/RETURN. Example: MATCH (u:Username)-[e:Event]-(i:IPAddress) WHERE u.user='administrator' AND e.id=4776 RETURN u.user, i.hostname, i.IP, e.id, e.logintype, e.authname, e.status AS user, u.rank AS rank ORDER BY u.rank DESC LIMIT 1000",
+        "next_investigation_explanation": "If investigation_complete=false: explain in 1-2 analyst-friendly sentences what the next step will analyze and why it is useful. Do not rely on Cypher syntax for the explanation.",
+        "next_investigation_context": "If investigation_complete=false: propose the single most useful next Neo4j Cypher to run, inline (no backticks). Use exact labels/properties from this schema and a minimal MATCH/RETURN. Example: MATCH (u:Username)-[e:Event]-(i:IPAddress) WHERE u.user='administrator' AND e.id=4776 RETURN u.user, i.hostname, i.IP, e.id, e.logintype, e.authname, e.status AS user, u.rank AS rank ORDER BY u.rank DESC LIMIT 1000",
         "recommendations": ["Immediate actions tied to the evidence, e.g., isolate host=<hostname>, rotate credentials for user=<user>, collect Event.id in (4624,4776,4768,4769) for the named entities"]
         }}
         You MUST strictly adhere to this JSON format in your response.
@@ -1225,7 +1497,9 @@ You MUST strictly adhere to this JSON format in your response.
         """Build prompt for final investigation report"""
         summary = data.get('investigation_summary', {})
         threats = data.get('discovered_threats', [])
-        timeline = data.get('investigation_timeline', [])
+        timeline = data.get('investigation_timeline', data.get('investigation_history', []))
+        analyst_feedback = data.get('analyst_feedback', [])
+        completion_reason = data.get('completion_reason', 'llm_completed')
         
         return f"""
         You are generating a comprehensive cybersecurity investigation report based on prior Neo4j-driven iterations.
@@ -1238,9 +1512,13 @@ You MUST strictly adhere to this JSON format in your response.
         {json.dumps(threats, indent=2)}
         - INVESTIGATION TIMELINE (array; may include raw events or summarized steps; timestamps may or may not be present):
         {json.dumps(timeline, indent=2)}
+        - ANALYST-IN-THE-LOOP FEEDBACK (verdicts use malicious, benign, unknown):
+        {json.dumps(analyst_feedback, indent=2, ensure_ascii=False) if analyst_feedback else 'None provided'}
+        - COMPLETION REASON:
+        {completion_reason}
 
         ALIGNMENT WITH INVESTIGATION PHASE:
-        - Use the same DETECTORS taxonomy (A–J). When summarizing a threat, explicitly mention which detectors triggered (e.g., "Detectors: A,E").
+        - Use the same DETECTORS taxonomy (A–J).
         A Cross-host NTLM by privileged account
         B Multiple IPs for same user
         C Failure→success coexistence
@@ -1254,6 +1532,7 @@ You MUST strictly adhere to this JSON format in your response.
 
         REPORTING RULES:
         - Evidence-first. Name users, hosts, IPs, Event.id, logintype, authname, servicename (if available), ticketencryptiontype (if available), and status/substatus when present.
+        - Explicitly incorporate analyst verdicts. Downgrade or exclude findings marked benign unless later steps contradicted them; preserve unknown as unresolved questions.
         - Apply the same severity semantics as the investigation phase (low|medium|high|critical). Do not introduce new categories.
         - Absence of 4625 must NOT be treated as benign; ambiguous values (LogonType=0, authname='-') alone must NOT drive severity.
         - If Event.date timestamps are present, order activities chronologically; otherwise reconstruct the sequence using relationships and co-occurrence only.
