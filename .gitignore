@@ -179,3 +179,6 @@ cython_debug/
 # Unit tests (the "*test*" pattern above would otherwise hide them)
 !tests/
 !tests/*.py
+
+# ltcase: per-case credentials and evidence
+cases/

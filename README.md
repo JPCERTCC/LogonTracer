@@ -272,6 +272,47 @@ With Neo4j Enterprise Edition, LogonTracer supports multiple independent investi
 - **Add/Delete Access to Case** — Grant or revoke per-user access to specific cases
 - **Change Case** — Switch the active case in the current session
 
+### One instance per case (Neo4j Community) — `tools/ltcase.py`
+
+Neo4j Community has one user database, so the case management above is not available there. `tools/ltcase.py` gives each case its own docker compose project instead ([`docker-compose-case/`](docker-compose-case/docker-compose.yml)): its own Neo4j volume, its own parse cache, random passwords, and ports bound to `127.0.0.1` only. Data from two cases never shares a database. The AI features stay off (`LOGONTRACER_OFFLINE=1`, no OpenAI key).
+
+```bash
+python3 tools/ltcase.py new cliente-a          # writes cases/cliente-a/.env (0600): ports + passwords
+python3 tools/ltcase.py up cliente-a           # http://127.0.0.1:<port>, login neo4j / NEO4J_PASSWORD from the .env
+python3 tools/ltcase.py import cliente-a /caso/*.zip /caso/Reports/*   # see below
+python3 tools/ltcase.py list                   # cases, ports, hosts imported, running or not
+python3 tools/ltcase.py down cliente-a         # stop; data is kept
+python3 tools/ltcase.py rm cliente-a           # DESTRUCTIVE: dry-run, prints what would be removed
+python3 tools/ltcase.py rm cliente-a --confirm cliente-a   # removes containers + volumes, keeps cases/cliente-a/evidencia/
+```
+
+Each running case uses about 0.7 GB of RAM idle and up to about 2 GB under load (`LT_NEO4J_HEAP` / `LT_NEO4J_PAGECACHE` in its `.env`). Stopped cases use none. `cases/` is in `.gitignore`. It holds credentials and evidence, so keep it on an encrypted volume.
+
+### Importing IR-Collector collections — `tools/import_ircollector.py`
+
+IR-Collector exports `02_eventlogs/pre_execution/Security.evtx` on every host, *before* it changes the host, with its SHA256 in `MANIFEST.txt`. Importing the collections of several hosts (domain controllers first: 4768/4769/4776/4662 only exist there) gives the cross-host logon graph that a single-host collection cannot show.
+
+For each collection (folder `<HOST>_<YYYYMMDD_HHMMSS>` or its `.zip`) the importer:
+
+1. finds the snapshot `Security.evtx` (the phase-2 copy, which includes the collector's own activity, only with `--allow-phase2`);
+2. checks the EVTX header and the SHA256 against `MANIFEST.txt` — a mismatch is always refused; a missing manifest or line only passes with `--allow-unverified`;
+3. copies it read-only into the case's evidence store and records the decision in `IMPORT_IRCOLLECTOR.csv` (custody ledger: collection, host, SHA256, manifest check, state, reason);
+4. keeps **one collection per host, the most recent** — the same rule as IR-Collector's `Compare-IRFrota.ps1`;
+5. rebuilds the graph from that selection (`--delete -e ...`). The graph is always a function of the store, so a newer collection of the same host never double-counts the events it shares with the older one.
+
+ZIPs are not extracted as a whole: only the EVTX entry is streamed, and entries with `..`, absolute paths or symlinks are refused. Only the Python standard library is needed on the host when going through `ltcase.py` (the parsing runs in the container, with the store mounted read-only).
+
+Without `ltcase.py` (local LogonTracer, any Neo4j edition):
+
+```bash
+export LOGONTRACER_NEO4J_PASSWORD='...'        # never on the command line
+python3 tools/import_ircollector.py /caso/*.zip --store /caso/logontracer --run -s localhost --wsport 7687
+```
+
+Re-running with new collections only stores what is new (same SHA256 = `JA_EXISTE`) and rebuilds.
+
+Environment variables used by both tools: `LOGONTRACER_NEO4J_PORT` (Bolt port used by the server when it differs from the browser's `--wsport`) and `LOGONTRACER_CACHE_DIR` (root of the per-case parse cache).
+
 ---
 
 ## Docker

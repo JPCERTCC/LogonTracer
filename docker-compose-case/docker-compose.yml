@@ -1,0 +1,63 @@
+# One isolated LogonTracer + Neo4j Community per case. Managed by tools/ltcase.py,
+# which writes the per-case .env (project name, ports, random passwords).
+# Everything is published on 127.0.0.1 only; each case has its own volumes.
+# The AI features stay off: LOGONTRACER_OFFLINE=1 and no OpenAI key.
+name: ${LT_PROJECT:?run through tools/ltcase.py}
+
+services:
+  neo4j:
+    image: neo4j:5.26.19            # Community edition (no license key needed)
+    volumes:
+      - neo4j_data:/data
+      - neo4j_logs:/logs
+    ports:
+      - "127.0.0.1:${LT_BOLT_PORT:?}:7687"
+    environment:
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:?}
+      - NEO4J_server_memory_heap_max__size=${LT_NEO4J_HEAP:-1G}
+      - NEO4J_server_memory_pagecache_size=${LT_NEO4J_PAGECACHE:-512M}
+    healthcheck:
+      test: ["CMD", "bash", "-c", "exec 3<>/dev/tcp/127.0.0.1/7687"]
+      interval: 5s
+      timeout: 3s
+      retries: 36
+      start_period: 20s
+    networks: [lt]
+    restart: unless-stopped
+
+  logontracer:
+    build:
+      context: ..
+      dockerfile: docker-compose/LogonTracer/build/Dockerfile
+    image: logontracer:latest
+    depends_on:
+      neo4j:
+        condition: service_healthy
+    working_dir: /usr/local/src/LogonTracer
+    # --wsport: the port the BROWSER uses (published on 127.0.0.1);
+    # LOGONTRACER_NEO4J_PORT: the one this container uses inside the network.
+    command: ["python", "logontracer.py", "-r", "-o", "8080", "-u", "neo4j", "-s", "neo4j", "--wsport", "${LT_BOLT_PORT}"]
+    ports:
+      - "127.0.0.1:${LT_WEB_PORT:?}:8080"
+    environment:
+      - LOGONTRACER_NEO4J_PASSWORD=${NEO4J_PASSWORD:?}
+      - LOGONTRACER_NEO4J_PORT=7687
+      - LOGONTRACER_DEFAULT_PASSWORD=${LOGONTRACER_DEFAULT_PASSWORD:?}
+      - LOGONTRACER_BROWSER_NEO4J_SERVER=127.0.0.1
+      - LOGONTRACER_OFFLINE=1
+    volumes:
+      # Shared parse cache: web uploads and `ltcase import` see the same case state.
+      - lt_cache:/usr/local/src/LogonTracer/cache
+      # LogonTracer users (data.db) survive container recreation.
+      - lt_instance:/usr/local/src/LogonTracer/instance
+    networks: [lt]
+    restart: unless-stopped
+
+volumes:
+  neo4j_data:
+  neo4j_logs:
+  lt_cache:
+  lt_instance:
+
+networks:
+  lt:
