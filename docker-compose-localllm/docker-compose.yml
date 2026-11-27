@@ -27,6 +27,8 @@ services:
       - "127.0.0.1:11434:11434"
     environment:
       - OLLAMA_HOST=0.0.0.0:11434
+      # The /v1 (OpenAI-compatible) API ignores num_ctx in requests; the server-side value is what applies.
+      - OLLAMA_CONTEXT_LENGTH=${OLLAMA_CONTEXT_LENGTH:-16384}
       - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30m}
     networks:
       - neo4j-network
@@ -35,7 +37,7 @@ services:
     container_name: logontracer
     build:
       context: ..
-      dockerfile: docker-compose-localllm/LogonTracer/build/Dockerfile
+      dockerfile: docker-compose/LogonTracer/build/Dockerfile
       args:
         FETCH_SIGMA_RULES: ${FETCH_SIGMA_RULES:-true}
         SIGMA_REPO: ${SIGMA_REPO:-https://github.com/SigmaHQ/sigma.git}

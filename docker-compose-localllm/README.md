@@ -50,7 +50,7 @@ To move the built images to a closed network without a registry:
 ```shell
 docker save \
   logontracer:localllm-offline \
-  logontracer-ollama:llama3.1-8b \
+  logontracer-ollama:${OLLAMA_IMAGE_TAG:-gpt-oss-20b} \
   neo4j:5.26.19-enterprise \
   -o logontracer-localllm-offline-images.tar
 ```
@@ -77,8 +77,8 @@ Edit `.env` before building to change the model or Ollama runtime defaults:
 
 ```shell
 OLLAMA_BASE_IMAGE=ollama/ollama:latest
-OLLAMA_MODEL=llama3.1:8b
-OLLAMA_IMAGE_TAG=llama3.1-8b
+OLLAMA_MODEL=gpt-oss:20b
+OLLAMA_IMAGE_TAG=gpt-oss-20b
 OLLAMA_CONTEXT_LENGTH=16384
 OLLAMA_KEEP_ALIVE=30m
 LOGONTRACER_MAX_COMPLETION_TOKENS=4096
