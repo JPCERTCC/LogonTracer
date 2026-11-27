@@ -25,3 +25,16 @@ settings:
   sigma:
     git_url: "https://github.com/SigmaHQ/sigma.git" # Sigma rules url
     results: "sigma_results.json" # Sigma scan result file (JSON format)
+
+  # Rule-based detections (detection.py). Every key is optional; defaults shown.
+  detection:
+    dcsync_allowlist: '\A(msol_[0-9a-f]+|aad_[0-9a-f]+|sync_.*)\Z' # accounts allowed to replicate (regex)
+    kerberoast_threshold: 3       # distinct RC4 service tickets per account...
+    kerberoast_window: 300        # ...within N seconds
+    spray_threshold: 10           # distinct target accounts per source...
+    spray_window: 600             # ...within N seconds
+    bruteforce_threshold: 20      # failed logons for one account...
+    bruteforce_window: 600        # ...within N seconds
+    explicit_creds_threshold: 3   # distinct remote targets with 4648...
+    explicit_creds_window: 3600   # ...within N seconds
+    reset_after_create_grace: 300 # 4724 this soon after 4720 is the normal creation flow

@@ -67,9 +67,9 @@
                                 <div id="openai-settings-section">
                                     <div class="mb-3">
                                         {{ form.openai_api_key.label(class="form-label") }}
-                                        {{ form.openai_api_key(class="form-control", placeholder="sk-proj-...", type="password") }}
+                                        {{ form.openai_api_key(class="form-control", placeholder=("Stored - leave empty to keep the current key" if current_setting and current_setting.openai_api_key else "sk-proj-..."), autocomplete="new-password") }}
                                         <small class="form-text text-muted">
-                                            Your OpenAI API key. Get one at <a href="https://platform.openai.com/api-keys" target="_blank">OpenAI Platform</a>.
+                                            Your OpenAI API key. Get one at <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer">OpenAI Platform</a>.
                                         </small>
                                     </div>
 

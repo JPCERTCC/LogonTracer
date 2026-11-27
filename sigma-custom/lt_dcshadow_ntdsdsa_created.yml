@@ -1,0 +1,32 @@
+title: Rogue Domain Controller Object Created (DCShadow)
+id: 30b546e7-42ad-4bfc-b468-d5cfa9eebfc7
+status: test
+description: |
+  nTDSDSA/server object created or deleted under CN=Sites,CN=Configuration by a user account.
+  DCShadow registers a temporary DC this way. Mirrors detection.py (_r5137_dcshadow).
+references:
+    - https://attack.mitre.org/techniques/T1207/
+author: LogonTracer
+date: 2026-11-27
+tags:
+    - attack.defense-evasion
+    - attack.t1207
+logsource:
+    product: windows
+    service: security
+    definition: 'Requires Audit Directory Service Changes (Success) on DCs and a SACL on CN=Sites'
+detection:
+    selection:
+        EventID:
+            - 5137
+            - 5141
+        ObjectClass:
+            - nTDSDSA
+            - server
+        ObjectDN|contains: 'CN=Sites,CN=Configuration'
+    filter_machine:
+        SubjectUserName|endswith: '$'
+    condition: selection and not filter_machine
+falsepositives:
+    - Legitimate DC promotion/demotion performed interactively by an administrator (correlate with change tickets)
+level: high

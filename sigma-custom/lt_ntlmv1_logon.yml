@@ -1,0 +1,25 @@
+title: Successful Logon Using NTLMv1
+id: 901d9793-6562-44ee-9259-ea78d18a6af5
+status: test
+description: |
+  NTLMv1 allows offline cracking/relay of the response (downgrade attacks).
+  Mirrors detection.py (_r4624 NTLMv1).
+references:
+    - https://attack.mitre.org/techniques/T1557/001/
+    - https://learn.microsoft.com/en-us/windows/security/threat-protection/security-policy-settings/network-security-lan-manager-authentication-level
+author: LogonTracer
+date: 2026-11-27
+tags:
+    - attack.credential-access
+    - attack.t1557.001
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 4624
+        LmPackageName: 'NTLM V1'
+    condition: selection
+falsepositives:
+    - Legacy devices/applications (printers, NAS, old appliances) - inventory and migrate them
+level: medium

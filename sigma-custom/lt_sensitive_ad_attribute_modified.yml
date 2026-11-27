@@ -1,0 +1,40 @@
+title: Sensitive AD Attribute Modified (Shadow Credentials, RBCD, AdminSDHolder)
+id: 45607d3b-69fd-4edd-95aa-da4f83160ece
+status: test
+description: |
+  Value added to attributes abused for persistence/privilege escalation, by a user account.
+  Mirrors detection.py (_r5136).
+references:
+    - https://attack.mitre.org/techniques/T1556/
+    - https://attack.mitre.org/techniques/T1098/
+author: LogonTracer
+date: 2026-11-27
+tags:
+    - attack.persistence
+    - attack.privilege-escalation
+    - attack.t1098
+    - attack.t1556
+logsource:
+    product: windows
+    service: security
+    definition: 'Requires Audit Directory Service Changes (Success) and the default/extended SACLs'
+detection:
+    selection_attr:
+        EventID: 5136
+        OperationType: '%%14674'
+        AttributeLDAPDisplayName:
+            - 'msDS-KeyCredentialLink'
+            - 'msDS-AllowedToActOnBehalfOfOtherIdentity'
+            - 'msDS-AllowedToDelegateTo'
+            - 'sIDHistory'
+    selection_adminsdholder:
+        EventID: 5136
+        OperationType: '%%14674'
+        ObjectDN|contains: 'CN=AdminSDHolder,CN=System'
+    filter_machine:
+        SubjectUserName|endswith: '$'
+    condition: (selection_attr or selection_adminsdholder) and not filter_machine
+falsepositives:
+    - Windows Hello for Business / Entra Connect writing msDS-KeyCredentialLink (usually machine or MSOL_ accounts)
+    - Planned delegation changes by AD administrators
+level: high
