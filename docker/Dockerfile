@@ -168,7 +168,7 @@ RUN set -ex \
 		curl \
 		gcc \
 		g++ \
-	&& pip install git+https://github.com/Supervisor/supervisor \
+	&& pip install "supervisor==4.3.0" \
     && cd /usr/bin \
     && ln -s /usr/local/bin/echo_supervisord_conf . \
     && ln -s /usr/local/bin/pidproxy . \
@@ -178,19 +178,29 @@ RUN set -ex \
 ## LogonTracer install
 WORKDIR /usr/local/src
 
-RUN git clone https://github.com/JPCERTCC/LogonTracer.git \
-    && chmod 777 /usr/local \
-    && chmod 777 /usr/local/src \
-    && chmod 777 LogonTracer \
-	&& chmod 777 LogonTracer/static \
-	&& chmod 777 LogonTracer/logs \
-    && cd LogonTracer \
+# Build from the checked-out source (context = repository root:
+#   docker image build -f docker/Dockerfile .)
+# instead of cloning upstream master, so the image contains the code that was tested.
+COPY requirements.txt LogonTracer/requirements.txt
+RUN cd LogonTracer \
 	&& python -m pip install --upgrade pip \
     && pip install cython \
     && pip install numpy \
     && pip install scipy \
     && pip install statsmodels \
     && pip install -r requirements.txt
+COPY config LogonTracer/config
+COPY intelligence LogonTracer/intelligence
+COPY static LogonTracer/static
+COPY templates LogonTracer/templates
+COPY images LogonTracer/images
+COPY model LogonTracer/model
+COPY es-index LogonTracer/es-index
+COPY sample LogonTracer/sample
+COPY sigma LogonTracer/sigma
+COPY sigma-custom LogonTracer/sigma-custom
+COPY logontracer.py detection.py README.md LICENSE.txt LogonTracer/
+RUN mkdir -p LogonTracer/logs LogonTracer/upload LogonTracer/cache
 
 ## Create supervisord.conf
 RUN touch /etc/supervisord.conf \
@@ -204,17 +214,24 @@ RUN touch /etc/supervisord.conf \
 ## Create setup file
 RUN echo "#!/bin/bash" > run.sh \
     && echo "cd /usr/local/src/LogonTracer" >> run.sh \
-    && echo "python logontracer.py -r -o 8080 -u neo4j -p password -s \${LTHOSTNAME}" >> run.sh \
+    && echo "exec python logontracer.py -r -o 8080 -u neo4j -s \${LTHOSTNAME}" >> run.sh \
     && chmod 755 run.sh
 
 ## Set env
 RUN sed -i -e "3i NEO4J_EDITION=community" /startup/docker-entrypoint.sh
 
-## Set initial Neo4j password
-RUN neo4j-admin dbms set-initial-password password
+## Neo4j password: set at run time (docker run -e NEO4J_PASSWORD=...), not baked into the image.
+## The Neo4j entrypoint applies NEO4J_AUTH on first start; LogonTracer reads LOGONTRACER_NEO4J_PASSWORD.
+RUN echo '#!/bin/bash' > /usr/local/bin/lt-entrypoint.sh \
+    && echo 'if [ -z "${NEO4J_PASSWORD}" ]; then echo "[!] NEO4J_PASSWORD not set: using the insecure default. Do not expose this container." >&2; NEO4J_PASSWORD=password; fi' >> /usr/local/bin/lt-entrypoint.sh \
+    && echo 'export NEO4J_AUTH="neo4j/${NEO4J_PASSWORD}" LOGONTRACER_NEO4J_PASSWORD="${NEO4J_PASSWORD}"' >> /usr/local/bin/lt-entrypoint.sh \
+    && echo 'unset NEO4J_PASSWORD' >> /usr/local/bin/lt-entrypoint.sh \
+    && echo 'exec "$@"' >> /usr/local/bin/lt-entrypoint.sh \
+    && chmod 755 /usr/local/bin/lt-entrypoint.sh
 
 WORKDIR /var/lib/neo4j
 
 EXPOSE 8080
 
+ENTRYPOINT ["/usr/local/bin/lt-entrypoint.sh"]
 CMD ["supervisord", "-n"]

@@ -1,0 +1,28 @@
+title: Domain Controller SPN Added to Computer Account (DCShadow)
+id: 7e205fd2-b3c3-4216-a9e5-8732077b17a5
+status: test
+description: |
+  DRS (E3514235-4B06-11D1-AB04-00C04FC2DCD2) or GC/ SPN set on a computer account by a user account.
+  Mirrors detection.py (_r4742_dcshadow_spn).
+references:
+    - https://attack.mitre.org/techniques/T1207/
+author: LogonTracer
+date: 2026-11-27
+tags:
+    - attack.defense-evasion
+    - attack.t1207
+logsource:
+    product: windows
+    service: security
+detection:
+    selection:
+        EventID: 4742
+        ServicePrincipalNames|contains:
+            - 'E3514235-4B06-11D1-AB04-00C04FC2DCD2'
+            - 'GC/'
+    filter_machine:
+        SubjectUserName|endswith: '$'
+    condition: selection and not filter_machine
+falsepositives:
+    - New domain controller being promoted
+level: high

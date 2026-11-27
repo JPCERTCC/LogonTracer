@@ -11,7 +11,7 @@ services:
     #  Set when sync container and local time
     #  - /etc/localtime:/etc/localtime:ro
     ports:
-      - "7474:7474"
+      - "127.0.0.1:7474:7474"
       - "7687:7687"
     environment:
       - NEO4J_dbms_default__database=neo4j
@@ -23,7 +23,7 @@ services:
       # - NEO4J_dbms_memory_heap_initial__size=2G
       # - NEO4j_dbms_memory_pagecache_size=20G
       # set default neo4j password
-      - NEO4J_AUTH=neo4j/password
+      - NEO4J_AUTH=neo4j/${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env (see .env.example)}
       - NEO4J_ACCEPT_LICENSE_AGREEMENT=yes
     networks:
       - neo4j-network
@@ -46,6 +46,7 @@ services:
       - "8080:8080"
     environment:
       - LTHOSTNAME=neo4j
+      - LOGONTRACER_NEO4J_PASSWORD=${NEO4J_PASSWORD:?Set NEO4J_PASSWORD in .env (see .env.example)}
     networks:
       - neo4j-network
 

@@ -57,6 +57,26 @@ LogonTracer uses [PageRank](https://en.wikipedia.org/wiki/PageRank), [Hidden Mar
 
 ![PageRank List](images/rank.png)
 
+### Rule-based detections
+
+On top of the scores, `detection.py` flags accounts and hosts (shown in the node `status`, and they also raise the PageRank):
+
+| Flag | Events | ATT&CK | Expected false positives |
+|------|--------|--------|--------------------------|
+| DCSync | 4662 with Control Access (0x100) + replication GUIDs, not a `$` account or allow-listed sync account | T1003.006 | Directory sync accounts not in `dcsync_allowlist` |
+| DCShadow | 5137/5141 of `nTDSDSA`/`server` under `CN=Sites`; 4742 adding DRS/GC SPNs | T1207 | DC promotion/demotion |
+| Kerberoasting | ≥N distinct RC4 (0x17/0x18) service tickets per account in a time window (4769) | T1558.003 | Legacy services that only support RC4 |
+| ASREPRoast | 4768 with `PreAuthType` 0 | T1558.004 | Accounts with "Do not require Kerberos preauthentication" on purpose |
+| PasswordSpray / BruteForce | 4625 (0xC000006A/0xC0000064) and 4771 (0x18) per source / per account in a time window | T1110.003 / T1110.001 | Vulnerability scanners, services with an expired password |
+| PassTheHash | 4624 logon type 9, `seclogo`, `Negotiate` | T1550.002 | `runas /netonly` |
+| NTLMv1 | 4624 with `LmPackageName` NTLM V1 | T1557.001 | Legacy devices |
+| ExplicitCredsMultiHost | 4648 towards ≥N remote hosts in a time window | T1021 / T1078 | Admin scripts, scheduled tasks |
+| ServiceInstall / SuspiciousService | 4697 (suspicious image paths: `%COMSPEC%`, `cmd /c`, PowerShell, `ADMIN$`, ...) | T1543.003 / T1569.002 | Software deployment, management agents |
+| ShadowCredentials, RBCD, ConstrainedDelegation, SPNChange, GPOChange, LogonScript, SIDHistory, AdminSDHolder | 5136 (value added) | T1556 / T1098 / T1484.001 | Windows Hello for Business, planned AD changes |
+| Lockout / PasswordReset | 4740 / 4724 (except right after 4720) | T1110 / T1098 | Helpdesk, devices with cached passwords |
+
+Thresholds and allowlists are in `config/config.yml` (`detection:`). 4662, 5136, 5137 and 5141 need *Audit Directory Service Access/Changes* on the domain controllers. Equivalent Sigma rules for the per-event detections are in `sigma-custom/` and are loaded with `--sigma` (in addition to SigmaHQ).
+
 With LogonTracer, it is also possible to display event logs in chronological order.
 
 ![Timeline](images/timeline.png)
@@ -259,17 +279,24 @@ With Neo4j Enterprise Edition, LogonTracer supports multiple independent investi
 ### Using Docker (single container)
 
 ```shell
+docker image build -f docker/Dockerfile -t logontracer-aio .
 docker run \
   --detach \
-  --publish=7474:7474 --publish=7687:7687 --publish=8080:8080 \
+  --publish=127.0.0.1:7474:7474 --publish=7687:7687 --publish=8080:8080 \
   -e LTHOSTNAME=<IP Address> \
-  jpcertcc/docker-logontracer
+  -e NEO4J_PASSWORD='<long random password>' \
+  logontracer-aio
 ```
+
+Without `NEO4J_PASSWORD` the container falls back to the old default password and prints a warning.
 
 ### Using Docker Compose
 
+All compose variants require `NEO4J_PASSWORD` (copy `.env.example` to `.env` in the same folder). Neo4j only applies it when its data folder is first created: for an existing database, use its current password. The Neo4j Browser port (7474) is bound to 127.0.0.1; the Bolt port (7687) stays published because the browser connects to it directly.
+
 ```shell
 cd docker-compose
+cp .env.example .env   # edit NEO4J_PASSWORD
 docker compose build
 docker compose up -d
 ```
@@ -303,7 +330,7 @@ docker compose up -d
 | `-x XML [...]` | Import XML event log file(s) |
 | `-s SERVER` | Neo4j server address (default: localhost) |
 | `-u USER` | Neo4j username (default: neo4j) |
-| `-p PASSWORD` | Neo4j password |
+| `-p PASSWORD` | Neo4j password (prefer the `LOGONTRACER_NEO4J_PASSWORD` environment variable: argv is visible to other local users) |
 | `--wsport PORT` | Neo4j Bolt port (default: 7687) |
 | `-z UTC` | Timezone offset (e.g. `9` for JST) |
 | `-f DATE` | Parse logs from this datetime (e.g. `2024-01-01T00:00:00`) |

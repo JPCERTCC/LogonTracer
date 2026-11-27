@@ -199,7 +199,12 @@ def with_neo4j(f):
 sys.modules.setdefault('logontracer', sys.modules[__name__])
 
 # Check Event Id
-EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719, 5137, 5141]
+EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719, 5137, 5141,
+            # rule-based detections (detection.py)
+            4648, 4697, 4724, 4740, 4742, 4771, 5136]
+
+# Events drawn as (IP)-[Event]->(User) edges in the graph
+LOGON_EVENT_IDS = [4624, 4625, 4768, 4769, 4776]
 
 # EVTX Header
 EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
@@ -433,7 +438,7 @@ statement_user = """
 
 statement_ip = """
   MERGE (ip:IPAddress{ IP: $IP }) 
-  SET ip.rank = $rank, ip.hostname = $hostname
+  SET ip.rank = $rank, ip.hostname = $hostname, ip.status = $status
   RETURN ip
   """
 
@@ -582,8 +587,9 @@ def _config_int(section, key, env_name, default):
         return default
 
 
-# neo4j password
-NEO4J_PASSWORD = config_data["neo4j"]["NEO4J_PASSWORD"]
+# neo4j password (environment variable wins over config.yml; never needs to be on argv)
+NEO4J_PASSWORD_ENV = "LOGONTRACER_NEO4J_PASSWORD"
+NEO4J_PASSWORD = os.environ.get(NEO4J_PASSWORD_ENV) or config_data["neo4j"]["NEO4J_PASSWORD"]
 # neo4j user name
 NEO4J_USER = config_data["neo4j"]["NEO4J_USER"]
 # neo4j server
@@ -611,7 +617,7 @@ ES_USER = config_data["elastic"]["ES_USER"]
 # logontracer default user
 default_user = config_data["logontracer"]["default_user"]
 # logontracer default password
-default_password = config_data["logontracer"]["default_password"]
+default_password = os.environ.get("LOGONTRACER_DEFAULT_PASSWORD") or config_data["logontracer"]["default_password"]
 # logontracer user info database
 database_name = config_data["logontracer"]["database_name"]
 # Default neo4j database name
@@ -623,6 +629,9 @@ SESSION_TTL = datetime.timedelta(hours=SESSION_TIMEOUT_HOURS)
 SIGMA_URL = config_data["sigma"]["git_url"]
 # Sigma scan result file
 SIGMA_RESULTS_FILE = config_data["sigma"]["results"]
+
+# Rule-based detection thresholds / allowlists (optional section)
+DETECTION_CONFIG = config_data.get("detection") or {}
 # Offline mode: no runtime access to GitHub/CDNs/OpenAI. Intended for pre-built
 # Docker images used in closed networks.
 OFFLINE_MODE = os.environ.get("LOGONTRACER_OFFLINE", "").lower() in ("1", "true", "yes", "on")
@@ -632,6 +641,8 @@ if args.user:
 
 if args.password:
     NEO4J_PASSWORD = args.password
+elif os.environ.get(NEO4J_PASSWORD_ENV):
+    NEO4J_PASSWORD = os.environ[NEO4J_PASSWORD_ENV]
 
 if args.server:
     NEO4J_SERVER = args.server
@@ -1000,7 +1011,8 @@ def set_security_headers(response):
     """Add security headers to every response."""
     response.headers['X-Content-Type-Options'] = 'nosniff'
     response.headers['X-Frame-Options'] = 'DENY'
-    response.headers['X-XSS-Protection'] = '1; mode=block'
+    # Legacy XSS auditor is removed from modern browsers and can introduce leaks; OWASP recommends 0
+    response.headers['X-XSS-Protection'] = '0'
     response.headers['Referrer-Policy'] = 'strict-origin-when-cross-origin'
     if USE_HTTPS:
         response.headers['Strict-Transport-Security'] = 'max-age=31536000; includeSubDomains'
@@ -1071,8 +1083,8 @@ class User(UserMixin, db.Model):
 
 
 class SettingForm(FlaskForm):
-    password1 = PasswordField('Password', validators=[DataRequired(), EqualTo('password2', message='Passwords must match.'), Length(min=3, max=20)])
-    password2 = PasswordField('Password (again)', validators=[DataRequired(), Length(min=3, max=20)])
+    password1 = PasswordField('Password', validators=[DataRequired(), EqualTo('password2', message='Passwords must match.'), Length(min=12, max=128)])
+    password2 = PasswordField('Password (again)', validators=[DataRequired(), Length(min=12, max=128)])
 
 class LoginForm(FlaskForm):
     username = StringField('Username', validators=[
@@ -1081,7 +1093,7 @@ class LoginForm(FlaskForm):
         Regexp(r'^[a-zA-Z0-9_-]+$',
                message='Username can only contain letters, numbers, underscores, and hyphens.')
     ])
-    password = PasswordField('Password', validators=[DataRequired(), Length(min=3, max=20)])
+    password = PasswordField('Password', validators=[DataRequired(), Length(min=1, max=128)])
 
 class RegistrationForm(FlaskForm):
     username = StringField('Username', validators=[
@@ -1090,8 +1102,8 @@ class RegistrationForm(FlaskForm):
         Regexp(r'^[a-zA-Z0-9_-]+$',
                message='Username can only contain letters, numbers, underscores, and hyphens.')
     ])
-    password1 = PasswordField('Password', validators=[DataRequired(), EqualTo('password2', message='Passwords must match.'), Length(min=3, max=20)])
-    password2 = PasswordField('Password (again)', validators=[DataRequired(), Length(min=3, max=20)])
+    password1 = PasswordField('Password', validators=[DataRequired(), EqualTo('password2', message='Passwords must match.'), Length(min=12, max=128)])
+    password2 = PasswordField('Password (again)', validators=[DataRequired(), Length(min=12, max=128)])
 
     def validate_username(self, username):
         user = User.query.filter_by(username=username.data).first()
@@ -1122,7 +1134,8 @@ class AISettingForm(FlaskForm):
                               choices=[('openai', 'OpenAI'),
                                      ('ollama', 'Ollama (Local LLM)')],
                               default=os.environ.get('LOGONTRACER_LLM_PROVIDER', 'openai').lower())
-    openai_api_key = StringField('OpenAI API Key', validators=[Optional()])
+    # PasswordField never renders the stored value back into the HTML (hide_value=True)
+    openai_api_key = PasswordField('OpenAI API Key', validators=[Optional()])
     openai_model = SelectField('OpenAI Model', 
                               choices=[('gpt-5', 'GPT-5'),
                                      ('gpt-5-mini', 'GPT-5 Mini'),
@@ -1858,7 +1871,11 @@ def _browser_neo4j_server():
     if configured_host:
         return configured_host
 
-    forwarded_host = request.headers.get("X-Forwarded-Host")
+    # X-Forwarded-Host is client-controlled unless a proxy overwrites it; it decides where the
+    # browser sends the Neo4j password, so only honour it when explicitly configured.
+    forwarded_host = None
+    if os.environ.get("LOGONTRACER_TRUST_PROXY", "").lower() in ("1", "true", "yes"):
+        forwarded_host = request.headers.get("X-Forwarded-Host", "").split(",")[0].strip() or None
     browser_host = forwarded_host or request.host or NEO4J_SERVER
     if browser_host.startswith("[") and "]" in browser_host:
         return browser_host[1:browser_host.index("]")]
@@ -1872,13 +1889,17 @@ def neo4j_credentials():
     _u, _p = get_neo4j_creds()
     if _u is None:
         return jsonify({"error": "Session expired"}), 401
-    return jsonify({
+    response = jsonify({
         "server": _browser_neo4j_server(),
         "port": WS_PORT,
         "username": _u,
         "password": _p,
         "case_name": session.get("case", CASE_NAME)
     })
+    # Contains a credential: never store it in browser/proxy caches
+    response.headers["Cache-Control"] = "no-store, max-age=0"
+    response.headers["Pragma"] = "no-cache"
+    return response
 
 
 @app.route('/api/neo4j/users')
@@ -2322,11 +2343,11 @@ def do_upload():
             return "FAIL"
         if not is_valid_timezone(timezone):
             return "FAIL"
-        if addlog in "true":
+        if addlog == "true":
             add_option = "--add"
         else:
             add_option = "--delete"
-        if sigmascan in "true":
+        if sigmascan == "true":
             sigma_option = ["--sigma"]
         else:
             sigma_option = []
@@ -2340,18 +2361,20 @@ def do_upload():
         _up_user, _up_pass = get_neo4j_creds()
         if _up_user is None:
             return "FAIL"
-        parse_command = ["python3", os.path.join(FPATH, "logontracer.py"),
+        # The Neo4j password goes through the environment, not argv:
+        # /proc/<pid>/cmdline is readable by every local user, environ only by the owner.
+        parse_command = [sys.executable, os.path.join(FPATH, "logontracer.py"),
                          add_option, "--case", casename, "-z", timezone,
                          logoption] + filelist + sigma_option + [
                          "-s", NEO4J_SERVER,
-                         "-u", _up_user,
-                         "-p", _up_pass]
+                         "-u", _up_user]
         with open(log_file, "w") as lf:
-            subprocess.Popen(parse_command, stdout=lf, stderr=subprocess.STDOUT)
-        # parse_evtx(filename)
+            subprocess.Popen(parse_command, stdout=lf, stderr=subprocess.STDOUT,
+                             env=_child_env(_up_pass))
         return "SUCCESS"
 
-    except:
+    except Exception:
+        logger.exception("[!] Upload processing failed.")
         return "FAIL"
 
 
@@ -2370,7 +2393,7 @@ def es_load():
         addes = request.form["addes"]
 
         from_option = []
-        if fromdatetime not in "false":
+        if fromdatetime != "false":
             try:
                 datetime.datetime.strptime(fromdatetime, "%Y-%m-%dT%H:%M:%S")
                 from_option = ["-f", fromdatetime]
@@ -2378,15 +2401,15 @@ def es_load():
                 return "FAIL"
 
         to_option = []
-        if todatetime not in "false":
+        if todatetime != "false":
             try:
                 datetime.datetime.strptime(todatetime, "%Y-%m-%dT%H:%M:%S")
                 to_option = ["-t", todatetime]
             except:
                 return "FAIL"
 
-        es_ip, es_port = es_server.split(":")
-        if (re.search(IPv4_PATTERN, es_ip) or es_ip in "localhost") and re.search(r"\A\d{2,5}\Z", es_port):
+        es_ip, _, es_port = es_server.rpartition(":")
+        if (re.search(IPv4_PATTERN, es_ip) or es_ip == "localhost") and re.search(r"\A\d{2,5}\Z", es_port):
             es_server_option = ["--es-server", es_server]
         else:
             return "FAIL"
@@ -2394,12 +2417,12 @@ def es_load():
         if not is_valid_timezone(timezone):
             return "FAIL"
 
-        if addlog in "true":
+        if addlog == "true":
             log_option = "--add"
         else:
             log_option = "--delete"
 
-        if addes in "true":
+        if addes == "true":
             es_option = ["--postes"]
         else:
             es_option = []
@@ -2414,20 +2437,21 @@ def es_load():
         _es_user, _es_pass = get_neo4j_creds()
         if _es_user is None:
             return "FAIL"
-        parse_command = ["python3", os.path.join(FPATH, "logontracer.py"),
+        parse_command = [sys.executable, os.path.join(FPATH, "logontracer.py"),
                          "--es", log_option] + es_option + [
                          "--case", casename, "-z", timezone
                          ] + from_option + to_option + es_server_option + [
                          "-s", NEO4J_SERVER,
                          "-u", _es_user,
-                         "-p", _es_pass,
                          "--es-index", ES_INDEX,
                          "--es-prefix", ES_PREFIX]
         with open(log_file, "w") as lf:
-            subprocess.Popen(parse_command, stdout=lf, stderr=subprocess.STDOUT)
+            subprocess.Popen(parse_command, stdout=lf, stderr=subprocess.STDOUT,
+                             env=_child_env(_es_pass))
         return "SUCCESS"
 
-    except:
+    except Exception:
+        logger.exception("[!] Elasticsearch import failed.")
         return "FAIL"
 
 
@@ -2894,7 +2918,10 @@ def adetection(counts, users, starttime, tohours):
 
         for i in udata:
             score = cf.update(i)
-            ret.append(round(score, 2))
+            # changefinder >= 0.5 returns (score, predict); older versions return the score only
+            if isinstance(score, tuple):
+                score = score[0]
+            ret.append(round(float(score), 2))
         result_array.append(ret)
 
         cfdetect[users[num]] = max(ret)
@@ -2911,33 +2938,33 @@ def adetection(counts, users, starttime, tohours):
 
 
 # Calculate PageRank
-def pagerank(event_set, admins, hmm, cf, ntml):
+def pagerank(event_set, admins, hmm, cf, ntml, flagged=None):
+    """
+    Weighted PageRank over the bipartite (IP/host)-(user) graph.
+
+    Edges are built by exact node equality. The previous implementation used
+    substring matching ("10.0.0.1" in "10.0.0.12", "ana@" in "joana@"), which
+    created edges between unrelated nodes, and was O(nodes * events).
+    """
+    flagged = flagged or set()
     graph = {}
-    nodes = []
-    for _, events in event_set.iterrows():
-        nodes.append(events["ipaddress"])
-        nodes.append(events["username"])
+    for ip, user in zip(event_set["ipaddress"], event_set["username"]):
+        graph.setdefault(ip, []).append(user)
+        graph.setdefault(user, []).append(ip)
 
-    for node in list(set(nodes)):
-        links = []
-        for _, events in event_set.iterrows():
-            if node in events["ipaddress"]:
-                links.append(events["username"])
-            if node in events["username"]:
-                links.append(events["ipaddress"])
-        graph[node] = links
+    npages = len(graph)
+    if npages == 0:
+        return {}
 
-    # d = 0.85
     numloops = 30
     ranks = {}
     d = {}
-    npages = len(graph)
 
     # Calc damping factor and initial value
     for page in graph:
         if page in admins:
             df = 0.6
-        elif "@" in page[-1]:
+        elif page[-1:] == "@":
             df = 0.85
         else:
             df = 0.8
@@ -2945,29 +2972,33 @@ def pagerank(event_set, admins, hmm, cf, ntml):
             df -= 0.2
         if page in ntml:
             df -= 0.1
+        if page in flagged:
+            df -= 0.1
         if page in cf:
             df -= cf[page] / 200
 
         d[page] = df
         ranks[page] = 1.0 / npages
 
-    for i in range(0, numloops):
+    # The graph is undirected, so the nodes linking to "page" are its neighbours.
+    neighbours = {page: set(links) for page, links in graph.items()}
+    out_degree = {page: len(links) for page, links in graph.items()}
+
+    for _ in range(numloops):
         newranks = {}
         for page in graph:
             newrank = (1 - d[page]) / npages
-            for node in graph:
-                if page in graph[node]:
-                    newrank = newrank + d[node] * ranks[node]/len(graph[node])
+            for node in neighbours[page]:
+                newrank += d[node] * ranks[node] / out_degree[node]
             newranks[page] = newrank
         ranks = newranks
 
-    nranks = {}
     max_v = max(ranks.values())
     min_v = min(ranks.values())
-    for key, value in ranks.items():
-        nranks[key] = (value - min_v) / (max_v - min_v)
-
-    return nranks
+    spread = max_v - min_v
+    if spread == 0:
+        return {key: 0.0 for key in ranks}
+    return {key: (value - min_v) / spread for key, value in ranks.items()}
 
 
 # Calculate Hidden Markov Model
@@ -3365,21 +3396,31 @@ def git_clone_pull(url, download_path):
         return
 
     import git
-    
+
+    # The repository ships an empty placeholder folder (sigma/.gitkeep). Treat it as
+    # "not cloned yet" instead of failing on git.Repo() every time.
+    if os.path.isdir(download_path) and not os.path.exists(os.path.join(download_path, ".git")):
+        leftovers = [f for f in os.listdir(download_path) if f != ".gitkeep"]
+        if not leftovers:
+            placeholder = os.path.join(download_path, ".gitkeep")
+            if os.path.exists(placeholder):
+                os.remove(placeholder)
+            os.rmdir(download_path)
+
     if os.path.exists(download_path):
         try:
             repo = git.Repo(download_path)
             o = repo.remotes.origin
             o.pull()
             logger.info("[+] git pull {0} repository.".format(download_path))
-        except:
-            logger.error("[!] Can't pull {0} repository.".format(download_path))
+        except Exception as e:
+            logger.error("[!] Can't pull {0} repository: {1}".format(download_path, e))
     else:
         try:
-            git.Repo.clone_from(url, download_path)
+            git.Repo.clone_from(url, download_path, depth=1)
             logger.info("[+] git clone {0} to {1}.".format(url, download_path))
-        except:
-            logger.error("[!] Can't clone git repository {0}.".format(url))
+        except Exception as e:
+            logger.error("[!] Can't clone git repository {0}: {1}".format(url, e))
 
 
 # Load sigma rules
@@ -3403,6 +3444,10 @@ def load_sigma(download_path):
     if os.path.exists(download_path):
         logger.info("[+] Load sigma rules from {0}.".format(download_path))
         sigma_rules_files = glob.glob(download_path + '/**/*.yml', recursive=True)
+        # Local rules shipped with LogonTracer (mirror of detection.py), always loaded
+        custom_dir = os.path.join(FPATH, "sigma-custom")
+        if os.path.isdir(custom_dir) and os.path.abspath(custom_dir) != os.path.abspath(download_path):
+            sigma_rules_files += glob.glob(custom_dir + '/**/*.yml', recursive=True)
         
         for rules_file in sigma_rules_files:
             # ignore rules
@@ -4109,6 +4154,46 @@ def convert_ticket_encryption_type(encryption_type_id):
     # Return original value if no conversion found
     return type_id
 
+def _child_env(neo4j_password):
+    """Environment for the parser subprocess: inherits ours plus the Neo4j password."""
+    env = dict(os.environ)
+    env[NEO4J_PASSWORD_ENV] = neo4j_password
+    return env
+
+
+def normalize_username(raw):
+    """Same normalisation the graph uses: 'user@' for accounts, '-' for machine/invalid names."""
+    if raw is None or re.search(UCHECK, str(raw)):
+        return "-"
+    username = str(raw).split("@")[0]
+    if username[-1:] not in "$":
+        return username.lower() + "@"
+    return "-"
+
+
+def new_detection_engine():
+    """Build the rule engine with thresholds from config.yml (section 'detection', optional)."""
+    from detection import DetectionEngine
+    return DetectionEngine(normalize_username, DETECTION_CONFIG, logger)
+
+
+class _FieldData:
+    """Minimal stand-in for an lxml <Data Name=...> element (used by the Elasticsearch path)."""
+    __slots__ = ("_name", "text")
+
+    def __init__(self, name, text):
+        self._name = name
+        self.text = None if text is None else str(text)
+
+    def get(self, key, default=None):
+        return self._name if key == "Name" else default
+
+
+def event_fields(event_data):
+    """{Name: text} dict from a list of <Data> elements."""
+    return {d.get("Name"): d.text for d in event_data if d.get("Name")}
+
+
 def flatten(l):
     for i in l:
         if type(i) == list:
@@ -4179,12 +4264,15 @@ def parse_evtx(evtx_list, case):
             sids = pickle.load(f)
         with open(os.path.join(cache_dir, "hosts.pkl"), "rb") as f:
             hosts = pickle.load(f)
-        with open(os.path.join(cache_dir, "dcsync.pkl"), "rb") as f:
-            dcsync = pickle.load(f)
-        with open(os.path.join(cache_dir, "dcshadow.pkl"), "rb") as f:
-            dcshadow = pickle.load(f)
+        # dcsync.pkl / dcshadow.pkl from older versions are ignored on purpose:
+        # the previous heuristics flagged any 4662/5137 event (false positives).
+        detection_state = None
+        if os.path.exists(os.path.join(cache_dir, "detections.pkl")):
+            with open(os.path.join(cache_dir, "detections.pkl"), "rb") as f:
+                detection_state = pickle.load(f)
         with open(os.path.join(cache_dir, "date.pkl"), "rb") as f:
             starttime, endtime = pickle.load(f)
+        sigma_results = []
     else:
         event_set = pd.DataFrame(index=[], columns=["eventid", "ipaddress", "username", "logintype", "status", "authname", "servicename", "ticketencryptiontype", "date"])
         count_set = pd.DataFrame(index=[], columns=["dates", "eventid", "username"])
@@ -4203,13 +4291,12 @@ def parse_evtx(evtx_list, case):
         removegroups = {}
         sids = {}
         hosts = {}
-        dcsync = {}
-        dcshadow = {}
+        detection_state = None
         starttime = None
         endtime = None
 
-    dcsync_count = {}
-    dcshadow_check = []
+    engine = new_detection_engine()
+    engine.import_state(detection_state)
     count = 0
     record_sum = 0
 
@@ -4312,6 +4399,9 @@ def parse_evtx(evtx_list, case):
                     endtime = stime
 
                 event_data = node.xpath("/Event/EventData/Data")
+                fields = event_fields(event_data)
+                # Rule-based detections (DCSync, DCShadow, Kerberoasting, spraying, ...)
+                engine.process(eventid, etime, fields)
                 logintype = 0
                 username = "-"
                 domain = "-"
@@ -4328,7 +4418,7 @@ def parse_evtx(evtx_list, case):
                 ###
                 if eventid == 4672:
                     for data in event_data:
-                        if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
                                 username = username.lower() + "@"
@@ -4343,7 +4433,7 @@ def parse_evtx(evtx_list, case):
                 ###
                 elif eventid in [4720, 4726]:
                     for data in event_data:
-                        if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
                                 username = username.lower() + "@"
@@ -4358,16 +4448,17 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4719: System audit policy was changed
                 ###
                 elif eventid == 4719:
+                    category = "-"
                     for data in event_data:
-                        if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
                                 username = username.lower() + "@"
                             else:
                                 username = "-"
-                        if data.get("Name") in "CategoryId" and data.text is not None and re.search(r"\A%%\d{4}\Z", data.text):
+                        if data.get("Name") == "CategoryId" and data.text is not None and re.search(r"\A%%\d{4}\Z", data.text):
                             category = data.text
-                        if data.get("Name") in "SubcategoryGuid" and data.text is not None and re.search(r"\A{[\w\-]*}\Z", data.text):
+                        if data.get("Name") == "SubcategoryGuid" and data.text is not None and re.search(r"\A{[\w\-]*}\Z", data.text):
                             guid = data.text
                     policylist.append([etime.strftime("%Y-%m-%d %H:%M:%S"), username, category, guid.lower(), int(stime.timestamp())])
                 ###
@@ -4377,12 +4468,15 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4756: A member was added to a security-enabled universal group
                 ###
                 elif eventid in [4728, 4732, 4756]:
+                    groupname = "-"
+                    usid = "-"
                     for data in event_data:
-                        if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             groupname = data.text
-                        elif data.get("Name") in "MemberSid" and data.text not in "-" and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
+                        elif data.get("Name") == "MemberSid" and data.text is not None and data.text != "-" and re.search(r"\AS-[0-9\-]*\Z", data.text):
                             usid = data.text
-                    addgroups[usid] = "AddGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
+                    if usid != "-":
+                        addgroups[usid] = "AddGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
                 ###
                 # Detect removed users from specific group
                 #  EventID 4729: A member was removed from a security-enabled global group
@@ -4390,45 +4484,17 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4757: A member was removed from a security-enabled universal group
                 ###
                 elif eventid in [4729, 4733, 4757]:
+                    groupname = "-"
+                    usid = "-"
                     for data in event_data:
-                        if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             groupname = data.text
-                        elif data.get("Name") in "MemberSid" and data.text not in "-" and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
+                        elif data.get("Name") == "MemberSid" and data.text is not None and data.text != "-" and re.search(r"\AS-[0-9\-]*\Z", data.text):
                             usid = data.text
-                    removegroups[usid] = "RemoveGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
-                ###
-                # Detect DCSync
-                #  EventID 4662: An operation was performed on an object
-                ###
-                elif eventid == 4662:
-                    for data in event_data:
-                        if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
-                            username = data.text.split("@")[0]
-                            if username[-1:] not in "$":
-                                username = username.lower() + "@"
-                            else:
-                                username = "-"
-                        dcsync_count[username] = dcsync_count.get(username, 0) + 1
-                        if dcsync_count[username] == 3:
-                            dcsync[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
-                            dcsync_count[username] = 0
-                ###
-                # Detect DCShadow
-                #  EventID 5137: A directory service object was created
-                #  EventID 5141: A directory service object was deleted
-                ###
-                elif eventid in [5137, 5141]:
-                    for data in event_data:
-                        if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
-                            username = data.text.split("@")[0]
-                            if username[-1:] not in "$":
-                                username = username.lower() + "@"
-                            else:
-                                username = "-"
-                        if etime.strftime("%Y-%m-%d %H:%M:%S") in dcshadow_check:
-                            dcshadow[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
-                        else:
-                            dcshadow_check.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
+                    if usid != "-":
+                        removegroups[usid] = "RemoveGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
+                # DCSync (4662) and DCShadow (5137/5141/4742) are evaluated by
+                # engine.process() above (detection.py).
                 ###
                 # Parse logon logs
                 #  EventID 4624: An account was successfully logged on
@@ -4437,7 +4503,7 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4769: A Kerberos service ticket was requested
                 #  EventID 4776: The domain controller attempted to validate the credentials for an account
                 ###
-                else:
+                elif eventid in LOGON_EVENT_IDS:
                     servicename = "-"
                     ticketencryptiontype = "-"
                     for data in event_data:
@@ -4452,26 +4518,26 @@ def parse_evtx(evtx_list, case):
                             hostname = hostname.lower().replace("::ffff:", "")
                             hostname = hostname.replace("\\", "")
                         # Parse username
-                        if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
                                 username = username.lower() + "@"
                             else:
                                 username = "-"
                         # Parse targeted domain name
-                        if data.get("Name") in "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
+                        if data.get("Name") == "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
                             domain = data.text
                         # parse trageted user SID
                         if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
                             sid = data.text
                         # parse lonon type
-                        if data.get("Name") in "LogonType" and re.search(r"\A\d{1,2}\Z", data.text):
+                        if data.get("Name") == "LogonType" and data.text is not None and re.search(r"\A\d{1,2}\Z", data.text):
                             logintype = int(data.text)
                         # parse status
-                        if data.get("Name") in "Status" and re.search(r"\A0x\w{8}\Z", data.text):
+                        if data.get("Name") == "Status" and data.text is not None and re.search(r"\A0x\w{8}\Z", data.text):
                             status = data.text
                         # parse Authentication package name
-                        if data.get("Name") in "AuthenticationPackageName" and re.search(r"\A\w*\Z", data.text):
+                        if data.get("Name") in ("AuthenticationPackageName", "PackageName") and data.text is not None and re.search(r"\A\w*\Z", data.text):
                             authname = data.text
                         # parse Service Name for EventID 4768 and 4769
                         if eventid in [4768, 4769] and data.get("Name") == "ServiceName" and data.text is not None:
@@ -4523,7 +4589,7 @@ def parse_evtx(evtx_list, case):
                         if hostname != "-" and ipaddress != "-":
                             hosts[ipaddress] = hostname
 
-                        if authname in "NTML" and authname not in ntmlauth:
+                        if authname == "NTLM" and username not in ntmlauth:
                             ntmlauth.append(username)
                 ###
                 # Sigma rule detection
@@ -4636,10 +4702,8 @@ def parse_evtx(evtx_list, case):
         pickle.dump(sids, f)
     with open(os.path.join(cache_dir, "hosts.pkl"), "wb") as f:
         pickle.dump(hosts, f)
-    with open(os.path.join(cache_dir, "dcsync.pkl"), "wb") as f:
-        pickle.dump(dcsync, f)
-    with open(os.path.join(cache_dir, "dcshadow.pkl"), "wb") as f:
-        pickle.dump(dcshadow, f)
+    with open(os.path.join(cache_dir, "detections.pkl"), "wb") as f:
+        pickle.dump(engine.export_state(), f)
     with open(os.path.join(cache_dir, "date.pkl"), "wb") as f:
         pickle.dump([starttime, endtime], f)
 
@@ -4685,7 +4749,16 @@ def parse_evtx(evtx_list, case):
 
     # Calculate PageRank
     logger.info("[+] Calculate PageRank.")
-    ranks = pagerank(event_set, admins, detect_hmm, detect_cf, ntmlauth)
+    ranks = pagerank(event_set, admins, detect_hmm, detect_cf, ntmlauth,
+                     engine.high_severity_users() | engine.high_severity_hosts())
+
+    # Report rule-based detections (also those whose entity is not a graph node)
+    for _user in sorted(engine.user_flags):
+        logger.info("[+] Detection user {0}: {1}{2}".format(
+            _user, engine.user_status(_user), "" if _user in ranks else "(not in graph)"))
+    for _host in sorted(engine.host_flags):
+        logger.info("[+] Detection host {0}: {1}{2}".format(
+            _host, engine.host_status(_host), "" if _host in ranks else "(not in graph)"))
 
     # Create node
     logger.info("[+] Creating a graph data.")
@@ -4732,7 +4805,8 @@ def parse_evtx(evtx_list, case):
         else:
             hostname = ipaddress
         # add the IPAddress node to neo4j
-        session.run(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname})
+        session.run(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname,
+                                     "status": engine.host_status(ipaddress) or "-"})
 
         # add host data to Elasticsearch
         if args.postes:
@@ -4755,10 +4829,7 @@ def parse_evtx(evtx_list, case):
             ustatus += addgroups[sid]
         if sid in removegroups:
             ustatus += removegroups[sid]
-        if username in dcsync:
-            ustatus += "DCSync(" + dcsync[username] + ") "
-        if username in dcshadow:
-            ustatus += "DCShadow(" + dcshadow[username] + ") "
+        ustatus += engine.user_status(username)
         if not ustatus:
             ustatus = "-"
 
@@ -4837,10 +4908,7 @@ def parse_es(case):
     removegroups = {}
     sids = {}
     hosts = {}
-    dcsync_count = {}
-    dcsync = {}
-    dcshadow_check = []
-    dcshadow = {}
+    engine = new_detection_engine()
     count = 0
     starttime = None
     endtime = None
@@ -4959,6 +5027,15 @@ def parse_es(case):
             elif endtime < etime:
                 endtime = stime
 
+            # winlogbeat event_data -> same shape as EVTX <Data Name=...> elements
+            try:
+                _raw_fields = event.event_data.to_dict()
+            except AttributeError:
+                _raw_fields = {}
+            fields = {k: (None if v is None else str(v)) for k, v in _raw_fields.items()}
+            event_data = [_FieldData(k, v) for k, v in fields.items()]
+            engine.process(eventid, etime, fields)
+
             logintype = 0
             username = "-"
             domain = "-"
@@ -5029,35 +5106,7 @@ def parse_es(case):
                 groupname = event.event_data.TargetUserName
                 usid = event.event_data.MemberSid
                 removegroups[usid] = "RemoveGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
-            ###
-            # Detect DCSync
-            #  EventID 4662: An operation was performed on an object
-            ###
-            elif eventid == 4662:
-                username = event.event_data.SubjectUserName.split("@")[0]
-                if username[-1:] not in "$":
-                    username = username.lower() + "@"
-                else:
-                    username = "-"
-                dcsync_count[username] = dcsync_count.get(username, 0) + 1
-                if dcsync_count[username] == 3:
-                    dcsync[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
-                    dcsync_count[username] = 0
-            ###
-            # Detect DCShadow
-            #  EventID 5137: A directory service object was created
-            #  EventID 5141: A directory service object was deleted
-            ###
-            elif eventid in [5137, 5141]:
-                username = event.event_data.SubjectUserName.split("@")[0]
-                if username[-1:] not in "$":
-                    username = username.lower() + "@"
-                else:
-                    username = "-"
-                if etime.strftime("%Y-%m-%d %H:%M:%S") in dcshadow_check:
-                    dcshadow[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    dcshadow_check.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
+            # DCSync / DCShadow: evaluated by engine.process() above (detection.py).
             ###
             # Parse logon logs
             #  EventID 4624: An account was successfully logged on
@@ -5066,7 +5115,7 @@ def parse_es(case):
             #  EventID 4769: A Kerberos service ticket was requested
             #  EventID 4776: The domain controller attempted to validate the credentials for an account
             ###
-            else:
+            elif eventid in LOGON_EVENT_IDS:
                 servicename = "-"
                 ticketencryptiontype = "-"
                 for data in event_data:
@@ -5081,26 +5130,26 @@ def parse_es(case):
                         hostname = hostname.lower().replace("::ffff:", "")
                         hostname = hostname.replace("\\", "")
                     # Parse username
-                    if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                    if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                         username = data.text.split("@")[0]
                         if username[-1:] not in "$":
                             username = username.lower() + "@"
                         else:
                             username = "-"
                     # Parse targeted domain name
-                    if data.get("Name") in "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
+                    if data.get("Name") == "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
                         domain = data.text
                     # parse trageted user SID
                     if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
                         sid = data.text
                     # parse lonon type
-                    if data.get("Name") in "LogonType" and re.search(r"\A\d{1,2}\Z", data.text):
+                    if data.get("Name") == "LogonType" and data.text is not None and re.search(r"\A\d{1,2}\Z", data.text):
                         logintype = int(data.text)
                     # parse status
-                    if data.get("Name") in "Status" and re.search(r"\A0x\w{8}\Z", data.text):
+                    if data.get("Name") == "Status" and data.text is not None and re.search(r"\A0x\w{8}\Z", data.text):
                         status = data.text
                     # parse Authentication package name
-                    if data.get("Name") in "AuthenticationPackageName" and re.search(r"\A\w*\Z", data.text):
+                    if data.get("Name") in ("AuthenticationPackageName", "PackageName") and data.text is not None and re.search(r"\A\w*\Z", data.text):
                         authname = data.text
                     # parse Service Name for EventID 4768 and 4769
                     if eventid in [4768, 4769] and data.get("Name") == "ServiceName" and data.text is not None:
@@ -5140,7 +5189,7 @@ def parse_es(case):
                     if hostname != "-" and ipaddress != "-":
                         hosts[ipaddress] = hostname
 
-                    if authname in "NTML" and authname not in ntmlauth:
+                    if authname == "NTLM" and username not in ntmlauth:
                         ntmlauth.append(username)
                                         
         ###
@@ -5207,7 +5256,16 @@ def parse_es(case):
 
     # Calculate PageRank
     logger.info("[+] Calculate PageRank.")
-    ranks = pagerank(event_set, admins, detect_hmm, detect_cf, ntmlauth)
+    ranks = pagerank(event_set, admins, detect_hmm, detect_cf, ntmlauth,
+                     engine.high_severity_users() | engine.high_severity_hosts())
+
+    # Report rule-based detections (also those whose entity is not a graph node)
+    for _user in sorted(engine.user_flags):
+        logger.info("[+] Detection user {0}: {1}{2}".format(
+            _user, engine.user_status(_user), "" if _user in ranks else "(not in graph)"))
+    for _host in sorted(engine.host_flags):
+        logger.info("[+] Detection host {0}: {1}{2}".format(
+            _host, engine.host_status(_host), "" if _host in ranks else "(not in graph)"))
 
     # Create node
     logger.info("[+] Creating a graph data.")
@@ -5240,7 +5298,8 @@ def parse_es(case):
         else:
             hostname = ipaddress
         # add the IPAddress node to neo4j
-        session.run(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname})
+        session.run(statement_ip, {"IP": ipaddress, "rank": ranks[ipaddress], "hostname": hostname,
+                                     "status": engine.host_status(ipaddress) or "-"})
 
         # add host data to Elasticsearch
         if args.postes:
@@ -5263,10 +5322,7 @@ def parse_es(case):
             ustatus += addgroups[sid]
         if sid in removegroups:
             ustatus += removegroups[sid]
-        if username in dcsync:
-            ustatus += "DCSync(" + dcsync[username] + ") "
-        if username in dcshadow:
-            ustatus += "DCShadow(" + dcshadow[username] + ") "
+        ustatus += engine.user_status(username)
         if not ustatus:
             ustatus = "-"
 
@@ -5357,7 +5413,6 @@ def ai_settings():
         form.llm_provider.data = getattr(current_setting, 'llm_provider', 'openai')
         if OFFLINE_MODE:
             form.llm_provider.data = 'ollama'
-        form.openai_api_key.data = current_setting.openai_api_key
         form.openai_model.data = current_setting.openai_model
         form.llm_base_url.data = getattr(current_setting, 'llm_base_url', 'http://ollama:11434/v1')
         form.ollama_model.data = getattr(current_setting, 'ollama_model', 'gpt-oss:20b')
@@ -5372,7 +5427,11 @@ def ai_settings():
         # Update settings from form
         current_setting.ai_enabled = form.ai_enabled.data
         current_setting.llm_provider = 'ollama' if OFFLINE_MODE else form.llm_provider.data
-        current_setting.openai_api_key = None if OFFLINE_MODE else form.openai_api_key.data
+        if OFFLINE_MODE:
+            current_setting.openai_api_key = None
+        elif form.openai_api_key.data:
+            # empty field = keep the stored key
+            current_setting.openai_api_key = form.openai_api_key.data
         current_setting.openai_model = form.openai_model.data
         current_setting.llm_base_url = form.llm_base_url.data
         current_setting.ollama_model = form.ollama_model.data
@@ -5396,6 +5455,10 @@ def ai_settings():
     return render_template('ai_settings.html', form=form, current_setting=current_setting, offline_mode=OFFLINE_MODE)
 
 def main():
+    if NEO4J_PASSWORD in ("password", "neo4j"):
+        logger.warning("[!] The default Neo4j password is in use. Set {0} (or config.yml) to a strong "
+                       "password before exposing LogonTracer to a network.".format(NEO4J_PASSWORD_ENV))
+
     if not has_neo4j:
         logger.error("[!] neo4j driver must be installed for this script.")
         sys.exit(1)

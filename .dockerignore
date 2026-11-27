@@ -1,0 +1,14 @@
+# Keep build contexts small and free of local state/secrets
+.git
+.github
+**/__pycache__
+.secret_key
+.env
+**/.env
+data.db
+cache/
+upload/
+logs/*.log
+docker-compose*/neo4j/data
+docker-compose*/neo4j/logs
+tests/

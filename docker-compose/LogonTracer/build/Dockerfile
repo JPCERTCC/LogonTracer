@@ -36,7 +36,8 @@ COPY model ./model
 COPY es-index ./es-index
 COPY sample ./sample
 COPY sigma ./sigma
-COPY logontracer.py README.md LICENSE.txt ./
+COPY sigma-custom ./sigma-custom
+COPY logontracer.py detection.py README.md LICENSE.txt ./
 COPY docker-compose/LogonTracer/build/fetch_vendor_assets.sh /usr/local/bin/fetch_vendor_assets.sh
 
 ARG FETCH_SIGMA_RULES=false
@@ -50,21 +51,25 @@ RUN sed -i 's/\r$//' /usr/local/bin/fetch_vendor_assets.sh \
         && git clone --depth 1 "${SIGMA_REPO}" /usr/local/src/LogonTracer/sigma; \
     fi
 
-RUN mkdir -p logs/llm_interactions upload cache \
-    && chmod 777 /usr/local/src/LogonTracer \
-    && chmod 777 /usr/local/src/LogonTracer/static \
-    && chmod 777 /usr/local/src/LogonTracer/logs \
-    && chmod 777 /usr/local/src/LogonTracer/upload \
-    && chmod 777 /usr/local/src/LogonTracer/cache
+# Run as an unprivileged user instead of root + world-writable (777) folders.
+# The app writes data.db/.secret_key in its root folder and logs/upload/cache/static/sigma below it.
+RUN useradd --system --uid 10001 --home-dir /usr/local/src/LogonTracer --shell /usr/sbin/nologin logontracer \
+    && mkdir -p logs/llm_interactions upload cache \
+    && chown logontracer:logontracer /usr/local/src/LogonTracer \
+    && chown -R logontracer:logontracer static logs upload cache sigma \
+    && chmod 750 /usr/local/src/LogonTracer static logs upload cache
 
 WORKDIR /usr/local/src
 
 RUN echo "#!/bin/bash" > run.sh \
     && echo "sleep 60" >> run.sh \
     && echo "cd /usr/local/src/LogonTracer" >> run.sh \
-    && echo "python logontracer.py -r -o 8080 -u neo4j -p password -s \${LTHOSTNAME:-neo4j}" >> run.sh \
+    && echo "# Neo4j password comes from LOGONTRACER_NEO4J_PASSWORD (never on the command line)" >> run.sh \
+    && echo "exec python logontracer.py -r -o 8080 -u neo4j -s \${LTHOSTNAME:-neo4j}" >> run.sh \
     && chmod 755 run.sh
 
 EXPOSE 8080
+
+USER logontracer
 
 CMD ["/usr/local/src/run.sh"]

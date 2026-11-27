@@ -4,6 +4,9 @@ on:
   release:
     types: [published]
 
+permissions:
+  contents: read
+
 jobs:
 
   test:
@@ -15,13 +18,13 @@ jobs:
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Build the LogonTracer Docker Image and start
       run: |
-        docker image build ./docker -t jpcertcc/docker-logontracer:latest -t ghcr.io/jpcertcc/docker-logontracer:latest
+        docker image build -f docker/Dockerfile . -t jpcertcc/docker-logontracer:latest -t ghcr.io/jpcertcc/docker-logontracer:latest
         docker container run --detach --publish=7474:7474 --publish=7687:7687  --publish=8080:8080 -e LTHOSTNAME=localhost jpcertcc/docker-logontracer
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
@@ -32,6 +35,10 @@ jobs:
         pip install scipy
         pip install statsmodels
         pip install -r requirements.txt
+    - name: Unit tests
+      run: |
+        pip install pytest
+        python -m pytest -q tests
     - name: Test for LogonTracer web gui
       run: curl --verbose --show-error http://localhost:8080
     - name: Test for LogonTracer log import
@@ -41,10 +48,13 @@ jobs:
 
     runs-on: ubuntu-latest
     needs: test
+    permissions:
+      contents: read
+      packages: write   # push to ghcr.io
 
     steps:
     - name: Checkout code
-      uses: actions/checkout@v4
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
     - name: Register Docker Hub
       uses: docker/build-push-action@v5
       with:
