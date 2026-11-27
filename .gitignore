@@ -23,6 +23,8 @@ __pycache__/
 # Distribution / packaging
 .Python
 build/
+# Docker build contexts are part of the repository (build/ above hid fetch_vendor_assets.sh)
+!docker-compose*/LogonTracer/build/
 develop-eggs/
 dist/
 downloads/

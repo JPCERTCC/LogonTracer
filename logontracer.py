@@ -201,6 +201,18 @@ sys.modules.setdefault('logontracer', sys.modules[__name__])
 # Check Event Id
 EVENT_ID = [4624, 4625, 4662, 4768, 4769, 4776, 4672, 4720, 4726, 4728, 4729, 4732, 4733, 4756, 4757, 4719, 5137, 5141]
 
+# Events drawn as (IP)-[Event]->(User) edges in the graph
+LOGON_EVENT_IDS = [4624, 4625, 4768, 4769, 4776]
+
+# DCSync: Control Access right + DRSUAPI replication extended rights
+# https://learn.microsoft.com/en-us/windows/win32/adschema/r-ds-replication-get-changes
+DCSYNC_ACCESS_MASK = 0x100
+DCSYNC_GUIDS = ("1131f6aa-9c07-11d1-f79f-00c04fc2dcd2",   # DS-Replication-Get-Changes
+                "1131f6ad-9c07-11d1-f79f-00c04fc2dcd2",   # DS-Replication-Get-Changes-All
+                "89e95b76-444d-4c62-991a-0facbeda640c")   # DS-Replication-Get-Changes-In-Filtered-Set
+# DCShadow: a rogue DC registers nTDSDSA/server objects under CN=Sites
+DCSHADOW_OBJECT_CLASSES = ("ntdsdsa", "server")
+
 # EVTX Header
 EVTX_HEADER = b"\x45\x6C\x66\x46\x69\x6C\x65\x00"
 
@@ -644,6 +656,9 @@ if args.host:
 
 if args.wsport:
     WS_PORT = args.wsport
+    # The CLI import connects with NEO4J_PORT: without this, --wsport was ignored
+    # by -e/-x and the data went to the Bolt port in config.yml.
+    NEO4J_PORT = args.wsport
 
 if args.esserver:
     ES_SERVER = args.esserver
@@ -2322,11 +2337,11 @@ def do_upload():
             return "FAIL"
         if not is_valid_timezone(timezone):
             return "FAIL"
-        if addlog in "true":
+        if addlog == "true":
             add_option = "--add"
         else:
             add_option = "--delete"
-        if sigmascan in "true":
+        if sigmascan == "true":
             sigma_option = ["--sigma"]
         else:
             sigma_option = []
@@ -2370,7 +2385,7 @@ def es_load():
         addes = request.form["addes"]
 
         from_option = []
-        if fromdatetime not in "false":
+        if fromdatetime != "false":
             try:
                 datetime.datetime.strptime(fromdatetime, "%Y-%m-%dT%H:%M:%S")
                 from_option = ["-f", fromdatetime]
@@ -2378,15 +2393,15 @@ def es_load():
                 return "FAIL"
 
         to_option = []
-        if todatetime not in "false":
+        if todatetime != "false":
             try:
                 datetime.datetime.strptime(todatetime, "%Y-%m-%dT%H:%M:%S")
                 to_option = ["-t", todatetime]
             except:
                 return "FAIL"
 
-        es_ip, es_port = es_server.split(":")
-        if (re.search(IPv4_PATTERN, es_ip) or es_ip in "localhost") and re.search(r"\A\d{2,5}\Z", es_port):
+        es_ip, _, es_port = es_server.rpartition(":")
+        if (re.search(IPv4_PATTERN, es_ip) or es_ip == "localhost") and re.search(r"\A\d{2,5}\Z", es_port):
             es_server_option = ["--es-server", es_server]
         else:
             return "FAIL"
@@ -2394,12 +2409,12 @@ def es_load():
         if not is_valid_timezone(timezone):
             return "FAIL"
 
-        if addlog in "true":
+        if addlog == "true":
             log_option = "--add"
         else:
             log_option = "--delete"
 
-        if addes in "true":
+        if addes == "true":
             es_option = ["--postes"]
         else:
             es_option = []
@@ -2894,7 +2909,10 @@ def adetection(counts, users, starttime, tohours):
 
         for i in udata:
             score = cf.update(i)
-            ret.append(round(score, 2))
+            # changefinder >= 0.5 returns (score, predict); older versions return the score only
+            if isinstance(score, tuple):
+                score = score[0]
+            ret.append(round(float(score), 2))
         result_array.append(ret)
 
         cfdetect[users[num]] = max(ret)
@@ -2912,32 +2930,26 @@ def adetection(counts, users, starttime, tohours):
 
 # Calculate PageRank
 def pagerank(event_set, admins, hmm, cf, ntml):
+    # Edges by exact node equality. Substring matching linked unrelated nodes
+    # ("192.0.2.1" in "192.0.2.12", "ana@" in "joana@") and was O(nodes * events).
     graph = {}
-    nodes = []
-    for _, events in event_set.iterrows():
-        nodes.append(events["ipaddress"])
-        nodes.append(events["username"])
+    for ip, user in zip(event_set["ipaddress"], event_set["username"]):
+        graph.setdefault(ip, []).append(user)
+        graph.setdefault(user, []).append(ip)
 
-    for node in list(set(nodes)):
-        links = []
-        for _, events in event_set.iterrows():
-            if node in events["ipaddress"]:
-                links.append(events["username"])
-            if node in events["username"]:
-                links.append(events["ipaddress"])
-        graph[node] = links
+    npages = len(graph)
+    if npages == 0:
+        return {}
 
-    # d = 0.85
     numloops = 30
     ranks = {}
     d = {}
-    npages = len(graph)
 
     # Calc damping factor and initial value
     for page in graph:
         if page in admins:
             df = 0.6
-        elif "@" in page[-1]:
+        elif page[-1:] == "@":
             df = 0.85
         else:
             df = 0.8
@@ -2951,23 +2963,25 @@ def pagerank(event_set, admins, hmm, cf, ntml):
         d[page] = df
         ranks[page] = 1.0 / npages
 
-    for i in range(0, numloops):
+    # The graph is undirected: the nodes linking to "page" are its neighbours.
+    neighbours = {page: set(links) for page, links in graph.items()}
+    out_degree = {page: len(links) for page, links in graph.items()}
+
+    for _ in range(numloops):
         newranks = {}
         for page in graph:
             newrank = (1 - d[page]) / npages
-            for node in graph:
-                if page in graph[node]:
-                    newrank = newrank + d[node] * ranks[node]/len(graph[node])
+            for node in neighbours[page]:
+                newrank += d[node] * ranks[node] / out_degree[node]
             newranks[page] = newrank
         ranks = newranks
 
-    nranks = {}
     max_v = max(ranks.values())
     min_v = min(ranks.values())
-    for key, value in ranks.items():
-        nranks[key] = (value - min_v) / (max_v - min_v)
-
-    return nranks
+    spread = max_v - min_v
+    if spread == 0:
+        return {key: 0.0 for key in ranks}
+    return {key: (value - min_v) / spread for key, value in ranks.items()}
 
 
 # Calculate Hidden Markov Model
@@ -3365,7 +3379,17 @@ def git_clone_pull(url, download_path):
         return
 
     import git
-    
+
+    # The repository ships an empty placeholder folder (sigma/.gitkeep). Treat it as
+    # "not cloned yet" instead of failing on git.Repo() every time.
+    if os.path.isdir(download_path) and not os.path.exists(os.path.join(download_path, ".git")):
+        leftovers = [f for f in os.listdir(download_path) if f != ".gitkeep"]
+        if not leftovers:
+            placeholder = os.path.join(download_path, ".gitkeep")
+            if os.path.exists(placeholder):
+                os.remove(placeholder)
+            os.rmdir(download_path)
+
     if os.path.exists(download_path):
         try:
             repo = git.Repo(download_path)
@@ -4109,6 +4133,55 @@ def convert_ticket_encryption_type(encryption_type_id):
     # Return original value if no conversion found
     return type_id
 
+def _field(fields, name):
+    value = fields.get(name)
+    return "" if value is None else str(value).strip()
+
+
+def is_dcsync(fields):
+    """4662 with Control Access and a replication GUID, by a non-machine account."""
+    try:
+        mask = _field(fields, "AccessMask").lower()
+        mask = int(mask, 16) if mask.startswith("0x") else int(mask)
+    except ValueError:
+        return False
+    if not mask & DCSYNC_ACCESS_MASK:
+        return False
+    props = _field(fields, "Properties").lower()
+    if not any(guid in props for guid in DCSYNC_GUIDS):
+        return False
+    return not _field(fields, "SubjectUserName").split("@")[0].endswith("$")
+
+
+def is_dcshadow(fields):
+    """5137/5141 of an nTDSDSA/server object under CN=Sites,CN=Configuration."""
+    return (_field(fields, "ObjectClass").lower() in DCSHADOW_OBJECT_CLASSES
+            and "cn=sites,cn=configuration" in _field(fields, "ObjectDN").lower())
+
+
+def subject_user(fields):
+    """SubjectUserName normalised like graph Username nodes ('user@'), '-' for machine/invalid."""
+    raw = _field(fields, "SubjectUserName")
+    if not raw or re.search(UCHECK, raw):
+        return "-"
+    username = raw.split("@")[0]
+    if username[-1:] == "$":
+        return "-"
+    return username.lower() + "@"
+
+
+class _FieldData:
+    """Minimal stand-in for an lxml <Data Name=...> element (Elasticsearch path)."""
+    __slots__ = ("_name", "text")
+
+    def __init__(self, name, text):
+        self._name = name
+        self.text = None if text is None else str(text)
+
+    def get(self, key, default=None):
+        return self._name if key == "Name" else default
+
+
 def flatten(l):
     for i in l:
         if type(i) == list:
@@ -4148,7 +4221,8 @@ def parse_evtx(evtx_list, case):
         sigma_eventids = []
 
     # Load cache files
-    if args.add and os.path.exists(cache_dir) and len(os.listdir(cache_dir)):
+    cache_loaded = bool(args.add and os.path.exists(cache_dir) and len(os.listdir(cache_dir)))
+    if cache_loaded:
         logger.info("[+] Load cashe files.")
         event_set = pd.read_pickle(os.path.join(cache_dir, "event_set.pkl"))
         count_set = pd.read_pickle(os.path.join(cache_dir, "count_set.pkl"))
@@ -4208,8 +4282,6 @@ def parse_evtx(evtx_list, case):
         starttime = None
         endtime = None
 
-    dcsync_count = {}
-    dcshadow_check = []
     count = 0
     record_sum = 0
 
@@ -4328,7 +4400,7 @@ def parse_evtx(evtx_list, case):
                 ###
                 if eventid == 4672:
                     for data in event_data:
-                        if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
                                 username = username.lower() + "@"
@@ -4343,7 +4415,7 @@ def parse_evtx(evtx_list, case):
                 ###
                 elif eventid in [4720, 4726]:
                     for data in event_data:
-                        if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
                                 username = username.lower() + "@"
@@ -4358,16 +4430,17 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4719: System audit policy was changed
                 ###
                 elif eventid == 4719:
+                    category = "-"
                     for data in event_data:
-                        if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
                                 username = username.lower() + "@"
                             else:
                                 username = "-"
-                        if data.get("Name") in "CategoryId" and data.text is not None and re.search(r"\A%%\d{4}\Z", data.text):
+                        if data.get("Name") == "CategoryId" and data.text is not None and re.search(r"\A%%\d{4}\Z", data.text):
                             category = data.text
-                        if data.get("Name") in "SubcategoryGuid" and data.text is not None and re.search(r"\A{[\w\-]*}\Z", data.text):
+                        if data.get("Name") == "SubcategoryGuid" and data.text is not None and re.search(r"\A{[\w\-]*}\Z", data.text):
                             guid = data.text
                     policylist.append([etime.strftime("%Y-%m-%d %H:%M:%S"), username, category, guid.lower(), int(stime.timestamp())])
                 ###
@@ -4377,12 +4450,15 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4756: A member was added to a security-enabled universal group
                 ###
                 elif eventid in [4728, 4732, 4756]:
+                    groupname = "-"
+                    usid = "-"
                     for data in event_data:
-                        if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             groupname = data.text
-                        elif data.get("Name") in "MemberSid" and data.text not in "-" and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
+                        elif data.get("Name") == "MemberSid" and data.text is not None and data.text != "-" and re.search(r"\AS-[0-9\-]*\Z", data.text):
                             usid = data.text
-                    addgroups[usid] = "AddGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
+                    if usid != "-":
+                        addgroups[usid] = "AddGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
                 ###
                 # Detect removed users from specific group
                 #  EventID 4729: A member was removed from a security-enabled global group
@@ -4390,45 +4466,38 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4757: A member was removed from a security-enabled universal group
                 ###
                 elif eventid in [4729, 4733, 4757]:
+                    groupname = "-"
+                    usid = "-"
                     for data in event_data:
-                        if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             groupname = data.text
-                        elif data.get("Name") in "MemberSid" and data.text not in "-" and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
+                        elif data.get("Name") == "MemberSid" and data.text is not None and data.text != "-" and re.search(r"\AS-[0-9\-]*\Z", data.text):
                             usid = data.text
-                    removegroups[usid] = "RemoveGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
+                    if usid != "-":
+                        removegroups[usid] = "RemoveGroup: " + groupname + "(" + etime.strftime("%Y-%m-%d %H:%M:%S") + ") "
                 ###
                 # Detect DCSync
                 #  EventID 4662: An operation was performed on an object
                 ###
+                #  The previous check counted every <Data> field of any 4662, so a single
+                #  ordinary object access was reported as DCSync.
                 elif eventid == 4662:
-                    for data in event_data:
-                        if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
-                            username = data.text.split("@")[0]
-                            if username[-1:] not in "$":
-                                username = username.lower() + "@"
-                            else:
-                                username = "-"
-                        dcsync_count[username] = dcsync_count.get(username, 0) + 1
-                        if dcsync_count[username] == 3:
-                            dcsync[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
-                            dcsync_count[username] = 0
+                    fields = {d.get("Name"): d.text for d in event_data if d.get("Name")}
+                    username = subject_user(fields)
+                    if username != "-" and username not in dcsync and is_dcsync(fields):
+                        dcsync[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
                 ###
                 # Detect DCShadow
                 #  EventID 5137: A directory service object was created
                 #  EventID 5141: A directory service object was deleted
                 ###
+                #  The previous check flagged any two <Data> fields with the same timestamp,
+                #  i.e. every 5137/5141 event.
                 elif eventid in [5137, 5141]:
-                    for data in event_data:
-                        if data.get("Name") in "SubjectUserName" and data.text is not None and not re.search(UCHECK, data.text):
-                            username = data.text.split("@")[0]
-                            if username[-1:] not in "$":
-                                username = username.lower() + "@"
-                            else:
-                                username = "-"
-                        if etime.strftime("%Y-%m-%d %H:%M:%S") in dcshadow_check:
-                            dcshadow[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
-                        else:
-                            dcshadow_check.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
+                    fields = {d.get("Name"): d.text for d in event_data if d.get("Name")}
+                    username = subject_user(fields)
+                    if username != "-" and username not in dcshadow and is_dcshadow(fields):
+                        dcshadow[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
                 ###
                 # Parse logon logs
                 #  EventID 4624: An account was successfully logged on
@@ -4437,7 +4506,7 @@ def parse_evtx(evtx_list, case):
                 #  EventID 4769: A Kerberos service ticket was requested
                 #  EventID 4776: The domain controller attempted to validate the credentials for an account
                 ###
-                else:
+                elif eventid in LOGON_EVENT_IDS:
                     servicename = "-"
                     ticketencryptiontype = "-"
                     for data in event_data:
@@ -4452,26 +4521,26 @@ def parse_evtx(evtx_list, case):
                             hostname = hostname.lower().replace("::ffff:", "")
                             hostname = hostname.replace("\\", "")
                         # Parse username
-                        if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                        if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                             username = data.text.split("@")[0]
                             if username[-1:] not in "$":
                                 username = username.lower() + "@"
                             else:
                                 username = "-"
                         # Parse targeted domain name
-                        if data.get("Name") in "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
+                        if data.get("Name") == "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
                             domain = data.text
                         # parse trageted user SID
                         if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
                             sid = data.text
                         # parse lonon type
-                        if data.get("Name") in "LogonType" and re.search(r"\A\d{1,2}\Z", data.text):
+                        if data.get("Name") == "LogonType" and data.text is not None and re.search(r"\A\d{1,2}\Z", data.text):
                             logintype = int(data.text)
                         # parse status
-                        if data.get("Name") in "Status" and re.search(r"\A0x\w{8}\Z", data.text):
+                        if data.get("Name") == "Status" and data.text is not None and re.search(r"\A0x\w{8}\Z", data.text):
                             status = data.text
                         # parse Authentication package name
-                        if data.get("Name") in "AuthenticationPackageName" and re.search(r"\A\w*\Z", data.text):
+                        if data.get("Name") == "AuthenticationPackageName" and data.text is not None and re.search(r"\A\w*\Z", data.text):
                             authname = data.text
                         # parse Service Name for EventID 4768 and 4769
                         if eventid in [4768, 4769] and data.get("Name") == "ServiceName" and data.text is not None:
@@ -4523,7 +4592,7 @@ def parse_evtx(evtx_list, case):
                         if hostname != "-" and ipaddress != "-":
                             hosts[ipaddress] = hostname
 
-                        if authname in "NTML" and authname not in ntmlauth:
+                        if authname == "NTLM" and username not in ntmlauth:
                             ntmlauth.append(username)
                 ###
                 # Sigma rule detection
@@ -4698,6 +4767,14 @@ def parse_evtx(evtx_list, case):
         logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
         sys.exit(1)
 
+    if cache_loaded:
+        # The graph is rewritten below from the merged cache (old + new events), and the
+        # Event/Group/Policy relationships use CREATE: writing over the previous graph
+        # duplicated every relationship of the earlier imports. The cache is the source
+        # of truth, so the case database is emptied first.
+        logger.info("[+] --add: rebuilding the graph of case {0} from the merged cache.".format(case))
+        session.run("MATCH (n) DETACH DELETE n")
+
     if args.postes:
         # Parse Event log
         logger.info("[+] Start sending the ES.")
@@ -4837,9 +4914,7 @@ def parse_es(case):
     removegroups = {}
     sids = {}
     hosts = {}
-    dcsync_count = {}
     dcsync = {}
-    dcshadow_check = []
     dcshadow = {}
     count = 0
     starttime = None
@@ -4959,6 +5034,15 @@ def parse_es(case):
             elif endtime < etime:
                 endtime = stime
 
+            # winlogbeat event_data -> same shape as EVTX <Data Name=...> elements.
+            # The logon branch below iterated event_data, which was never defined here.
+            try:
+                raw_fields = event.event_data.to_dict()
+            except AttributeError:
+                raw_fields = {}
+            fields = {k: (None if v is None else str(v)) for k, v in raw_fields.items()}
+            event_data = [_FieldData(k, v) for k, v in fields.items()]
+
             logintype = 0
             username = "-"
             domain = "-"
@@ -5034,30 +5118,18 @@ def parse_es(case):
             #  EventID 4662: An operation was performed on an object
             ###
             elif eventid == 4662:
-                username = event.event_data.SubjectUserName.split("@")[0]
-                if username[-1:] not in "$":
-                    username = username.lower() + "@"
-                else:
-                    username = "-"
-                dcsync_count[username] = dcsync_count.get(username, 0) + 1
-                if dcsync_count[username] == 3:
+                username = subject_user(fields)
+                if username != "-" and username not in dcsync and is_dcsync(fields):
                     dcsync[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
-                    dcsync_count[username] = 0
             ###
             # Detect DCShadow
             #  EventID 5137: A directory service object was created
             #  EventID 5141: A directory service object was deleted
             ###
             elif eventid in [5137, 5141]:
-                username = event.event_data.SubjectUserName.split("@")[0]
-                if username[-1:] not in "$":
-                    username = username.lower() + "@"
-                else:
-                    username = "-"
-                if etime.strftime("%Y-%m-%d %H:%M:%S") in dcshadow_check:
+                username = subject_user(fields)
+                if username != "-" and username not in dcshadow and is_dcshadow(fields):
                     dcshadow[username] = etime.strftime("%Y-%m-%d %H:%M:%S")
-                else:
-                    dcshadow_check.append(etime.strftime("%Y-%m-%d %H:%M:%S"))
             ###
             # Parse logon logs
             #  EventID 4624: An account was successfully logged on
@@ -5066,7 +5138,7 @@ def parse_es(case):
             #  EventID 4769: A Kerberos service ticket was requested
             #  EventID 4776: The domain controller attempted to validate the credentials for an account
             ###
-            else:
+            elif eventid in LOGON_EVENT_IDS:
                 servicename = "-"
                 ticketencryptiontype = "-"
                 for data in event_data:
@@ -5081,26 +5153,26 @@ def parse_es(case):
                         hostname = hostname.lower().replace("::ffff:", "")
                         hostname = hostname.replace("\\", "")
                     # Parse username
-                    if data.get("Name") in "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
+                    if data.get("Name") == "TargetUserName" and data.text is not None and not re.search(UCHECK, data.text):
                         username = data.text.split("@")[0]
                         if username[-1:] not in "$":
                             username = username.lower() + "@"
                         else:
                             username = "-"
                     # Parse targeted domain name
-                    if data.get("Name") in "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
+                    if data.get("Name") == "TargetDomainName" and data.text is not None and not re.search(HCHECK, data.text):
                         domain = data.text
                     # parse trageted user SID
                     if data.get("Name") in ["TargetUserSid", "TargetSid"] and data.text is not None and re.search(r"\AS-[0-9\-]*\Z", data.text):
                         sid = data.text
                     # parse lonon type
-                    if data.get("Name") in "LogonType" and re.search(r"\A\d{1,2}\Z", data.text):
+                    if data.get("Name") == "LogonType" and data.text is not None and re.search(r"\A\d{1,2}\Z", data.text):
                         logintype = int(data.text)
                     # parse status
-                    if data.get("Name") in "Status" and re.search(r"\A0x\w{8}\Z", data.text):
+                    if data.get("Name") == "Status" and data.text is not None and re.search(r"\A0x\w{8}\Z", data.text):
                         status = data.text
                     # parse Authentication package name
-                    if data.get("Name") in "AuthenticationPackageName" and re.search(r"\A\w*\Z", data.text):
+                    if data.get("Name") == "AuthenticationPackageName" and data.text is not None and re.search(r"\A\w*\Z", data.text):
                         authname = data.text
                     # parse Service Name for EventID 4768 and 4769
                     if eventid in [4768, 4769] and data.get("Name") == "ServiceName" and data.text is not None:
@@ -5140,7 +5212,7 @@ def parse_es(case):
                     if hostname != "-" and ipaddress != "-":
                         hosts[ipaddress] = hostname
 
-                    if authname in "NTML" and authname not in ntmlauth:
+                    if authname == "NTLM" and username not in ntmlauth:
                         ntmlauth.append(username)
                                         
         ###
