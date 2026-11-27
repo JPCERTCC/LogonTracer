@@ -5456,8 +5456,9 @@ def ai_settings():
 
 def main():
     if NEO4J_PASSWORD in ("password", "neo4j"):
-        logger.warning("[!] The default Neo4j password is in use. Set {0} (or config.yml) to a strong "
-                       "password before exposing LogonTracer to a network.".format(NEO4J_PASSWORD_ENV))
+        # Only a fixed message: never log the value (or anything derived from it).
+        logger.warning("[!] The default Neo4j password is in use. Set the LOGONTRACER_NEO4J_PASSWORD "
+                       "environment variable (or config.yml) before exposing LogonTracer to a network.")
 
     if not has_neo4j:
         logger.error("[!] neo4j driver must be installed for this script.")
