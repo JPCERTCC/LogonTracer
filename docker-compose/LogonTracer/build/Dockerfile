@@ -52,12 +52,12 @@ RUN sed -i 's/\r$//' /usr/local/bin/fetch_vendor_assets.sh \
     fi
 
 # Run as an unprivileged user instead of root + world-writable (777) folders.
-# The app writes data.db/.secret_key in its root folder and logs/upload/cache/static/sigma below it.
+# The app writes .secret_key in its root folder, data.db in instance/, and logs/upload/cache/static/sigma below it.
 RUN useradd --system --uid 10001 --home-dir /usr/local/src/LogonTracer --shell /usr/sbin/nologin logontracer \
-    && mkdir -p logs/llm_interactions upload cache \
+    && mkdir -p logs/llm_interactions upload cache instance \
     && chown logontracer:logontracer /usr/local/src/LogonTracer \
-    && chown -R logontracer:logontracer static logs upload cache sigma \
-    && chmod 750 /usr/local/src/LogonTracer static logs upload cache
+    && chown -R logontracer:logontracer static logs upload cache instance sigma \
+    && chmod 750 /usr/local/src/LogonTracer static logs upload cache instance
 
 WORKDIR /usr/local/src
 

@@ -358,7 +358,11 @@ else:
     AuthError = None
     ConfigurationError = None
     
-    app = Flask(__name__)
+    # Explicit instance folder (holds data.db): when the code lives under sys.prefix
+    # (/usr/local/src in the Docker image), Flask's default is /usr/local/var/...,
+    # which the unprivileged container user cannot create, and startup failed.
+    # <LogonTracer>/instance is the folder Flask already used for a git checkout.
+    app = Flask(__name__, instance_path=os.path.join(FPATH, "instance"))
 
 parser = argparse.ArgumentParser(description="Visualizing and analyzing active directory Windows logon event logs.")
 parser.add_argument("-r", "--run", action="store_true", default=False,
@@ -655,6 +659,20 @@ if args.host:
 
 if args.wsport:
     WS_PORT = args.wsport
+    # The CLI import connects with NEO4J_PORT: without this, --wsport was ignored
+    # by -e/-x and the data went to the Bolt port in config.yml.
+    NEO4J_PORT = args.wsport
+
+# Server-side Bolt port when it differs from the one the browser uses (a container
+# reaching neo4j:7687 while the browser uses the published 127.0.0.1:<port>).
+if os.environ.get("LOGONTRACER_NEO4J_PORT"):
+    if not re.fullmatch(r"[0-9]{1,5}", os.environ["LOGONTRACER_NEO4J_PORT"]):
+        sys.exit("[!] LOGONTRACER_NEO4J_PORT must be a port number.")
+    NEO4J_PORT = os.environ["LOGONTRACER_NEO4J_PORT"]
+
+# Root of the per-case parse cache (default: <LogonTracer>/cache). Every Community
+# instance uses database "neo4j", so separate cases need separate cache roots.
+CACHE_ROOT = os.environ.get("LOGONTRACER_CACHE_DIR") or os.path.join(FPATH, 'cache')
 
 if args.esserver:
     ES_SERVER = args.esserver
@@ -4221,7 +4239,7 @@ def parse_evtx(evtx_list, case):
     from evtx import PyEvtxParser
     from neo4j import GraphDatabase
     
-    cache_dir = os.path.join(FPATH, 'cache', case)
+    cache_dir = os.path.join(CACHE_ROOT, case)
 
     # Download sigma rules from github
     if args.sigma:
@@ -4233,7 +4251,8 @@ def parse_evtx(evtx_list, case):
         sigma_eventids = []
 
     # Load cache files
-    if args.add and os.path.exists(cache_dir) and len(os.listdir(cache_dir)):
+    cache_loaded = bool(args.add and os.path.exists(cache_dir) and len(os.listdir(cache_dir)))
+    if cache_loaded:
         logger.info("[+] Load cashe files.")
         event_set = pd.read_pickle(os.path.join(cache_dir, "event_set.pkl"))
         count_set = pd.read_pickle(os.path.join(cache_dir, "count_set.pkl"))
@@ -4770,6 +4789,14 @@ def parse_evtx(evtx_list, case):
     except Exception as e:
         logger.error("[!] Can't connect Neo4j Database: {0}".format(str(e)))
         sys.exit(1)
+
+    if cache_loaded:
+        # The graph is rewritten below from the merged cache (old + new events), and the
+        # Event/Group/Policy relationships use CREATE: writing over the previous graph
+        # duplicated every relationship of the earlier imports. The cache is the source
+        # of truth, so the case database is emptied first.
+        logger.info("[+] --add: rebuilding the graph of case {0} from the merged cache.".format(case))
+        session.run("MATCH (n) DETACH DELETE n")
 
     if args.postes:
         # Parse Event log
@@ -5566,7 +5593,7 @@ def main():
 
         logger.info("[+] Delete all nodes and relationships from this Neo4j database.")
 
-        cache_dir = os.path.join(FPATH, 'cache', case)
+        cache_dir = os.path.join(CACHE_ROOT, case)
         if os.path.exists(cache_dir):
             shutil.rmtree(cache_dir)
             logger.info("[+] Delete cache folder {0}.".format(cache_dir))
