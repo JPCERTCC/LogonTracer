@@ -318,6 +318,10 @@ import yaml
 with open(FPATH + "/config/logging.yml", 'r') as logging_open:
     logging_data = yaml.safe_load(logging_open)
 
+for _handler in logging_data.get("handlers", {}).values():
+    if "filename" in _handler and not os.path.isabs(_handler["filename"]):
+        _handler["filename"] = os.path.join(FPATH, _handler["filename"])
+        os.makedirs(os.path.dirname(_handler["filename"]), exist_ok=True)
 dictConfig(logging_data)
 logger = getLogger("agent_logger")
 
@@ -1853,9 +1857,14 @@ def timeline():
 @app.route('/log')
 @login_required(role="ANY")
 def logs():
-    with open(FPATH + "/static/logontracer.log", "r") as lf:
-        logdata = lf.read()
     from flask import Response
+    log_path = os.path.join(FPATH, "static", "logontracer.log")
+    # Before the first import (or right after an upload, before the parser writes) the file may not exist yet.
+    try:
+        with open(log_path, "r", encoding="utf-8", errors="replace") as lf:
+            logdata = lf.read()
+    except FileNotFoundError:
+        logdata = ""
     return Response(logdata, mimetype='text/plain')
 
 
@@ -2353,13 +2362,18 @@ def do_upload():
                 filelist.append(filename)
                 logger.info(f"[+] Uploaded file saved as: {unique_filename}")
                 
+        if not filelist:
+            logger.warning("[!] Upload rejected: no file received (logtype=%s).", logtype)
+            return "FAIL"
         if "EVTX" in logtype:
             logoption = "-e"
         elif "XML" in logtype:
             logoption = "-x"
         else:
+            logger.warning("[!] Upload rejected: unsupported log type.")
             return "FAIL"
         if not is_valid_timezone(timezone):
+            logger.warning("[!] Upload rejected: invalid time zone value.")
             return "FAIL"
         if addlog == "true":
             add_option = "--add"
@@ -2370,6 +2384,7 @@ def do_upload():
         else:
             sigma_option = []
         if not re.search(r"\A[0-9a-zA-Z]{2,20}\Z", casename):
+            logger.warning("[!] Upload rejected: invalid case name.")
             return "FAIL"
 
         log_file = os.path.join(FPATH, "static", "logontracer.log")
@@ -2378,6 +2393,7 @@ def do_upload():
 
         _up_user, _up_pass = get_neo4j_creds()
         if _up_user is None:
+            logger.warning("[!] Upload rejected: Neo4j credentials expired, log in again.")
             return "FAIL"
         # The Neo4j password goes through the environment, not argv:
         # /proc/<pid>/cmdline is readable by every local user, environ only by the owner.
@@ -2387,8 +2403,12 @@ def do_upload():
                          "-s", NEO4J_SERVER,
                          "-u", _up_user]
         with open(log_file, "w") as lf:
-            subprocess.Popen(parse_command, stdout=lf, stderr=subprocess.STDOUT,
-                             env=_child_env(_up_pass))
+            # cwd=FPATH: config/logging.yml uses paths relative to the project folder.
+            # -u: unbuffered, so progress reaches the log (and the UI) as it happens.
+            subprocess.Popen([parse_command[0], "-u"] + parse_command[1:],
+                             stdout=lf, stderr=subprocess.STDOUT,
+                             env=_child_env(_up_pass), cwd=FPATH)
+        logger.info("[+] Parser started for case %s (%d file(s)).", casename, len(filelist))
         return "SUCCESS"
 
     except Exception:
@@ -2446,6 +2466,7 @@ def es_load():
             es_option = []
 
         if not re.search(r"\A[0-9a-zA-Z]{2,20}\Z", casename):
+            logger.warning("[!] Upload rejected: invalid case name.")
             return "FAIL"
 
         log_file = os.path.join(FPATH, "static", "logontracer.log")
@@ -2464,8 +2485,9 @@ def es_load():
                          "--es-index", ES_INDEX,
                          "--es-prefix", ES_PREFIX]
         with open(log_file, "w") as lf:
-            subprocess.Popen(parse_command, stdout=lf, stderr=subprocess.STDOUT,
-                             env=_child_env(_es_pass))
+            subprocess.Popen([parse_command[0], "-u"] + parse_command[1:],
+                             stdout=lf, stderr=subprocess.STDOUT,
+                             env=_child_env(_es_pass), cwd=FPATH)
         return "SUCCESS"
 
     except Exception:

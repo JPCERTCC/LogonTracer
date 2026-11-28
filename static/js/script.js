@@ -1697,21 +1697,54 @@ function progressHandler(event) {
 
 var parse_status = false;
 
+/*
+uploadResponseError
+Return an error message for an upload/load response that is not a plain SUCCESS/FAIL,
+or null when the response is one of those.
+*/
+function uploadResponseError(xhr) {
+  var body = (xhr.responseText || "").trim();
+  if (xhr.status == 413) {
+    return "File too large (LOGONTRACER_MAX_UPLOAD_MB).";
+  }
+  if (xhr.status == 400) {
+    return "Request rejected (CSRF token / session expired). Reload the page and log in again.";
+  }
+  if (xhr.status == 429) {
+    return "Too many requests. Wait a moment and try again.";
+  }
+  if (xhr.status != 200) {
+    return "Server returned HTTP " + xhr.status + ". Check the server console and logs/application.log.";
+  }
+  // A redirect to the login page also ends in HTTP 200, with HTML instead of SUCCESS/FAIL.
+  if (body != "SUCCESS" && body != "FAIL") {
+    return "Unexpected server response (session expired?). Reload the page and log in again.";
+  }
+  return null;
+}
+
 function completeHandler(event) {
-  if (event.target.responseText == "FAIL") {
-    document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Upload Failed!</div>';
+  var xhr = event.target;
+  var err = uploadResponseError(xhr);
+  if (err) {
+    document.getElementById("uploadBar").innerHTML = '';
+    document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: ' + escapeHtml(err) + '</div>';
+    return;
   }
-  if (event.target.responseText == "SUCCESS") {
-    parse_status = false
-    document.getElementById("uploadBar").innerHTML = '<h4>Upload ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">Waiting ...</div></div>';
-    var loop = function() {
-      if (parse_status == false) {
-        setTimeout(loop, 2000);
-      }
+  if (xhr.responseText.trim() == "FAIL") {
+    document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Upload Failed! Check the server console and logs/application.log.</div>';
+    return;
+  }
+  parse_status = false;
+  parse_polls = 0;
+  document.getElementById("uploadBar").innerHTML = '<h4>Upload ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">Waiting ...</div></div>';
+  var loop = function() {
+    if (parse_status == false) {
       parseEVTX();
+      setTimeout(loop, 2000);
     }
-    loop();
   }
+  loop();
 }
 
 function errorHandler(event) {
@@ -1728,20 +1761,26 @@ function progressHandlerES(event) {
 }
 
 function completeHandlerES(event) {
-  if (event.target.responseText == "FAIL") {
+  var xhr = event.target;
+  var err = uploadResponseError(xhr);
+  if (err) {
+    document.getElementById("uploadBarES").innerHTML = '';
+    document.getElementById("statusES").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: ' + escapeHtml(err) + '</div>';
+    return;
+  }
+  if (xhr.responseText.trim() == "FAIL") {
     document.getElementById("statusES").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: Failed!</div>';
+    return;
   }
-  if (event.target.responseText == "SUCCESS") {
-    parse_status = false
-    document.getElementById("uploadBarES").innerHTML = '<h4>Wait ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">Waiting ...</div></div>';
-    var loop = function() {
-      if (parse_status == false) {
-        setTimeout(loop, 2000);
-      }
+  parse_status = false;
+  document.getElementById("uploadBarES").innerHTML = '<h4>Wait ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">Waiting ...</div></div>';
+  var loop = function() {
+    if (parse_status == false) {
       parseES();
+      setTimeout(loop, 2000);
     }
-    loop();
   }
+  loop();
 }
 
 function errorHandlerES(event) {
@@ -1756,39 +1795,58 @@ function abortHandlerES(event) {
 parseEVTX
 Get EVTX parsing progress from log.
 */
+var parse_polls = 0;
+
+/*
+lastLogLine
+Last non-empty line of the parser log ("Now loading" lines are separated by \r).
+*/
+function lastLogLine(text) {
+  var lines = text.split(/\r\n|\r|\n/).filter(function(l) { return l.trim() != ""; });
+  return lines.length ? lines[lines.length - 1] : "";
+}
+
 function parseEVTX() {
   var xmlhttp2 = new XMLHttpRequest();
   xmlhttp2.open("GET", "/log");
-  xmlhttp2.send();
   xmlhttp2.onreadystatechange = function() {
-    if (xmlhttp2.readyState == 4) {
-      if (xmlhttp2.status == 200) {
-        var logdata = xmlhttp2.responseText.split(/\r\n|\r|\n/);
-        for (i = 0; i < logdata.length; i++) {
-          if (logdata[i].indexOf("Last record number") != -1) {
-            var allrecode = logdata[i].split(" ")[5].replace(".", "");
-            break;
-          }
-        }
-        var nowdata = logdata[logdata.length - 2];
-        if (nowdata.indexOf("Now loading") != -1) {
-          var recordnum = nowdata.split(" ")[3];
-          var percent = (recordnum / allrecode) * 100;
-          document.getElementById("uploadBar").innerHTML = '<h4>Parsing  ...</h4><div class="progress"><div class="progress-bar progress-bar-striped active" role="progressbar" style="width: ' + Math.round(percent) + '%;">' + Math.round(percent) + '%</div></div>';
-        } else if (nowdata.indexOf("Script end") != -1) {
-          document.getElementById("uploadBar").innerHTML = '<h4>Parsing  ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">SUCCESS</div></div>';
-          document.getElementById("status").innerHTML = '<div class="alert alert-info"><strong>Import Success</strong>: You need to reload the web page.</div>';
-          parse_status = true;
-        } else if (nowdata.indexOf("[!]") != -1) {
-          document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: EVTX parse Failed!</div>';
-          parse_status = true;
-        }
+    if (xmlhttp2.readyState != 4 || parse_status) {
+      return;
+    }
+    if (xmlhttp2.status != 200) {
+      document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: logontracer.log status =  ' + xmlhttp2.status + '</div>';
+      parse_status = true;
+      return;
+    }
+    var text = xmlhttp2.responseText || "";
+    var total = text.match(/Last record number is (\d+)/);
+    var nowdata = lastLogLine(text);
+    parse_polls++;
+    if (nowdata.indexOf("Script end") != -1) {
+      document.getElementById("uploadBar").innerHTML = '<h4>Parsing  ...</h4><div class="progress"><div class="progress-bar progress-bar-success progress-bar-striped" role="progressbar" style="width: 100%;">SUCCESS</div></div>';
+      document.getElementById("status").innerHTML = '<div class="alert alert-info"><strong>Import Success</strong>: You need to reload the web page.</div>';
+      parse_status = true;
+    } else if (nowdata.indexOf("[!]") != -1 || text.indexOf("Traceback (most recent call last)") != -1) {
+      document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: EVTX parse Failed! ' + escapeHtml(nowdata) + ' (see /log)</div>';
+      parse_status = true;
+    } else if (nowdata.indexOf("Now loading") != -1) {
+      var recordnum = parseInt((nowdata.match(/Now loading (\d+)/) || [0, 0])[1], 10);
+      var label;
+      var percent = 100;
+      if (total && parseInt(total[1], 10) > 0) {
+        percent = Math.min(100, Math.round(recordnum / parseInt(total[1], 10) * 100));
+        label = percent + '%';
       } else {
-        document.getElementById("status").innerHTML = '<div class="alert alert-danger"><strong>ERROR</strong>: logontracer.log status =  ' + xmlhttp2.status + '</div>';
-        parse_status = true;
+        label = recordnum + ' records';
       }
+      document.getElementById("uploadBar").innerHTML = '<h4>Parsing  ...</h4><div class="progress"><div class="progress-bar progress-bar-striped active" role="progressbar" style="width: ' + percent + '%;">' + label + '</div></div>';
+    } else if (text == "" && parse_polls > 30) {
+      // 60 s without any output: the parser most likely did not start.
+      document.getElementById("status").innerHTML = '<div class="alert alert-warning"><strong>WARNING</strong>: No parser output after 60 s. Check the server console and logs/application.log.</div>';
+      parse_status = true;
     }
   }
+  xmlhttp2.send();
 }
 
 function parseES() {
@@ -1798,8 +1856,7 @@ function parseES() {
   xmlhttp2.onreadystatechange = function() {
     if (xmlhttp2.readyState == 4) {
       if (xmlhttp2.status == 200) {
-        var logdata = xmlhttp2.responseText.split(/\r\n|\r|\n/);
-        var nowdata = logdata[logdata.length - 2];
+        var nowdata = lastLogLine(xmlhttp2.responseText || "");
         if (nowdata.indexOf("Now loading") != -1) {
           var recordnum = nowdata.split(" ")[3];
           document.getElementById("uploadBarES").innerHTML = '<h4>Parsing process ...</h4><div class="progress"><div class="progress-bar progress-bar-striped active" role="progressbar" style="width: 100%;">' + recordnum + ' record</div></div>';
